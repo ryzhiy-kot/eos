@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { CommandEntry } from '../lib/commandRegistry';
 
 export type PaneType = 'chat' | 'data' | 'doc' | 'visual' | 'code' | 'empty';
 
@@ -48,6 +49,7 @@ interface WorkspaceState {
     isArchiveOpen: boolean; // For visual catalog overlay
     isHelpOpen: boolean;
     pendingCommand: string | null;
+    commands: CommandEntry[];
 
     // Actions
     addPane: (pane: Pane) => void;
@@ -73,9 +75,10 @@ interface WorkspaceState {
     removeClock: (id: string) => void;
     addTimer: (label: string, durationSec: number) => void;
     removeTimer: (id: string) => void;
+    registerCommands: (entries: CommandEntry[]) => void;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
+export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     panes: {},
     activeLayout: [],
     focusedPaneId: null,
@@ -92,13 +95,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     isArchiveOpen: false,
     isHelpOpen: false,
     pendingCommand: null,
+    commands: [],
 
     addPane: (pane) => set((state) => {
-        const currentCount = state.activeLayout.length;
-        let newLayout = [...state.activeLayout];
-        let newArchive = [...state.archive];
+        // If already in active layout, just focus it and update content
+        if (state.activeLayout.includes(pane.id)) {
+            return {
+                panes: { ...state.panes, [pane.id]: pane },
+                focusedPaneId: pane.id
+            };
+        }
 
-        if (currentCount < state.density) {
+        // If in archive, remove from archive and add to active layout (handling eviction)
+        let newLayout = [...state.activeLayout];
+        let newArchive = state.archive.filter(id => id !== pane.id);
+
+        if (newLayout.length < state.density) {
             newLayout.push(pane.id);
         } else {
             const evictIndex = newLayout.findIndex(id => !state.panes[id]?.isSticky);
@@ -108,7 +120,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
                 newLayout.splice(evictIndex, 1);
                 newLayout.push(pane.id);
             } else {
-                newLayout.shift();
+                const evictedId = newLayout.shift();
+                if (evictedId) newArchive.push(evictedId);
                 newLayout.push(pane.id);
             }
         }
@@ -294,4 +307,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     removeTimer: (id) => set((state) => ({
         timers: state.timers.filter(t => t.id !== id)
     })),
+
+    registerCommands: (entries) => set((state) => {
+        const newCommands = [...state.commands];
+        entries.forEach(entry => {
+            const idx = newCommands.findIndex(c => c.name === entry.name);
+            if (idx !== -1) {
+                newCommands[idx] = entry;
+            } else {
+                newCommands.push(entry);
+            }
+        });
+        return { commands: newCommands };
+    }),
 }));

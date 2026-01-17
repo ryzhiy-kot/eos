@@ -4,6 +4,8 @@ import { Terminal, Send, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { parseCommand } from '../../lib/parser';
 import { mockExecute } from '../../lib/mockBackend';
+import { CommandContext, CommandEntry } from '../../lib/commandRegistry';
+import type { PaneType } from '../../store/workspaceStore';
 
 const CommandTerminal: React.FC = () => {
     const [input, setInput] = useState('');
@@ -18,7 +20,7 @@ const CommandTerminal: React.FC = () => {
         archivePane, restorePane, toggleArchiveOverlay, undoPane, redoPane,
         addClock, addTimer,
         toggleHelpOverlay, pendingCommand, setPendingCommand,
-        isArchiveOpen, isHelpOpen
+        isArchiveOpen, isHelpOpen, registerCommands
     } = useWorkspaceStore();
 
     // Auto-focus logic & Pending Command Check
@@ -40,6 +42,190 @@ const CommandTerminal: React.FC = () => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [pendingCommand, setPendingCommand, isArchiveOpen, isHelpOpen]);
+
+    // Register Core Commands
+    useEffect(() => {
+        registerCommands([
+            {
+                name: 'load',
+                description: 'Load a file (PDF, CSV, JSON) into a new pane.',
+                parameters: [{ name: 'file', description: 'File to load', required: false, type: 'file' }],
+                category: 'system',
+                handler: (): boolean => {
+                    fileInputRef.current?.click();
+                    return true;
+                }
+            },
+            {
+                name: 'grid',
+                description: 'Set the number of visible panes.',
+                parameters: [{ name: '1|2|4|9', description: 'Number of panes', required: false, type: 'number' }],
+                category: 'system',
+                handler: (args: string[]) => {
+                    const d = parseInt(args[0]);
+                    if ([1, 2, 4, 9].includes(d)) {
+                        setDensity(d as 1 | 2 | 4 | 9);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'focus',
+                description: 'Switch focus to a specific pane.',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to focus', required: false, type: 'paneId' }],
+                category: 'pane',
+                handler: (args: string[], ctx: CommandContext) => {
+                    const target = args[0] || ctx.sourceId;
+                    if (target && panes[target]) {
+                        focusPane(target);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'swap',
+                description: 'Swap the positions of two panes.',
+                parameters: [{ name: 'P1', description: 'First pane ID', required: true, type: 'paneId' }, { name: 'P2', description: 'Second pane ID', required: true, type: 'paneId' }],
+                category: 'pane',
+                handler: (args: string[], ctx: CommandContext) => {
+                    if (ctx.sourceId && args[0]) {
+                        swapPanes(ctx.sourceId, args[0]);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'close',
+                description: 'Archive a pane (alias for /hide).',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to close', required: false, type: 'paneId' }],
+                category: 'pane',
+                handler: (_: string[], ctx: CommandContext) => {
+                    if (ctx.sourceId) {
+                        archivePane(ctx.sourceId);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'hide',
+                description: 'Archive a pane (alias for /close).',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to hide', required: false, type: 'paneId' }],
+                category: 'pane',
+                handler: (_: string[], ctx: CommandContext) => {
+                    if (ctx.sourceId) {
+                        archivePane(ctx.sourceId);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'ls',
+                description: 'Open the Archive Gallery (The Shelf).',
+                category: 'utility',
+                handler: (): boolean => {
+                    toggleArchiveOverlay(true);
+                    return true;
+                }
+            },
+            {
+                name: 'show',
+                description: 'Restore a pane from the archive.',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to restore', required: true, type: 'paneId' }],
+                category: 'utility',
+                handler: (args: string[], ctx: CommandContext) => {
+                    const rid = args[0] || ctx.sourceId;
+                    if (rid) {
+                        restorePane(rid);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'undo',
+                description: 'Undo the last change in a pane.',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to undo', required: false, type: 'paneId' }],
+                category: 'pane',
+                handler: (_: string[], ctx: CommandContext) => {
+                    if (ctx.sourceId) {
+                        undoPane(ctx.sourceId);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'redo',
+                description: 'Redo the last undone change.',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to redo', required: false, type: 'paneId' }],
+                category: 'pane',
+                handler: (_: string[], ctx: CommandContext) => {
+                    if (ctx.sourceId) {
+                        redoPane(ctx.sourceId);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'clock',
+                description: 'Add a world clock to the header.',
+                parameters: [{ name: 'City', description: 'City name', required: true }, { name: 'Zone', description: 'Timezone identifier', required: true }],
+                category: 'utility',
+                handler: (args: string[]) => {
+                    if (args.length >= 2) {
+                        addClock(args[0], args[1]);
+                        return true;
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'timer',
+                description: 'Start a countdown timer.',
+                parameters: [{ name: 'Sec', description: 'Duration in seconds', required: true, type: 'number' }, { name: 'Label', description: 'Timer label', required: false }],
+                category: 'utility',
+                handler: (args: string[]) => {
+                    if (args.length > 0) {
+                        const { seconds, labelStartIdx } = parseDurationExpression(args);
+                        const label = args.slice(labelStartIdx).join(' ') || 'Timer';
+                        if (seconds > 0) {
+                            addTimer(label, seconds);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            },
+            {
+                name: 'help',
+                description: 'Show command help.',
+                category: 'utility',
+                handler: (): boolean => {
+                    toggleHelpOverlay(true);
+                    return true;
+                }
+            },
+            {
+                name: '?',
+                description: 'Show command help (alias for /help).',
+                category: 'utility',
+                handler: (): boolean => {
+                    toggleHelpOverlay(true);
+                    return true;
+                }
+            },
+            // Data/Mock commands (no local handler, will fail isClient and fall back to mockExecute)
+            { name: 'plot', description: 'Generate a chart from data.', example: '/plot [P1] "prompt"', category: 'data' },
+            { name: 'run', description: 'Execute code against pane data.', example: '/run [P1] "code"', category: 'data' },
+            { name: 'diff', description: 'Compare two panes.', example: '/diff [P1],[P2]', category: 'data' },
+        ] as CommandEntry[]);
+    }, [registerCommands, panes, setDensity, focusPane, swapPanes, archivePane, restorePane, toggleArchiveOverlay, toggleHelpOverlay, undoPane, redoPane, addClock, addTimer]);
 
     const activePane = focusedPaneId ? panes[focusedPaneId] : null;
 
@@ -68,11 +254,13 @@ const CommandTerminal: React.FC = () => {
         try {
             const newId = generatePaneId();
             let content: any = '';
-            let type: 'doc' | 'data' | 'code' = 'doc';
-
+            let type: PaneType = "empty";
             if (file.type === 'application/pdf') {
                 content = URL.createObjectURL(file);
                 type = 'doc';
+            } else if (file.type.startsWith('image/')) {
+                content = URL.createObjectURL(file);
+                type = 'visual';
             } else if (file.name.endsWith('.csv') || file.name.endsWith('.json')) {
                 const text = await file.text();
                 content = file.name.endsWith('.json') ? JSON.parse(text) : [{ raw: text }];
@@ -155,68 +343,14 @@ const CommandTerminal: React.FC = () => {
     };
 
     const executeClientCommand = async (verb: string, args: string[], sourceId?: string, targetId?: string) => {
-        const cmd = verb.toLowerCase();
+        const cmdName = verb.toLowerCase();
+        const entry = useWorkspaceStore.getState().commands.find(c => c.name === cmdName);
 
-        switch (cmd) {
-            case 'help':
-            case '?':
-                toggleHelpOverlay(true);
-                return true;
-            case 'grid':
-                const density = parseInt(args[0]);
-                if ([1, 2, 4, 9].includes(density)) {
-                    setDensity(density as 1 | 2 | 4 | 9);
-                } else {
-                    console.warn("Invalid density. Use 1, 2, 4, or 9.");
-                }
-                return true;
-            case 'focus':
-                const targetPane = args[0] || (sourceId as string);
-                if (targetPane && panes[targetPane]) {
-                    focusPane(targetPane);
-                }
-                return true;
-            case 'swap':
-                if (sourceId && args[0]) {
-                    swapPanes(sourceId, args[0]);
-                }
-                return true;
-            case 'close':
-            case 'hide':
-                if (sourceId) archivePane(sourceId);
-                return true;
-            case 'show':
-                // Restores from archive. usage: /show P1
-                const restoreId = args[0] || sourceId;
-                if (restoreId) restorePane(restoreId);
-                return true;
-            case 'ls':
-                toggleArchiveOverlay(true);
-                return true;
-            case 'undo':
-                if (sourceId) undoPane(sourceId);
-                return true;
-            case 'redo':
-                if (sourceId) redoPane(sourceId);
-                return true;
-            case 'clock':
-                if (args.length >= 2) {
-                    addClock(args[0], args[1]);
-                }
-                return true;
-            case 'timer':
-                if (args.length > 0) {
-                    const { seconds, labelStartIdx } = parseDurationExpression(args);
-                    const label = args.slice(labelStartIdx).join(' ') || 'Timer';
-                    if (seconds > 0) addTimer(label, seconds);
-                }
-                return true;
-            case 'load':
-                fileInputRef.current?.click();
-                return true;
-            default:
-                return false;
+        if (entry && entry.handler) {
+            return await entry.handler(args, { sourceId, targetId, focusedPaneId });
         }
+
+        return false;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
