@@ -34,34 +34,37 @@ const OverlayWindow: React.FC<OverlayWindowProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col p-8 animate-in fade-in duration-200">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8 border-b border-neutral-800 pb-4">
-                <div className="flex items-center space-x-4">
-                    <h2 className="text-2xl font-mono font-bold text-white uppercase">{title}</h2>
-                    {subtitle && (
-                        <span className="bg-neutral-800 text-neutral-400 px-2 py-1 rounded text-xs font-mono">
-                            {subtitle}
-                        </span>
-                    )}
+        <div className="overlay-backdrop">
+            {/* Window Container */}
+            <div className={clsx("overlay-window", maxWidth, className)}>
+                {/* Header */}
+                <div className="overlay-header">
+                    <div className="flex items-center space-x-4">
+                        <h2 className="text-xl font-bold uppercase tracking-widest">{title}</h2>
+                        {subtitle && (
+                            <span className="bg-terminal-700 text-neutral-400 px-2 py-0.5 rounded text-[10px] font-mono tracking-wide">
+                                {subtitle}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-neutral-500 hover:text-white transition-colors focus:outline-none"
+                        aria-label="Close overlay"
+                    >
+                        <X size={20} />
+                    </button>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="text-neutral-500 hover:text-white transition-colors focus:outline-none"
-                    aria-label="Close overlay"
-                >
-                    <X size={32} />
-                </button>
-            </div>
 
-            {/* Content Container */}
-            <div className={clsx("flex-1 overflow-y-auto w-full mx-auto", maxWidth, className)}>
-                {children}
-            </div>
+                {/* Content Container */}
+                <div className="flex-1 overflow-y-auto w-full mx-auto p-6 scrollbar-thin scrollbar-thumb-terminal-700 scrollbar-track-transparent">
+                    {children}
+                </div>
 
-            {/* Footer Tip */}
-            <div className="mt-8 text-center text-neutral-600 font-mono text-xs">
-                Press [ESC] to close
+                {/* Footer Tip */}
+                <div className="p-2 text-center text-terminal-700 font-mono text-[10px] bg-terminal-900 border-t border-terminal-800 uppercase tracking-widest">
+                    Press [ESC] to close
+                </div>
             </div>
         </div>
     );

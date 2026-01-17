@@ -1,6 +1,6 @@
 import React from 'react';
 import { useWorkspaceStore, Pane } from '../../store/workspaceStore';
-import { X, Maximize2, MoreHorizontal } from 'lucide-react';
+import { X, Maximize2 } from 'lucide-react';
 import clsx from 'clsx';
 import ContentFactory from './ContentFactory';
 
@@ -20,28 +20,39 @@ const PaneFrame: React.FC<PaneFrameProps> = ({ pane }) => {
         <div
             onClick={handleFocus}
             className={clsx(
-                "flex flex-col h-full w-full bg-neutral-900 border transition-colors duration-150 overflow-hidden",
-                isFocused ? "border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)]" : "border-neutral-800 hover:border-neutral-700"
+                "pane-frame group",
+                isFocused && "active"
             )}
         >
+            {/* Corner Accents (Top-Left, Bottom-Right) */}
+            {isFocused && (
+                <>
+                    <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-accent-main" />
+                    <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-accent-main" />
+                </>
+            )}
+
             {/* Pane Header */}
             <div className={clsx(
-                "h-8 flex items-center justify-between px-3 text-xs font-mono select-none uppercase tracking-wide",
-                isFocused ? "bg-blue-900/20 text-blue-400" : "bg-neutral-900 text-neutral-500"
-            )}>
+                "pane-header",
+                isFocused && "active"
+            )}
+            >
+                {/* ... content remains same ... */}
                 <div className="flex items-center space-x-2">
-                    <span className={clsx("font-bold", pane.isSticky && "text-yellow-500")}>
-                        [{pane.type.toUpperCase()}: {pane.id}]
+                    <span className={clsx("font-bold", pane.isSticky ? "text-accent-secondary" : "opacity-70")}>
+                        [{pane.type.toUpperCase()}:{pane.id}]
                     </span>
-                    <span>{pane.title}</span>
-                    {isFocused && <span className="animate-pulse">_</span>}
+                    <span className="truncate max-w-[150px]">{pane.title}</span>
                 </div>
 
-                <div className="flex items-center space-x-2 opacity-50 hover:opacity-100 transition-opacity">
-                    <button className="hover:text-white"><Maximize2 size={12} /></button>
-                    <button className="hover:text-white"><MoreHorizontal size={12} /></button>
+                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="hover:text-white p-1 hover:bg-white/5 rounded"><Maximize2 size={12} /></button>
                     {!pane.isSticky && (
-                        <button onClick={(e) => { e.stopPropagation(); removePane(pane.id); }} className="hover:text-red-500">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); removePane(pane.id); }}
+                            className="hover:text-red-500 p-1 hover:bg-white/5 rounded"
+                        >
                             <X size={12} />
                         </button>
                     )}

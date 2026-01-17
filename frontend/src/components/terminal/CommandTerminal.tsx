@@ -76,7 +76,8 @@ const CommandTerminal: React.FC = () => {
                 parameters: [{ name: 'PaneID', description: 'ID of the pane to focus', required: false, type: 'paneId' }],
                 category: 'pane',
                 handler: (args: string[], ctx: CommandContext) => {
-                    const target = args[0] || ctx.sourceId;
+                    const rawTarget = args[0] || ctx.sourceId;
+                    const target = rawTarget?.toUpperCase();
                     if (target && panes[target]) {
                         focusPane(target);
                         return true;
@@ -91,7 +92,7 @@ const CommandTerminal: React.FC = () => {
                 category: 'pane',
                 handler: (args: string[], ctx: CommandContext) => {
                     if (ctx.sourceId && args[0]) {
-                        swapPanes(ctx.sourceId, args[0]);
+                        swapPanes(ctx.sourceId, args[0].toUpperCase());
                         return true;
                     }
                     return false;
@@ -138,7 +139,7 @@ const CommandTerminal: React.FC = () => {
                 parameters: [{ name: 'PaneID', description: 'ID of the pane to restore', required: true, type: 'paneId' }],
                 category: 'utility',
                 handler: (args: string[], ctx: CommandContext) => {
-                    const rid = args[0] || ctx.sourceId;
+                    const rid = (args[0] || ctx.sourceId)?.toUpperCase();
                     if (rid) {
                         restorePane(rid);
                         return true;
@@ -415,7 +416,7 @@ const CommandTerminal: React.FC = () => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="h-full w-full flex items-center bg-black border border-neutral-800 rounded px-4 focus-within:border-neutral-600 transition-colors">
+        <form onSubmit={handleSubmit} className="terminal-input-container">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -434,12 +435,12 @@ const CommandTerminal: React.FC = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 disabled={isLoading}
-                className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder-neutral-700 disabled:opacity-50"
+                className="terminal-input"
                 placeholder={activePane?.type === 'chat' ? "Type a message..." : "Enter command, e.g. /help, /load, /ls"}
                 autoFocus
             />
 
-            <button type="submit" disabled={isLoading} className="text-neutral-600 hover:text-white transition-colors disabled:opacity-50">
+            <button type="submit" disabled={isLoading} className="text-terminal-700 hover:text-accent-main transition-colors disabled:opacity-50">
                 <Send size={16} />
             </button>
         </form>
