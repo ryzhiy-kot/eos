@@ -3,10 +3,11 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Search, Terminal, ArrowRight } from 'lucide-react';
 import OverlayWindow from './OverlayWindow';
 import { formatCommandUsage } from '../../lib/commandRegistry';
+import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 import clsx from 'clsx';
 
 const HelpOverlay: React.FC = () => {
-    const { isHelpOpen, toggleHelpOverlay, setPendingCommand, commands } = useWorkspaceStore();
+    const { isHelpOpen, commands, focusedPaneId } = useWorkspaceStore();
     const [search, setSearch] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -21,8 +22,8 @@ const HelpOverlay: React.FC = () => {
     }, [search, isHelpOpen]);
 
     const handleSelect = (name: string) => {
-        setPendingCommand(`/${name} `);
-        toggleHelpOverlay(false);
+        commandBus.dispatch({ name: COMMAND_NAMES.UI_PENDING_SET, args: [`/${name} `], context: { focusedPaneId } });
+        commandBus.dispatch({ name: COMMAND_NAMES.UI_HELP, args: ['close'], context: { focusedPaneId } });
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -37,7 +38,7 @@ const HelpOverlay: React.FC = () => {
             if (filteredCommands.length > 0) {
                 handleSelect(filteredCommands[selectedIndex].name);
             } else {
-                toggleHelpOverlay(false);
+                commandBus.dispatch({ name: COMMAND_NAMES.UI_HELP, args: ['close'], context: { focusedPaneId } });
             }
         }
     };
@@ -47,7 +48,7 @@ const HelpOverlay: React.FC = () => {
             title="Command Center (Help)"
             subtitle="Registry-Driven"
             isOpen={isHelpOpen}
-            onClose={() => toggleHelpOverlay(false)}
+            onClose={() => commandBus.dispatch({ name: COMMAND_NAMES.UI_HELP, args: ['close'], context: { focusedPaneId } })}
         >
             <div className="flex flex-col h-full">
                 {/* Search */}
@@ -65,7 +66,7 @@ const HelpOverlay: React.FC = () => {
                 </div>
 
                 {/* Command Grid */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto max-h-[60vh]">
                     <div className="grid grid-cols-1 gap-2">
                         {filteredCommands.map((c, i) => (
                             <div

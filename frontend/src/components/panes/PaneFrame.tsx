@@ -3,17 +3,24 @@ import { useWorkspaceStore, Pane } from '../../store/workspaceStore';
 import { X, Maximize2 } from 'lucide-react';
 import clsx from 'clsx';
 import ContentFactory from './ContentFactory';
+import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 
 interface PaneFrameProps {
     pane: Pane;
 }
 
 const PaneFrame: React.FC<PaneFrameProps> = ({ pane }) => {
-    const { focusedPaneId, focusPane, removePane } = useWorkspaceStore();
+    const { focusedPaneId } = useWorkspaceStore();
     const isFocused = focusedPaneId === pane.id;
 
     const handleFocus = () => {
-        if (!isFocused) focusPane(pane.id);
+        if (!isFocused) {
+            commandBus.dispatch({
+                name: COMMAND_NAMES.FOCUS,
+                args: [],
+                context: { sourceId: pane.id, focusedPaneId }
+            });
+        }
     };
 
     return (
@@ -39,18 +46,27 @@ const PaneFrame: React.FC<PaneFrameProps> = ({ pane }) => {
             )}
             >
                 {/* ... content remains same ... */}
-                <div className="flex items-center space-x-2">
-                    <span className={clsx("font-bold", pane.isSticky ? "text-accent-secondary" : "opacity-70")}>
-                        [{pane.type.toUpperCase()}:{pane.id}]
+                <div className="flex items-center gap-2">
+                    <span className="font-bold text-accent-secondary">
+                        [{pane.id}]
                     </span>
-                    <span className="font-mono">{pane.title}</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200">
+                        [{pane.type.charAt(0).toUpperCase() + pane.type.slice(1)}: {pane.title}]
+                    </span>
                 </div>
 
                 <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button className="hover:text-white p-1 hover:bg-white/5 rounded"><Maximize2 size={12} /></button>
                     {!pane.isSticky && (
                         <button
-                            onClick={(e) => { e.stopPropagation(); removePane(pane.id); }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                commandBus.dispatch({
+                                    name: COMMAND_NAMES.REMOVE_PANE,
+                                    args: [],
+                                    context: { sourceId: pane.id, focusedPaneId }
+                                });
+                            }}
                             className="hover:text-red-500 p-1 hover:bg-white/5 rounded"
                         >
                             <X size={12} />

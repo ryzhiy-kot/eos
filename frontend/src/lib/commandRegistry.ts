@@ -1,3 +1,5 @@
+import { CommandName } from './commandBus';
+
 export interface CommandParameter {
     name: string;
     description: string;
@@ -5,20 +7,14 @@ export interface CommandParameter {
     type?: 'string' | 'number' | 'paneId' | 'file';
 }
 
-export interface CommandContext {
-    sourceId?: string;
-    targetId?: string;
-    focusedPaneId: string | null;
-    [key: string]: any;
-}
 
 export interface CommandEntry {
-    name: string;
+    name: CommandName;
     description: string;
     parameters?: CommandParameter[];
     example?: string;
+    shortcut?: string; // e.g., 'ctrl+/' or 'alt+l'
     category?: 'system' | 'pane' | 'utility' | 'data';
-    handler?: (args: string[], context: CommandContext) => boolean | Promise<boolean>;
 }
 
 /**

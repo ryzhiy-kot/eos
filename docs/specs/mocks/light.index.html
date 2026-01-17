@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>LLM Financial Terminal</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#0ea5e9", // Electric Sky Blue
+                        "background-light": "#e2e4e7",
+                        "background-dark": "#09090b", // Zinc 950
+                        "panel-light": "#ffffff",
+                        "panel-dark": "#121214",
+                        "border-light": "#cbd5e1",
+                        "border-dark": "#27272a",
+                        "accent-red": "#ef4444",
+                        "accent-green": "#22c55e",
+                        "accent-amber": "#f59e0b",
+                        "accent-blue": "#3b82f6",
+                    },
+                    fontFamily: {
+                        display: ["'JetBrains Mono'", "monospace"],
+                        mono: ["'JetBrains Mono'", "monospace"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "2px", // Sharp, technical corners
+                    },
+                    boxShadow: {
+                        'neon': '0 0 5px theme("colors.primary"), 0 0 10px theme("colors.primary")',
+                    }
+                },
+            },
+        };
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .dark ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 2px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .cursor-blink {
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-300 font-mono h-screen flex flex-col overflow-hidden text-xs selection:bg-primary selection:text-white transition-colors duration-300">
+    <header
+        class="flex-none p-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 border-b border-border-light dark:border-border-dark bg-panel-light dark:bg-panel-dark">
+        <div class="flex flex-col gap-1">
+            <div
+                class="flex justify-between items-center px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded">
+                <span class="text-primary font-bold">NYC</span>
+                <span>10:15 <span class="text-slate-500">-1d</span></span>
+            </div>
+            <div
+                class="h-6 flex items-center px-2 text-[10px] bg-red-900/20 border border-accent-red text-accent-red rounded justify-between">
+                <span>T1: SQL_IMPORT</span>
+                <span>00:39</span>
+            </div>
+        </div>
+        <div class="flex flex-col gap-1">
+            <div
+                class="flex justify-between items-center px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded">
+                <span class="text-primary font-bold">LON</span>
+                <span>15:15</span>
+            </div>
+            <div
+                class="h-6 flex items-center px-2 text-[10px] bg-red-900/20 border border-accent-red text-accent-red rounded justify-between">
+                <span>T2: MEETING</span>
+                <span>04:30</span>
+            </div>
+        </div>
+        <div class="flex flex-col gap-1">
+            <div
+                class="flex justify-between items-center px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded">
+                <span class="text-primary font-bold">TKYO</span>
+                <span>00:15 <span class="text-slate-500">+1d</span></span>
+            </div>
+            <div
+                class="h-6 flex items-center px-2 text-[10px] bg-amber-900/20 border border-accent-amber text-accent-amber rounded justify-between">
+                <span>T2: PENDING</span>
+                <span>04:30</span>
+            </div>
+        </div>
+        <div class="flex flex-col gap-1">
+            <div
+                class="flex justify-between items-center px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded">
+                <span class="text-primary font-bold">SGP</span>
+                <span>01:15 <span class="text-slate-500">+1d</span></span>
+            </div>
+            <div
+                class="h-6 flex items-center px-2 text-[10px] bg-green-900/20 border border-accent-green text-accent-green rounded justify-between">
+                <span>T1: ODR</span>
+                <span>08:42</span>
+            </div>
+        </div>
+        <div class="flex flex-col gap-1">
+            <div
+                class="flex justify-between items-center px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded">
+                <span class="text-primary font-bold">ZUR</span>
+                <span>16:15</span>
+            </div>
+            <div
+                class="h-6 flex items-center px-2 text-[10px] bg-green-900/20 border border-accent-green text-accent-green rounded justify-between">
+                <span>T2: CODE</span>
+                <span>09:43</span>
+            </div>
+        </div>
+        <div class="flex flex-col gap-1">
+            <div
+                class="flex justify-between items-center px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-border-light dark:border-border-dark rounded">
+                <span class="text-primary font-bold">HKG</span>
+                <span>23:15 <span class="text-slate-500">+1d</span></span>
+            </div>
+            <div
+                class="h-6 flex items-center px-2 text-[10px] bg-green-900/20 border border-accent-green text-accent-green rounded justify-between">
+                <span>T1: OSAK</span>
+                <span>00:30</span>
+            </div>
+        </div>
+    </header>
+    <main class="flex-1 overflow-hidden p-2 grid grid-cols-1 lg:grid-cols-12 gap-2">
+        <div
+            class="lg:col-span-6 flex flex-col bg-panel-light dark:bg-panel-dark border border-border-light dark:border-border-dark rounded overflow-hidden shadow-sm">
+            <div
+                class="flex justify-between items-center px-3 py-2 border-b border-border-light dark:border-border-dark bg-slate-50 dark:bg-slate-900/50">
+                <div class="flex items-center gap-2">
+                    <span class="text-accent-amber font-bold">[P1]</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-200">[Chat: Risk Analysis]</span>
+                </div>
+                <div class="flex gap-2 text-slate-400">
+                    <span class="material-icons text-sm cursor-pointer hover:text-primary">minimize</span>
+                    <span class="material-icons text-sm cursor-pointer hover:text-primary">close</span>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-6 text-sm">
+                <div class="text-slate-500 border-l-2 border-slate-300 dark:border-slate-700 pl-3 italic text-xs">
+                    Context: @P2, @P3 loaded into context window.
+                </div>
+                <div class="flex gap-4">
+                    <div class="text-primary w-20 flex-shrink-0 font-bold">Assistant</div>
+                    <div class="text-slate-700 dark:text-slate-300 leading-relaxed">
+                        Here is a running-everyhunt-een kost processing white ronsleg constitution, for nsst Risk
+                        analysis.
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="text-accent-green w-20 flex-shrink-0 font-bold">User</div>
+                    <div class="text-slate-700 dark:text-slate-300 leading-relaxed">
+                        Your results: He add running analysis will show risk Alsk analysts and botits the potentiss with
+                        productivity.
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="text-primary w-20 flex-shrink-0 font-bold">Assistant</div>
+                    <div class="space-y-3 text-slate-700 dark:text-slate-300 leading-relaxed">
+                        <p>Risk analysis in the wee Financialniss-to AI regulator access to best ofcoe oreoty ventovke
+                            beses osan-entioes at answer cir one.</p>
+                        <p class="text-slate-500 dark:text-slate-400">
+                            So, the therert0oacrer is vee, ponavetvnorit other oongtooe oollator eth wamsitlmg white
+                            coosererg actomsetsos lreooctectoe-toeecbwntoni arcosechtoc toe tstthg conoretetatens.
+                        </p>
+                        <p>
+                            In conclusion, the people-simpsitive cases and ocet-oees eeses weet seperts oueteteers. in
+                            ortexota. <span class="text-primary underline cursor-pointer">ner@orecrrny</span> <span
+                                class="text-primary underline cursor-pointer">#eethanoe</span> aoont esomocercre.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex gap-4 border-t border-dashed border-border-light dark:border-border-dark pt-4">
+                    <div class="text-accent-green w-20 flex-shrink-0 font-bold">User</div>
+                    <div class="text-slate-700 dark:text-slate-300 leading-relaxed font-mono text-xs opacity-70">
+                        https://adsushot.com/uiskars8KTok_SSted
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="text-primary w-20 flex-shrink-0 font-bold">Assistant</div>
+                    <div class="text-slate-700 dark:text-slate-300">
+                        Processing link content...
+                    </div>
+                </div>
+            </div>
+            <div class="p-2 border-t border-border-light dark:border-border-dark bg-slate-50 dark:bg-slate-900/50">
+                <input
+                    class="w-full bg-transparent border border-border-light dark:border-border-dark rounded p-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-slate-500 text-slate-200 dark:text-white"
+                    placeholder="Type a command..." type="text" />
+            </div>
+        </div>
+        <div class="lg:col-span-6 flex flex-col gap-2">
+            <div
+                class="h-1/2 flex flex-col bg-panel-light dark:bg-panel-dark border border-border-light dark:border-border-dark rounded overflow-hidden shadow-sm">
+                <div
+                    class="flex justify-between items-center px-3 py-2 border-b border-border-light dark:border-border-dark bg-slate-50 dark:bg-slate-900/50">
+                    <div class="flex items-center gap-2">
+                        <span class="text-accent-amber font-bold">[P2]</span>
+                        <span class="font-bold text-slate-700 dark:text-slate-200">[Data: C9_Sales.csv]</span>
+                    </div>
+                    <span class="material-icons text-sm text-slate-400">more_horiz</span>
+                </div>
+                <div class="flex-1 overflow-auto bg-slate-100 dark:bg-[#0c0c0e]">
+                    <table class="w-full text-right border-collapse text-[10px] font-mono whitespace-nowrap">
+                        <thead class="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 sticky top-0">
+                            <tr>
+                                <th class="p-1 text-left">SYM</th>
+                                <th class="p-1">BID</th>
+                                <th class="p-1">ASK</th>
+                                <th class="p-1">LST</th>
+                                <th class="p-1">CHG</th>
+                                <th class="p-1">%CHG</th>
+                                <th class="p-1">VOL</th>
+                                <th class="p-1">RSI</th>
+                                <th class="p-1">MACD</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-slate-800 dark:text-slate-300">
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">AAPL</td>
+                                <td class="p-1 text-accent-green bg-green-900/10">145.20</td>
+                                <td class="p-1 text-accent-green bg-green-900/10">145.22</td>
+                                <td class="p-1">145.21</td>
+                                <td class="p-1 text-accent-green">+0.45</td>
+                                <td class="p-1 text-accent-green">+0.31%</td>
+                                <td class="p-1 text-slate-500">2.4M</td>
+                                <td class="p-1 text-accent-amber">56</td>
+                                <td class="p-1 text-accent-green">0.12</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">MSFT</td>
+                                <td class="p-1 text-accent-red bg-red-900/10">230.10</td>
+                                <td class="p-1 text-accent-red bg-red-900/10">230.15</td>
+                                <td class="p-1">230.12</td>
+                                <td class="p-1 text-accent-red">-1.20</td>
+                                <td class="p-1 text-accent-red">-0.52%</td>
+                                <td class="p-1 text-slate-500">1.8M</td>
+                                <td class="p-1 text-accent-red">32</td>
+                                <td class="p-1 text-accent-red">-0.05</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">GOOG</td>
+                                <td class="p-1 text-accent-amber bg-amber-900/10">2750.00</td>
+                                <td class="p-1 text-accent-amber bg-amber-900/10">2751.50</td>
+                                <td class="p-1">2750.80</td>
+                                <td class="p-1 text-slate-400">0.00</td>
+                                <td class="p-1 text-slate-400">0.00%</td>
+                                <td class="p-1 text-slate-500">500K</td>
+                                <td class="p-1 text-slate-400">50</td>
+                                <td class="p-1 text-slate-400">0.00</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">TSLA</td>
+                                <td class="p-1 text-accent-green bg-green-900/20">720.50</td>
+                                <td class="p-1 text-accent-green bg-green-900/20">721.00</td>
+                                <td class="p-1">720.80</td>
+                                <td class="p-1 text-accent-green">+15.20</td>
+                                <td class="p-1 text-accent-green">+2.15%</td>
+                                <td class="p-1 text-slate-500">5.1M</td>
+                                <td class="p-1 text-accent-green">78</td>
+                                <td class="p-1 text-accent-green">1.25</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">AMZN</td>
+                                <td class="p-1 bg-slate-800/50 dark:bg-slate-800">3300.10</td>
+                                <td class="p-1 bg-slate-800/50 dark:bg-slate-800">3302.00</td>
+                                <td class="p-1">3301.00</td>
+                                <td class="p-1 text-accent-red">-5.40</td>
+                                <td class="p-1 text-accent-red">-0.16%</td>
+                                <td class="p-1 text-slate-500">900K</td>
+                                <td class="p-1 text-accent-amber">45</td>
+                                <td class="p-1 text-accent-red">-0.22</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">NVDA</td>
+                                <td class="p-1 text-accent-green bg-green-900/10">198.50</td>
+                                <td class="p-1 text-accent-green bg-green-900/10">198.60</td>
+                                <td class="p-1">198.55</td>
+                                <td class="p-1 text-accent-green">+3.20</td>
+                                <td class="p-1 text-accent-green">+1.64%</td>
+                                <td class="p-1 text-slate-500">3.2M</td>
+                                <td class="p-1 text-accent-green">65</td>
+                                <td class="p-1 text-accent-green">0.55</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">AMD</td>
+                                <td class="p-1 text-accent-red bg-red-900/10">105.10</td>
+                                <td class="p-1 text-accent-red bg-red-900/10">105.15</td>
+                                <td class="p-1">105.12</td>
+                                <td class="p-1 text-accent-red">-0.80</td>
+                                <td class="p-1 text-accent-red">-0.76%</td>
+                                <td class="p-1 text-slate-500">2.1M</td>
+                                <td class="p-1 text-accent-amber">42</td>
+                                <td class="p-1 text-accent-red">-0.08</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">NFLX</td>
+                                <td class="p-1 bg-slate-800/50 dark:bg-slate-800">550.00</td>
+                                <td class="p-1 bg-slate-800/50 dark:bg-slate-800">550.50</td>
+                                <td class="p-1">550.25</td>
+                                <td class="p-1 text-accent-green">+1.25</td>
+                                <td class="p-1 text-accent-green">+0.23%</td>
+                                <td class="p-1 text-slate-500">1.1M</td>
+                                <td class="p-1 text-accent-amber">52</td>
+                                <td class="p-1 text-accent-green">0.05</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">INTC</td>
+                                <td class="p-1 bg-slate-800/50 dark:bg-slate-800">53.20</td>
+                                <td class="p-1 bg-slate-800/50 dark:bg-slate-800">53.25</td>
+                                <td class="p-1">53.22</td>
+                                <td class="p-1 text-accent-red">-0.10</td>
+                                <td class="p-1 text-accent-red">-0.19%</td>
+                                <td class="p-1 text-slate-500">4.5M</td>
+                                <td class="p-1 text-accent-amber">48</td>
+                                <td class="p-1 text-accent-red">-0.01</td>
+                            </tr>
+                            <tr
+                                class="border-b border-border-light dark:border-slate-800/50 hover:bg-white/5 dark:hover:bg-white/5">
+                                <td class="p-1 text-left text-primary">ORCL</td>
+                                <td class="p-1 text-accent-green bg-green-900/10">88.50</td>
+                                <td class="p-1 text-accent-green bg-green-900/10">88.60</td>
+                                <td class="p-1">88.55</td>
+                                <td class="p-1 text-accent-green">+0.75</td>
+                                <td class="p-1 text-accent-green">+0.85%</td>
+                                <td class="p-1 text-slate-500">1.5M</td>
+                                <td class="p-1 text-accent-green">60</td>
+                                <td class="p-1 text-accent-green">0.20</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="h-1/2 grid grid-cols-2 gap-2">
+                <div
+                    class="flex flex-col bg-panel-light dark:bg-panel-dark border border-border-light dark:border-border-dark rounded overflow-hidden shadow-sm">
+                    <div
+                        class="flex justify-between items-center px-3 py-2 border-b border-border-light dark:border-border-dark bg-slate-50 dark:bg-slate-900/50">
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent-amber font-bold">[P3]</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-200">[Chart: Trends]</span>
+                        </div>
+                        <span class="text-[10px] text-primary">Source: PZ &gt; /plot</span>
+                    </div>
+                    <div class="relative flex-1 bg-[#09090b] p-2 flex items-end gap-1">
+                        <div class="absolute inset-0 grid grid-cols-4 grid-rows-4 pointer-events-none">
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-r border-b border-white/5"></div>
+                            <div class="border-b border-white/5"></div>
+                        </div>
+                        <div class="w-1/12 h-[30%] bg-accent-red/20 border border-accent-red relative mx-auto">
+                            <div class="absolute top-full h-4 w-[1px] bg-accent-red left-1/2"></div>
+                            <div class="absolute bottom-full h-2 w-[1px] bg-accent-red left-1/2"></div>
+                        </div>
+                        <div class="w-1/12 h-[40%] bg-accent-red/20 border border-accent-red relative mx-auto mb-2">
+                            <div class="absolute top-full h-1 w-[1px] bg-accent-red left-1/2"></div>
+                        </div>
+                        <div class="w-1/12 h-[20%] bg-accent-green/20 border border-accent-green relative mx-auto mb-1">
+                            <div class="absolute bottom-full h-5 w-[1px] bg-accent-green left-1/2"></div>
+                        </div>
+                        <div class="w-1/12 h-[50%] bg-accent-green/20 border border-accent-green relative mx-auto mb-4">
+                            <div class="absolute bottom-full h-2 w-[1px] bg-accent-green left-1/2"></div>
+                        </div>
+                        <div
+                            class="w-1/12 h-[35%] bg-accent-green/20 border border-accent-green relative mx-auto mb-10">
+                            <div class="absolute bottom-full h-6 w-[1px] bg-accent-green left-1/2"></div>
+                        </div>
+                        <div class="w-1/12 h-[25%] bg-accent-red/20 border border-accent-red relative mx-auto mb-12">
+                        </div>
+                        <div class="w-1/12 h-[45%] bg-accent-green/20 border border-accent-green relative mx-auto mb-8">
+                        </div>
+                        <div
+                            class="w-1/12 h-[55%] bg-accent-green/20 border border-accent-green relative mx-auto mb-16">
+                            <div class="absolute bottom-full h-3 w-[1px] bg-accent-green left-1/2"></div>
+                        </div>
+                        <svg class="absolute inset-0 w-full h-full pointer-events-none opacity-50">
+                            <path d="M0 150 Q 50 140, 100 100 T 200 50 T 300 80" fill="none" stroke="#3b82f6"
+                                stroke-width="2"></path>
+                            <path d="M0 160 Q 50 155, 100 120 T 200 80 T 300 100" fill="none" stroke="#f59e0b"
+                                stroke-width="2"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div
+                    class="flex flex-col bg-panel-light dark:bg-panel-dark border border-border-light dark:border-border-dark rounded overflow-hidden shadow-sm">
+                    <div
+                        class="flex justify-between items-center px-3 py-2 border-b border-border-light dark:border-border-dark bg-slate-50 dark:bg-slate-900/50">
+                        <div class="flex items-center gap-2">
+                            <span class="text-accent-amber font-bold">[P4]</span>
+                            <span
+                                class="font-bold text-slate-700 dark:text-slate-200 text-[10px] whitespace-nowrap overflow-hidden text-ellipsis">[Doc:
+                                Reg_Report.pdf]</span>
+                        </div>
+                        <span class="material-icons text-sm text-slate-400">fullscreen</span>
+                    </div>
+                    <div class="flex-1 bg-slate-200 dark:bg-slate-800 p-4 overflow-hidden relative">
+                        <div
+                            class="bg-white text-black h-full w-full shadow-lg p-3 text-[5px] leading-relaxed opacity-90 overflow-hidden select-none">
+                            <div class="h-2 w-1/3 bg-black mb-2"></div>
+                            <div class="space-y-1">
+                                <div class="h-1 w-full bg-slate-300"></div>
+                                <div class="h-1 w-full bg-slate-300"></div>
+                                <div class="h-1 w-5/6 bg-slate-300"></div>
+                                <div class="h-1 w-full bg-slate-300"></div>
+                            </div>
+                            <div class="h-16 w-full bg-yellow-100 my-2 border border-yellow-200 p-1">
+                                <div class="h-1 w-full bg-yellow-300 mb-1"></div>
+                                <div class="h-1 w-2/3 bg-yellow-300"></div>
+                            </div>
+                            <div class="space-y-1">
+                                <div class="h-1 w-full bg-slate-300"></div>
+                                <div class="h-1 w-11/12 bg-slate-300"></div>
+                                <div class="h-1 w-full bg-slate-300"></div>
+                            </div>
+                            <div class="space-y-1 mt-2">
+                                <div class="h-1 w-full bg-slate-300"></div>
+                                <div class="h-1 w-full bg-slate-300"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer class="flex-none p-2 pt-0">
+        <div
+            class="bg-panel-light dark:bg-panel-dark border border-primary rounded p-2 flex items-center gap-2 shadow-[0_0_15px_-3px_rgba(14,165,233,0.3)]">
+            <span class="bg-primary/20 text-primary px-1 rounded text-xs font-bold border border-primary/50">[P1]</span>
+            <span class="text-slate-400">&gt;</span>
+            <span class="text-accent-amber">/summarize</span>
+            <span class="text-slate-300">P2</span>
+            <span class="text-slate-400">&gt;</span>
+            <span class="text-slate-300">P4</span>
+            <span class="text-slate-500 mx-2">|</span>
+            <span class="text-primary animate-pulse">Generating report...</span>
+            <span class="w-2 h-4 bg-primary cursor-blink ml-1"></span>
+            <div class="ml-auto text-slate-500 text-xs">
+                &gt; 1190ms
+            </div>
+        </div>
+    </footer>
+    <script>
+        // Simple script to demonstrate functionality or toggle theme if needed by user interaction
+        // Defaulting to dark as requested by image but respecting system pref
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
+
+</body>
+
+</html>

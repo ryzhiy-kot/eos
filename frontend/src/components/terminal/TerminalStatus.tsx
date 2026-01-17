@@ -1,0 +1,43 @@
+import React from 'react';
+import { Loader2, LogOut } from 'lucide-react';
+import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
+
+interface TerminalStatusProps {
+    isLoading: boolean;
+    executionTime?: string;
+}
+
+const TerminalStatus: React.FC<TerminalStatusProps> = ({ isLoading, executionTime = '12ms' }) => {
+
+    return (
+        <div className="flex items-center gap-3">
+            <span className="text-slate-500 mx-3 select-none text-lg">|</span>
+
+            {/* Status / Output Preview */}
+            {isLoading ? (
+                <div className="flex items-center text-primary animate-pulse whitespace-nowrap">
+                    <span className="mr-1 text-sm">Processing</span>
+                    <Loader2 size={16} className="animate-spin" />
+                </div>
+            ) : (
+                <span className="text-slate-500 text-sm whitespace-nowrap hidden sm:inline-block">Ready</span>
+            )}
+
+            {/* Execution Time Mock */}
+            <div className="ml-auto text-slate-500 text-xs hidden md:block mr-4">
+                &gt; {executionTime}
+            </div>
+
+            {/* Logout Button */}
+            <button
+                onClick={() => commandBus.dispatch({ name: COMMAND_NAMES.LOGOUT, args: [], context: { focusedPaneId: null } })}
+                className="text-slate-500 hover:text-accent-red transition-colors p-1"
+                title="Logout"
+            >
+                <LogOut size={16} />
+            </button>
+        </div>
+    );
+};
+
+export default TerminalStatus;

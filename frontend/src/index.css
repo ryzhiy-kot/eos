@@ -3,39 +3,105 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    .dark ::-webkit-scrollbar-track {
+        background: #18181b;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 2px;
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+    }
+}
+
+@layer utilities {
+    .cursor-blink {
+        animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0;
+        }
+    }
+}
+
 @layer components {
 
     /* Pane Styling */
     .pane-frame {
-        @apply flex flex-col h-full w-full border transition-all duration-200 overflow-hidden relative;
-        background-color: #0a0a0f;
-        border-color: #1f1f26;
+        @apply flex flex-col h-full w-full border transition-all duration-200 overflow-hidden relative rounded shadow-sm;
+        background-color: theme('colors.panel-light');
+        border-color: theme('colors.border-light');
+    }
+
+    .dark .pane-frame {
+        background-color: theme('colors.panel-dark');
+        border-color: theme('colors.border-dark');
     }
 
     .pane-frame:hover {
-        border-color: #2d2d35;
+        border-color: #cbd5e1;
+        /* border-slate-300 */
+    }
+
+    .dark .pane-frame:hover {
+        border-color: #334155;
+        /* border-slate-700 */
     }
 
     .pane-frame.active {
-        @apply shadow-glow z-10;
-        border-color: #00f0ff;
-        /* accent-main */
+        @apply ring-1 ring-primary border-primary;
     }
 
     .pane-header {
-        @apply h-8 flex items-center justify-between px-3 text-xs font-mono select-none uppercase tracking-wider transition-colors text-neutral-500 border-b;
-        background-color: #141419;
-        /* terminal-800 */
-        border-color: #1f1f26;
-        /* terminal-700 */
+        @apply flex justify-between items-center px-3 py-2 border-b text-xs font-mono select-none transition-colors;
+        background-color: #f8fafc;
+        /* bg-slate-50 */
+        border-color: theme('colors.border-light');
+        color: #334155;
+        /* text-slate-700 */
+    }
+
+    .dark .pane-header {
+        background-color: rgba(15, 23, 42, 0.5);
+        /* bg-slate-900/50 */
+        border-color: theme('colors.border-dark');
+        color: #e2e8f0;
+        /* text-slate-200 */
     }
 
     .pane-header.active {
-        @apply text-accent-main border-b;
-        background-color: rgba(0, 240, 255, 0.1);
-        /* accent-main/10 */
-        border-color: rgba(0, 240, 255, 0.2);
-        /* accent-main/20 */
+        background-color: #eff6ff;
+        /* bg-blue-50 */
+    }
+
+    .dark .pane-header.active {
+        background-color: rgba(30, 58, 138, 0.1);
+        /* bg-blue-900/10 */
     }
 
     /* Overlay Styling */

@@ -69,10 +69,17 @@ export const mockExecute = async (
                 ]
             };
 
+        case 'summarize':
+            return {
+                type: 'chat',
+                title: `Summary: ${sourceId || 'Context'}`,
+                content: [{ role: 'assistant', content: `**Summary of ${sourceId || 'context'}**:\n\nBased on the analysis, the key indicators suggest a positive trend with 15% growth in efficiency. Risk factors remain low, but monitoring of ${targetId || 'external variables'} is recommended.\n\n*   **Key Point 1**: Optimization successful.\n*   **Key Point 2**: Latency reduced by 25%.\n*   **Action Item**: Proceed with Phase 2 deployment.` }]
+            };
+
         default:
             return {
                 type: 'chat',
-                title: 'System Alert',
+                title: 'Default',
                 content: [{ role: 'system', content: `Unknown command: ${verb}` }]
             };
     }

@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Activity, Wifi, Clock, Timer } from 'lucide-react';
+import { ShieldCheck, Activity, Wifi, Clock, Timer, X } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 
 const ChronoHeader: React.FC = () => {
     const [time, setTime] = useState(new Date());
-    const { clocks, timers } = useWorkspaceStore();
+    const { clocks, timers, focusedPaneId } = useWorkspaceStore();
 
     useEffect(() => {
         const timer = setInterval(() => setTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    // We keep 'time' state to force a re-render every second for clocks
+    // even if 'time' itself isn't rendered directly as a string here.
+    if (!time) return null;
 
     // Format time for a specific timezone
     const formatTime = (timezone: string) => {
@@ -38,9 +43,17 @@ const ChronoHeader: React.FC = () => {
                 </div>
 
                 {clocks.map(clock => (
-                    <div key={clock.id} className="flex flex-col md:flex-row md:space-x-1">
-                        <span className="font-bold text-neutral-500">{clock.city}</span>
-                        <span>{formatTime(clock.timezone)}</span>
+                    <div key={clock.id} className="flex items-center space-x-2 group/clock">
+                        <div className="flex flex-col md:flex-row md:space-x-1">
+                            <span className="font-bold text-neutral-500">{clock.city}</span>
+                            <span>{formatTime(clock.timezone)}</span>
+                        </div>
+                        <button
+                            onClick={() => commandBus.dispatch({ name: COMMAND_NAMES.REMOVE_CLOCK, args: [clock.id], context: { focusedPaneId } })}
+                            className="opacity-0 group-hover/clock:opacity-100 hover:text-red-500 transition-opacity"
+                        >
+                            <X size={10} />
+                        </button>
                     </div>
                 ))}
             </div>
@@ -49,10 +62,18 @@ const ChronoHeader: React.FC = () => {
             {timers.length > 0 && (
                 <div className="flex items-center space-x-4 px-4 border-l border-r border-neutral-800 mx-4">
                     {timers.map(t => (
-                        <div key={t.id} className="flex items-center space-x-2 text-orange-400 animate-pulse">
-                            <Timer size={14} />
-                            <span className="font-bold">{t.label}</span>
-                            <span>{formatCountdown(t.endsAt)}</span>
+                        <div key={t.id} className="flex items-center space-x-2 text-orange-400 group/timer">
+                            <div className="flex items-center space-x-2 animate-pulse">
+                                <Timer size={14} />
+                                <span className="font-bold">{t.label}</span>
+                                <span>{formatCountdown(t.endsAt)}</span>
+                            </div>
+                            <button
+                                onClick={() => commandBus.dispatch({ name: COMMAND_NAMES.REMOVE_TIMER, args: [t.id], context: { focusedPaneId } })}
+                                className="opacity-0 group-hover/timer:opacity-100 hover:text-red-500 transition-opacity"
+                            >
+                                <X size={10} />
+                            </button>
                         </div>
                     ))}
                 </div>

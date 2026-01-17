@@ -2,6 +2,7 @@ import React from 'react';
 import { Pane } from '../../store/workspaceStore';
 import CodeRenderer from '../renderers/CodeRenderer';
 import MarkdownRenderer from '../renderers/MarkdownRenderer';
+import ReactMarkdown from 'react-markdown';
 import PDFRenderer from '../renderers/PDFRenderer';
 import DataGridRenderer from '../renderers/DataGridRenderer';
 import VisualRenderer from '../renderers/VisualRenderer';
@@ -15,18 +16,26 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
         case 'chat':
             // Chat is a list of messages. We'll render them as markdown bubbles.
             return (
-                <div className="p-4 h-full overflow-y-auto text-sm font-mono text-neutral-300 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6 text-sm">
+                    {/* Optional Context Header Placeholder */}
+                    <div className="text-slate-500 border-l-2 border-border-light dark:border-border-dark pl-3 italic text-xs">
+                        Context: System initialized.
+                    </div>
+
                     {Array.isArray(pane.content) ? (
-                        pane.content.map((msg: any, i: number) => (
-                            <div key={i} className="flex flex-col">
-                                <span className={`font-bold uppercase text-xs mb-1 ${msg.role === 'user' ? 'text-blue-400' : 'text-emerald-400'}`}>
-                                    [{msg.role === 'user' ? 'User' : 'AI'}]
-                                </span>
-                                <div className="bg-neutral-800/50 p-3 rounded border border-neutral-800/50">
-                                    <MarkdownRenderer content={msg.content} />
+                        pane.content.map((msg: any, i: number) => {
+                            const isUser = msg.role === 'user';
+                            return (
+                                <div key={i} className="flex gap-4">
+                                    <div className={`w-20 flex-shrink-0 font-bold ${isUser ? 'text-accent-green' : 'text-primary'}`}>
+                                        {isUser ? 'User' : 'Assistant'}
+                                    </div>
+                                    <div className="text-slate-700 dark:text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0">
+                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                    </div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <div className="opacity-50 italic">New conversation started...</div>
                     )}

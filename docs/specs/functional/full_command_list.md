@@ -12,6 +12,8 @@ These commands control the dynamic grid and the "Shelf" (archive).
 | /swap | `/swap P1 P2` | Exchanges the positions of two panes. |
 | /ls | `/ls [query]` | Opens the Visual Gallery overlay to browse archived panes. |
 | /focus | `/focus P3` | Makes P3 the active pane and scrolls to it. |
+| /rm | `/rm P1 [--force]` | Deletes a pane. Blocked if children exist unless `--force` is used. |
+| /prune | `/prune [--chat\|--force]` | Smart delete for archived Orphans (non-sticky, terminal nodes). |
 
 ### 2. Data Ingestion & Extraction
 Commands for getting data into the system and moving it between formats.
@@ -44,7 +46,7 @@ Commands to move through the version stack and trace data origins.
 | /redo | `/redo [P1]` | Steps forward in the version history. |
 | /log | `/log [P1]` | Displays a vertical timeline of versions for that pane. |
 | /source | `/source [P1]` | The Lineage Jump. Automatically finds and shows the parent of P1. |
-| /trace | `/trace [P1]` | Toggles visual arrows showing the flow from original anchor to P1. |
+| /trace | `/trace` | Toggles Lineage Mode: dims grid and draws glowing dependency lines. |
 
 ### 5. Utility & System Tools
 Managing the persistent header elements (Clocks/Timers) and the session.

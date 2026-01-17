@@ -4,9 +4,10 @@ import { Search, MonitorPlay } from 'lucide-react';
 import clsx from 'clsx';
 import ContentFactory from '../panes/ContentFactory';
 import OverlayWindow from './OverlayWindow';
+import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 
 const ArchiveOverlay: React.FC = () => {
-    const { archive, panes, toggleArchiveOverlay, restorePane, isArchiveOpen } = useWorkspaceStore();
+    const { archive, panes, isArchiveOpen, focusedPaneId } = useWorkspaceStore();
     const [search, setSearch] = useState('');
 
     const filteredIds = archive.filter(id => {
@@ -21,7 +22,7 @@ const ArchiveOverlay: React.FC = () => {
             title="The Shelf (Archive)"
             subtitle={`${archive.length} Items`}
             isOpen={isArchiveOpen}
-            onClose={() => toggleArchiveOverlay(false)}
+            onClose={() => commandBus.dispatch({ name: COMMAND_NAMES.UI_ARCHIVE, args: ['close'], context: { focusedPaneId } })}
             maxWidth="max-w-none"
         >
             <div className="flex flex-col h-full">
@@ -45,7 +46,11 @@ const ArchiveOverlay: React.FC = () => {
                         return (
                             <div
                                 key={id}
-                                onClick={() => restorePane(id)}
+                                onClick={() => commandBus.dispatch({
+                                    name: COMMAND_NAMES.SHOW,
+                                    args: [id],
+                                    context: { sourceId: id, focusedPaneId }
+                                })}
                                 className="group bg-neutral-900 border border-neutral-800 hover:border-blue-500 rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.02] flex flex-col h-64"
                             >
                                 <div className="bg-neutral-950 p-2 border-b border-neutral-800 flex justify-between items-center">

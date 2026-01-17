@@ -51,40 +51,16 @@ interface WorkspaceState {
     pendingCommand: string | null;
     commands: CommandEntry[];
 
-    // Actions
-    addPane: (pane: Pane) => void;
-    removePane: (id: string) => void;
-    focusPane: (id: string) => void;
-    setDensity: (density: 1 | 2 | 4 | 9) => void;
-    updatePaneContent: (id: string, content: any, pushToHistory?: boolean) => void;
-    renamePane: (id: string, title: string) => void;
-
-    // Archive Actions
-    archivePane: (id: string) => void;
-    restorePane: (id: string) => void;
-    swapPanes: (id1: string, id2: string) => void;
-    toggleArchiveOverlay: (isOpen?: boolean) => void;
-    toggleHelpOverlay: (isOpen?: boolean) => void;
-    setPendingCommand: (cmd: string | null) => void;
-
-    // History Actions
-    undoPane: (id: string) => void;
-    redoPane: (id: string) => void;
-
-    // Utility Actions
-    addClock: (city: string, timezone: string) => void;
-    removeClock: (id: string) => void;
-    addTimer: (label: string, durationSec: number) => void;
-    removeTimer: (id: string) => void;
-    registerCommands: (entries: CommandEntry[]) => void;
+    terminalFocusCounter: number;
+    commandSubmitRequest: { command: string; timestamp: number } | null;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>(() => ({
     panes: {},
     activeLayout: [],
     focusedPaneId: null,
     archive: [],
-    density: 4,
+    density: 9,
     history: {},
     future: {},
     clocks: [
@@ -98,7 +74,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     pendingCommand: null,
     commands: [],
 
-    addPane: (pane) => set((state) => {
+    terminalFocusCounter: 0,
+    commandSubmitRequest: null,
+}));
+
+/**
+ * standalone actions that modify the store.
+ * These are NOT part of the store state, keeping the store data-only.
+ * These should ideally be called ONLY by command handlers.
+ */
+export const workspaceActions = {
+    triggerFocusTerminal: () =>
+        useWorkspaceStore.setState((state) => ({ terminalFocusCounter: state.terminalFocusCounter + 1 })),
+
+    triggerSubmitCommand: (command: string) =>
+        useWorkspaceStore.setState({ commandSubmitRequest: { command, timestamp: Date.now() } }),
+
+    addPane: (pane: Pane) => useWorkspaceStore.setState((state) => {
         // If already in active layout, just focus it and update content
         if (state.activeLayout.includes(pane.id)) {
             return {
@@ -107,7 +99,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
             };
         }
 
-        // If in archive, remove from archive and add to active layout (handling eviction)
         let newLayout = [...state.activeLayout];
         let newArchive = state.archive.filter(id => id !== pane.id);
 
@@ -135,7 +126,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    removePane: (id) => set((state) => {
+    removePane: (id: string) => useWorkspaceStore.setState((state) => {
         const { [id]: removed, ...remainingPanes } = state.panes;
         return {
             panes: remainingPanes,
@@ -145,9 +136,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    focusPane: (id) => set({ focusedPaneId: id }),
+    focusPane: (id: string) => useWorkspaceStore.setState({ focusedPaneId: id }),
 
-    setDensity: (density) => set((state) => {
+    setDensity: (density: 1 | 2 | 4 | 9) => useWorkspaceStore.setState((state) => {
         let newLayout = [...state.activeLayout];
         let newArchive = [...state.archive];
 
@@ -157,8 +148,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
             newLayout = newLayout.slice(excess);
             newArchive.push(...toArchive);
         }
-        // If density increases, we could auto-restore from archive? (Spec doesn't explicitly mandate, but nice to have)
-        // For now, strict: only archive on shrink.
 
         return {
             density,
@@ -167,7 +156,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    updatePaneContent: (id, content, pushToHistory = true) => set((state) => {
+    updatePaneContent: (id: string, content: any, pushToHistory = true) => useWorkspaceStore.setState((state) => {
         const currentContent = state.panes[id]?.content;
         const newHistory = { ...state.history };
         const newFuture = { ...state.future };
@@ -175,7 +164,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         if (pushToHistory) {
             if (!newHistory[id]) newHistory[id] = [];
             newHistory[id].push(currentContent);
-            // Clear future on new change
             newFuture[id] = [];
         }
 
@@ -189,37 +177,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    renamePane: (id, title) => set((state) => ({
+    renamePane: (id: string, title: string) => useWorkspaceStore.setState((state) => ({
         panes: {
             ...state.panes,
             [id]: { ...state.panes[id], title }
         }
     })),
 
-    archivePane: (id) => set((state) => ({
+    archivePane: (id: string) => useWorkspaceStore.setState((state) => ({
         activeLayout: state.activeLayout.filter(pid => pid !== id),
         archive: [...state.archive, id]
     })),
 
-    restorePane: (id) => set((state) => {
-        // If already active, just focus
+    restorePane: (id: string) => useWorkspaceStore.setState((state) => {
         if (state.activeLayout.includes(id)) {
             return { focusedPaneId: id, isArchiveOpen: false };
         }
 
-        // Need to verify capacity
         let newLayout = [...state.activeLayout];
         let newArchive = state.archive.filter(pid => pid !== id);
 
         if (newLayout.length >= state.density) {
-            // Evict one to make room
             const evictIndex = newLayout.findIndex(pid => !state.panes[pid]?.isSticky);
             if (evictIndex !== -1) {
                 const evictId = newLayout[evictIndex];
                 newArchive.push(evictId);
                 newLayout.splice(evictIndex, 1);
             } else {
-                // Force replace first
                 const evictId = newLayout[0];
                 newArchive.push(evictId);
                 newLayout.shift();
@@ -235,7 +219,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    swapPanes: (id1, id2) => set((state) => {
+    swapPanes: (id1: string, id2: string) => useWorkspaceStore.setState((state) => {
         const layout = [...state.activeLayout];
         const idx1 = layout.indexOf(id1);
         const idx2 = layout.indexOf(id2);
@@ -245,19 +229,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         return { activeLayout: layout };
     }),
 
-    toggleArchiveOverlay: (isOpen) => set((state) => ({
+    toggleArchiveOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => ({
         isArchiveOpen: isOpen !== undefined ? isOpen : !state.isArchiveOpen,
-        isHelpOpen: false // Close help if archive opens
+        isHelpOpen: false
     })),
 
-    toggleHelpOverlay: (isOpen) => set((state) => ({
+    toggleHelpOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => ({
         isHelpOpen: isOpen !== undefined ? isOpen : !state.isHelpOpen,
-        isArchiveOpen: false // Close archive if help opens
+        isArchiveOpen: false
     })),
 
-    setPendingCommand: (cmd) => set({ pendingCommand: cmd }),
+    setPendingCommand: (cmd: string | null) => useWorkspaceStore.setState({ pendingCommand: cmd }),
 
-    undoPane: (id) => set((state) => {
+    undoPane: (id: string) => useWorkspaceStore.setState((state) => {
         const past = state.history[id] || [];
         if (past.length === 0) return {};
 
@@ -276,7 +260,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    redoPane: (id) => set((state) => {
+    redoPane: (id: string) => useWorkspaceStore.setState((state) => {
         const future = state.future[id] || [];
         if (future.length === 0) return {};
 
@@ -295,15 +279,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         };
     }),
 
-    addClock: (city, timezone) => set((state) => ({
+    addClock: (city: string, timezone: string) => useWorkspaceStore.setState((state) => ({
         clocks: [...state.clocks, { id: `c_${Date.now()}`, city, timezone }]
     })),
 
-    removeClock: (id) => set((state) => ({
+    removeClock: (id: string) => useWorkspaceStore.setState((state) => ({
         clocks: state.clocks.filter(c => c.id !== id)
     })),
 
-    addTimer: (label, durationSec) => set((state) => ({
+    addTimer: (label: string, durationSec: number) => useWorkspaceStore.setState((state) => ({
         timers: [...state.timers, {
             id: `t_${Date.now()}`,
             label,
@@ -312,11 +296,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         }]
     })),
 
-    removeTimer: (id) => set((state) => ({
+    removeTimer: (id: string) => useWorkspaceStore.setState((state) => ({
         timers: state.timers.filter(t => t.id !== id)
     })),
 
-    registerCommands: (entries) => set((state) => {
+    registerCommands: (entries: CommandEntry[]) => useWorkspaceStore.setState((state) => {
         const newCommands = [...state.commands];
         entries.forEach(entry => {
             const idx = newCommands.findIndex(c => c.name === entry.name);
@@ -328,4 +312,4 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         });
         return { commands: newCommands };
     }),
-}));
+};
