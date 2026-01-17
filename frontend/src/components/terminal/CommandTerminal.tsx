@@ -78,8 +78,9 @@ const CommandTerminal: React.FC = () => {
                 handler: (args: string[], ctx: CommandContext) => {
                     const rawTarget = args[0] || ctx.sourceId;
                     const target = rawTarget?.toUpperCase();
-                    if (target && panes[target]) {
-                        focusPane(target);
+                    const state = useWorkspaceStore.getState();
+                    if (target && state.panes[target]) {
+                        state.focusPane(target);
                         return true;
                     }
                     return false;
@@ -92,7 +93,7 @@ const CommandTerminal: React.FC = () => {
                 category: 'pane',
                 handler: (args: string[], ctx: CommandContext) => {
                     if (ctx.sourceId && args[0]) {
-                        swapPanes(ctx.sourceId, args[0].toUpperCase());
+                        useWorkspaceStore.getState().swapPanes(ctx.sourceId, args[0].toUpperCase());
                         return true;
                     }
                     return false;
@@ -141,7 +142,7 @@ const CommandTerminal: React.FC = () => {
                 handler: (args: string[], ctx: CommandContext) => {
                     const rid = (args[0] || ctx.sourceId)?.toUpperCase();
                     if (rid) {
-                        restorePane(rid);
+                        useWorkspaceStore.getState().restorePane(rid);
                         return true;
                     }
                     return false;
@@ -210,6 +211,34 @@ const CommandTerminal: React.FC = () => {
                 handler: (): boolean => {
                     toggleHelpOverlay(true);
                     return true;
+                }
+            },
+            {
+                name: 'rename',
+                description: 'Rename a pane.',
+                parameters: [{ name: 'PaneID', description: 'ID of pane to rename (optional)', required: false, type: 'paneId' }, { name: 'Name', description: 'New title', required: true }],
+                category: 'pane',
+                handler: (args: string[], ctx: CommandContext) => {
+                    const store = useWorkspaceStore.getState();
+
+                    // Case 1: First arg is Pane ID?
+                    const potentialId = args[0]?.toUpperCase();
+                    if (potentialId && store.panes[potentialId] && args.length > 1) {
+                        const newTitle = args.slice(1).join(' ');
+                        store.renamePane(potentialId, newTitle);
+                        return true;
+                    }
+
+                    // Case 2: Rename current pane
+                    if (ctx.sourceId && args.length > 0) {
+                        // Check if first arg looks like ID but isn't valid -> treat as title
+                        // Or if it's just a title
+                        const newTitle = args.join(' ');
+                        store.renamePane(ctx.sourceId, newTitle);
+                        return true;
+                    }
+
+                    return false;
                 }
             },
             {

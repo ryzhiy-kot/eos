@@ -43,7 +43,7 @@ const PaneFrame: React.FC<PaneFrameProps> = ({ pane }) => {
                     <span className={clsx("font-bold", pane.isSticky ? "text-accent-secondary" : "opacity-70")}>
                         [{pane.type.toUpperCase()}:{pane.id}]
                     </span>
-                    <span className="truncate max-w-[150px]">{pane.title}</span>
+                    <span className="font-mono">{pane.title}</span>
                 </div>
 
                 <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">

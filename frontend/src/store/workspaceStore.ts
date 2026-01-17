@@ -57,6 +57,7 @@ interface WorkspaceState {
     focusPane: (id: string) => void;
     setDensity: (density: 1 | 2 | 4 | 9) => void;
     updatePaneContent: (id: string, content: any, pushToHistory?: boolean) => void;
+    renamePane: (id: string, title: string) => void;
 
     // Archive Actions
     archivePane: (id: string) => void;
@@ -187,6 +188,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
             future: newFuture
         };
     }),
+
+    renamePane: (id, title) => set((state) => ({
+        panes: {
+            ...state.panes,
+            [id]: { ...state.panes[id], title }
+        }
+    })),
 
     archivePane: (id) => set((state) => ({
         activeLayout: state.activeLayout.filter(pid => pid !== id),
