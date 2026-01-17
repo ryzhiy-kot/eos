@@ -12,27 +12,67 @@ export interface Pane {
     id: string;
     type: PaneType;
     title: string;
-    content: any; // Flexible content payload
+    content: any;
     isSticky: boolean;
     lineage?: PaneLineage;
 }
 
+export interface ClockConfig {
+    id: string;
+    city: string; // e.g., 'New York', 'Tokyo'
+    timezone: string; // e.g., 'America/New_York'
+}
+
+export interface TimerConfig {
+    id: string;
+    label: string;
+    durationSec: number;
+    endsAt: number; // Timestamp
+}
+
 interface WorkspaceState {
-    panes: Record<string, Pane>;
+    panes: Record<string, Pane>; // All panes (active + archived)
     activeLayout: string[]; // IDs of visible panes
     focusedPaneId: string | null;
     archive: string[]; // IDs of archived panes (shelf)
-    density: 1 | 2 | 4 | 9; // User preference for max visible panes
+    density: 1 | 2 | 4 | 9;
+
+    // History (Simple stack of snapshots for undo/redo on key panes)
+    // Map of PaneID -> Stack of Content
+    history: Record<string, any[]>;
+    future: Record<string, any[]>;
+
+    // Utilities
+    clocks: ClockConfig[];
+    timers: TimerConfig[];
+    isArchiveOpen: boolean; // For visual catalog overlay
+    isHelpOpen: boolean;
+    pendingCommand: string | null;
 
     // Actions
     addPane: (pane: Pane) => void;
     removePane: (id: string) => void;
     focusPane: (id: string) => void;
     setDensity: (density: 1 | 2 | 4 | 9) => void;
-    updatePaneContent: (id: string, content: any) => void;
+    updatePaneContent: (id: string, content: any, pushToHistory?: boolean) => void;
+
+    // Archive Actions
     archivePane: (id: string) => void;
     restorePane: (id: string) => void;
     swapPanes: (id1: string, id2: string) => void;
+    toggleArchiveOverlay: (isOpen?: boolean) => void;
+    toggleHelpOverlay: (isOpen?: boolean) => void;
+    setPendingCommand: (cmd: string | null) => void;
+
+    // History Actions
+    undoPane: (id: string) => void;
+    redoPane: (id: string) => void;
+
+    // Utility Actions
+    addClock: (city: string, timezone: string) => void;
+    removeClock: (id: string) => void;
+    addTimer: (label: string, durationSec: number) => void;
+    removeTimer: (id: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -40,37 +80,34 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     activeLayout: [],
     focusedPaneId: null,
     archive: [],
-    density: 4, // Default to quad view
+    density: 4,
+    history: {},
+    future: {},
+    clocks: [
+        { id: 'c1', city: 'NYC', timezone: 'America/New_York' },
+        { id: 'c2', city: 'LON', timezone: 'Europe/London' },
+        { id: 'c3', city: 'TKY', timezone: 'Asia/Tokyo' },
+    ],
+    timers: [],
+    isArchiveOpen: false,
+    isHelpOpen: false,
+    pendingCommand: null,
 
     addPane: (pane) => set((state) => {
-        // Logic: If layout is full, archive the oldest non-sticky pane
         const currentCount = state.activeLayout.length;
         let newLayout = [...state.activeLayout];
         let newArchive = [...state.archive];
 
-        // If we haven't reached the current density limit, just add it
         if (currentCount < state.density) {
             newLayout.push(pane.id);
         } else {
-            // We are full. Find a candidate to evict (not sticky, usually first one/LRU)
-            // Simple strategy: Evict the first non-sticky pane
             const evictIndex = newLayout.findIndex(id => !state.panes[id]?.isSticky);
-
             if (evictIndex !== -1) {
-                // Move to archive
                 const evictedId = newLayout[evictIndex];
                 newArchive.push(evictedId);
-                // Replace with new pane or re-arrange? 
-                // Spec says "auto-eviction", let's replace the slot or push to end if we treat layout as a queue.
-                // Let's remove at index and push new one to end to maintain order
                 newLayout.splice(evictIndex, 1);
                 newLayout.push(pane.id);
             } else {
-                // All are sticky? This is an edge case. For now, force add and maybe expand density if possible?
-                // Or just replace the last one even if sticky (force)? 
-                // Spec says "Cannot be overwritten or auto-evicted". 
-                // We'll warn user? For now, we'll just push it and let the grid handle overflow or just replace 0?
-                // Let's replace the first one for now as fallback.
                 newLayout.shift();
                 newLayout.push(pane.id);
             }
@@ -80,7 +117,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             panes: { ...state.panes, [pane.id]: pane },
             activeLayout: newLayout,
             archive: newArchive,
-            focusedPaneId: pane.id, // Auto-focus new pane
+            focusedPaneId: pane.id,
         };
     }),
 
@@ -97,8 +134,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     focusPane: (id) => set({ focusedPaneId: id }),
 
     setDensity: (density) => set((state) => {
-        // If reducing density, we might need to archive excess panes
-        // This is complex, will implement basic truncation for now
         let newLayout = [...state.activeLayout];
         let newArchive = [...state.archive];
 
@@ -108,6 +143,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             newLayout = newLayout.slice(excess);
             newArchive.push(...toArchive);
         }
+        // If density increases, we could auto-restore from archive? (Spec doesn't explicitly mandate, but nice to have)
+        // For now, strict: only archive on shrink.
 
         return {
             density,
@@ -116,12 +153,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         };
     }),
 
-    updatePaneContent: (id, content) => set((state) => ({
-        panes: {
-            ...state.panes,
-            [id]: { ...state.panes[id], content }
+    updatePaneContent: (id, content, pushToHistory = true) => set((state) => {
+        const currentContent = state.panes[id]?.content;
+        const newHistory = { ...state.history };
+        const newFuture = { ...state.future };
+
+        if (pushToHistory) {
+            if (!newHistory[id]) newHistory[id] = [];
+            newHistory[id].push(currentContent);
+            // Clear future on new change
+            newFuture[id] = [];
         }
-    })),
+
+        return {
+            panes: {
+                ...state.panes,
+                [id]: { ...state.panes[id], content }
+            },
+            history: newHistory,
+            future: newFuture
+        };
+    }),
 
     archivePane: (id) => set((state) => ({
         activeLayout: state.activeLayout.filter(pid => pid !== id),
@@ -129,9 +181,36 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     })),
 
     restorePane: (id) => set((state) => {
+        // If already active, just focus
+        if (state.activeLayout.includes(id)) {
+            return { focusedPaneId: id, isArchiveOpen: false };
+        }
+
+        // Need to verify capacity
+        let newLayout = [...state.activeLayout];
+        let newArchive = state.archive.filter(pid => pid !== id);
+
+        if (newLayout.length >= state.density) {
+            // Evict one to make room
+            const evictIndex = newLayout.findIndex(pid => !state.panes[pid]?.isSticky);
+            if (evictIndex !== -1) {
+                const evictId = newLayout[evictIndex];
+                newArchive.push(evictId);
+                newLayout.splice(evictIndex, 1);
+            } else {
+                // Force replace first
+                const evictId = newLayout[0];
+                newArchive.push(evictId);
+                newLayout.shift();
+            }
+        }
+        newLayout.push(id);
+
         return {
-            archive: state.archive.filter(pid => pid !== id),
-            activeLayout: [...state.activeLayout, id]
+            activeLayout: newLayout,
+            archive: newArchive,
+            focusedPaneId: id,
+            isArchiveOpen: false
         };
     }),
 
@@ -139,12 +218,80 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const layout = [...state.activeLayout];
         const idx1 = layout.indexOf(id1);
         const idx2 = layout.indexOf(id2);
-
         if (idx1 === -1 || idx2 === -1) return {};
-
         layout[idx1] = id2;
         layout[idx2] = id1;
-
         return { activeLayout: layout };
-    })
+    }),
+
+    toggleArchiveOverlay: (isOpen) => set((state) => ({
+        isArchiveOpen: isOpen !== undefined ? isOpen : !state.isArchiveOpen,
+        isHelpOpen: false // Close help if archive opens
+    })),
+
+    toggleHelpOverlay: (isOpen) => set((state) => ({
+        isHelpOpen: isOpen !== undefined ? isOpen : !state.isHelpOpen,
+        isArchiveOpen: false // Close archive if help opens
+    })),
+
+    setPendingCommand: (cmd) => set({ pendingCommand: cmd }),
+
+    undoPane: (id) => set((state) => {
+        const past = state.history[id] || [];
+        if (past.length === 0) return {};
+
+        const previous = past[past.length - 1];
+        const newPast = past.slice(0, -1);
+        const current = state.panes[id]?.content;
+
+        const newFuture = { ...state.future };
+        if (!newFuture[id]) newFuture[id] = [];
+        newFuture[id].push(current);
+
+        return {
+            panes: { ...state.panes, [id]: { ...state.panes[id], content: previous } },
+            history: { ...state.history, [id]: newPast },
+            future: newFuture
+        };
+    }),
+
+    redoPane: (id) => set((state) => {
+        const future = state.future[id] || [];
+        if (future.length === 0) return {};
+
+        const next = future[future.length - 1];
+        const newFuture = future.slice(0, -1);
+        const current = state.panes[id]?.content;
+
+        const newHistory = { ...state.history };
+        if (!newHistory[id]) newHistory[id] = [];
+        newHistory[id].push(current);
+
+        return {
+            panes: { ...state.panes, [id]: { ...state.panes[id], content: next } },
+            history: newHistory,
+            future: { ...state.future, [id]: newFuture }
+        };
+    }),
+
+    addClock: (city, timezone) => set((state) => ({
+        clocks: [...state.clocks, { id: `c_${Date.now()}`, city, timezone }]
+    })),
+
+    removeClock: (id) => set((state) => ({
+        clocks: state.clocks.filter(c => c.id !== id)
+    })),
+
+    addTimer: (label, durationSec) => set((state) => ({
+        timers: [...state.timers, {
+            id: `t_${Date.now()}`,
+            label,
+            durationSec,
+            endsAt: Date.now() + (durationSec * 1000)
+        }]
+    })),
+
+    removeTimer: (id) => set((state) => ({
+        timers: state.timers.filter(t => t.id !== id)
+    })),
 }));

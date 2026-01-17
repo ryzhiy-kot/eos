@@ -4,6 +4,7 @@ import CodeRenderer from '../renderers/CodeRenderer';
 import MarkdownRenderer from '../renderers/MarkdownRenderer';
 import PDFRenderer from '../renderers/PDFRenderer';
 import DataGridRenderer from '../renderers/DataGridRenderer';
+import VisualRenderer from '../renderers/VisualRenderer';
 
 interface ContentFactoryProps {
     pane: Pane;
@@ -44,16 +45,8 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
             }
             return <MarkdownRenderer content={String(pane.content)} />;
         case 'visual':
-            // Placeholder for charts
-            return (
-                <div className="p-4 flex items-center justify-center h-full text-neutral-500">
-                    <div className="text-center">
-                        <div className="text-4xl mb-2">📊</div>
-                        <div>Visual Pane (Impl Pending)</div>
-                        <pre className="text-xs mt-4 text-left bg-black p-2 rounded">{JSON.stringify(pane.content, null, 2)}</pre>
-                    </div>
-                </div>
-            );
+            const imgSrc = typeof pane.content === 'string' ? pane.content : (pane.content?.url || pane.content?.src || '');
+            return <VisualRenderer src={imgSrc} title={pane.title} />;
         default:
             return (
                 <div className="p-4 flex items-center justify-center h-full text-neutral-600 font-mono text-xs">

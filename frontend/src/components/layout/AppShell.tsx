@@ -2,10 +2,15 @@ import React from 'react';
 import ChronoHeader from './ChronoHeader';
 import WorkspaceGrid from '../grid/WorkspaceGrid';
 import CommandTerminal from '../terminal/CommandTerminal';
+import ArchiveOverlay from './ArchiveOverlay';
+import HelpOverlay from './HelpOverlay';
 
 const AppShell: React.FC = () => {
     return (
-        <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden font-mono">
+        <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden font-mono relative">
+            <ArchiveOverlay />
+            <HelpOverlay />
+
             {/* Top: Header */}
             <ChronoHeader />
 

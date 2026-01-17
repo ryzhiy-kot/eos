@@ -11,21 +11,35 @@ const CommandTerminal: React.FC = () => {
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Updated destructuring inclusive of states to prevent focus stealing
     const {
         focusedPaneId, panes,
-        addPane, updatePaneContent, setDensity, focusPane, swapPanes, removePane
+        addPane, updatePaneContent, setDensity, focusPane, swapPanes,
+        archivePane, restorePane, toggleArchiveOverlay, undoPane, redoPane,
+        addClock, addTimer,
+        toggleHelpOverlay, pendingCommand, setPendingCommand,
+        isArchiveOpen, isHelpOpen
     } = useWorkspaceStore();
 
-    // Auto-focus logic
+    // Auto-focus logic & Pending Command Check
     useEffect(() => {
+        if (pendingCommand) {
+            setInput(pendingCommand);
+            inputRef.current?.focus();
+            setPendingCommand(null);
+        }
+
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Do not steal focus if an overlay is open
+            if (isArchiveOpen || isHelpOpen) return;
+
             if (document.activeElement !== inputRef.current && !e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1) {
                 inputRef.current?.focus();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [pendingCommand, setPendingCommand, isArchiveOpen, isHelpOpen]);
 
     const activePane = focusedPaneId ? panes[focusedPaneId] : null;
 
@@ -61,7 +75,6 @@ const CommandTerminal: React.FC = () => {
                 type = 'doc';
             } else if (file.name.endsWith('.csv') || file.name.endsWith('.json')) {
                 const text = await file.text();
-                // Simple parsing demo
                 content = file.name.endsWith('.json') ? JSON.parse(text) : [{ raw: text }];
                 type = 'data';
             } else {
@@ -85,8 +98,70 @@ const CommandTerminal: React.FC = () => {
         }
     };
 
+    // Timer parsing helper
+    const parseDurationExpression = (inputArgs: string[]): { seconds: number, labelStartIdx: number } => {
+        let totalSeconds = 0;
+        let ptr = 0;
+        let hasTime = false;
+
+        while (ptr < inputArgs.length) {
+            const arg = inputArgs[ptr].toLowerCase();
+
+            // Check for "20m", "50s" format
+            const combinedMatch = arg.match(/^(\d+)([ms])$/);
+            if (combinedMatch) {
+                const val = parseInt(combinedMatch[1]);
+                const unit = combinedMatch[2];
+                totalSeconds += unit === 'm' ? val * 60 : val;
+                hasTime = true;
+                ptr++;
+                continue;
+            }
+
+            // Check for pure number
+            if (/^\d+$/.test(arg)) {
+                const val = parseInt(arg);
+                // Look ahead for unit
+                if (ptr + 1 < inputArgs.length) {
+                    const next = inputArgs[ptr + 1].toLowerCase();
+                    if (['m', 's', 'min', 'sec', 'mins', 'secs', 'minute', 'minutes'].includes(next)) {
+                        if (next.startsWith('s')) totalSeconds += val;
+                        else totalSeconds += val * 60;
+                        hasTime = true;
+                        ptr += 2;
+                        continue;
+                    }
+                }
+
+                // No explicit unit following
+                if (!hasTime) {
+                    // First number encountered, default to minutes as per requirement
+                    totalSeconds += val * 60;
+                    hasTime = true;
+                    ptr++;
+                } else {
+                    // Subsequent number, assume seconds (e.g., "20 minutes 50")
+                    totalSeconds += val;
+                    ptr++;
+                }
+                continue;
+            }
+
+            // Hit something else (label starts)
+            break;
+        }
+
+        return { seconds: totalSeconds, labelStartIdx: ptr };
+    };
+
     const executeClientCommand = async (verb: string, args: string[], sourceId?: string, targetId?: string) => {
-        switch (verb) {
+        const cmd = verb.toLowerCase();
+
+        switch (cmd) {
+            case 'help':
+            case '?':
+                toggleHelpOverlay(true);
+                return true;
             case 'grid':
                 const density = parseInt(args[0]);
                 if ([1, 2, 4, 9].includes(density)) {
@@ -96,27 +171,51 @@ const CommandTerminal: React.FC = () => {
                 }
                 return true;
             case 'focus':
-                // Usage: /focus P1
                 const targetPane = args[0] || (sourceId as string);
                 if (targetPane && panes[targetPane]) {
                     focusPane(targetPane);
                 }
                 return true;
             case 'swap':
-                // Usage: /swap P1 P2
                 if (sourceId && args[0]) {
                     swapPanes(sourceId, args[0]);
                 }
                 return true;
             case 'close':
             case 'hide':
-                if (sourceId) removePane(sourceId);
+                if (sourceId) archivePane(sourceId);
+                return true;
+            case 'show':
+                // Restores from archive. usage: /show P1
+                const restoreId = args[0] || sourceId;
+                if (restoreId) restorePane(restoreId);
+                return true;
+            case 'ls':
+                toggleArchiveOverlay(true);
+                return true;
+            case 'undo':
+                if (sourceId) undoPane(sourceId);
+                return true;
+            case 'redo':
+                if (sourceId) redoPane(sourceId);
+                return true;
+            case 'clock':
+                if (args.length >= 2) {
+                    addClock(args[0], args[1]);
+                }
+                return true;
+            case 'timer':
+                if (args.length > 0) {
+                    const { seconds, labelStartIdx } = parseDurationExpression(args);
+                    const label = args.slice(labelStartIdx).join(' ') || 'Timer';
+                    if (seconds > 0) addTimer(label, seconds);
+                }
                 return true;
             case 'load':
                 fileInputRef.current?.click();
                 return true;
             default:
-                return false; // Not a client command
+                return false;
         }
     };
 
@@ -143,19 +242,12 @@ const CommandTerminal: React.FC = () => {
                     }, 500);
                 }
             } else if (verb) {
-                // Try Client Command First
                 const isClient = await executeClientCommand(verb, args, sourceId, targetId);
 
                 if (!isClient) {
-                    // Fallback to Mock Backend
                     const result = await mockExecute(verb, sourceId, action, targetId);
 
-                    // Handle Result (Create/Update Pane)
                     let finalTargetId = targetId;
-
-                    // Determine if we should create NEW or update EXISTING
-                    // Default logic: If no target specified, create NEW unless overwriting check passes?
-                    // Let's standardise: always new unless > Pn specified.
 
                     if (finalTargetId === 'new' || !finalTargetId) {
                         const newId = generatePaneId();
@@ -170,7 +262,6 @@ const CommandTerminal: React.FC = () => {
                     } else if (panes[finalTargetId]) {
                         updatePaneContent(finalTargetId, result.content);
                     } else {
-                        // Target doesn't exist, create it
                         addPane({
                             id: finalTargetId,
                             type: result.type,
@@ -210,7 +301,7 @@ const CommandTerminal: React.FC = () => {
                 onChange={(e) => setInput(e.target.value)}
                 disabled={isLoading}
                 className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder-neutral-700 disabled:opacity-50"
-                placeholder={activePane?.type === 'chat' ? "Type a message..." : "Enter command (e.g. /load, /grid 2)"}
+                placeholder={activePane?.type === 'chat' ? "Type a message..." : "Enter command, e.g. /help, /load, /ls"}
                 autoFocus
             />
 
