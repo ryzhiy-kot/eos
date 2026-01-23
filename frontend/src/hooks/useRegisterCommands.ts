@@ -3,16 +3,18 @@ import { useWorkspaceStore, workspaceActions } from '../store/workspaceStore';
 import { useAuthStore } from '../store/authStore';
 import { CommandEntry } from '../lib/commandRegistry';
 import { parseDurationExpression } from '../lib/terminalUtils';
-import { useCommandHandler } from './useCommandHandler';
 import { COMMAND_NAMES } from '../lib/commandBus';
+import { useCommandHandler } from './useCommandHandler';
 
-export const useRegisterCommands = () => {
-    const { panes, activeLayout } = useWorkspaceStore();
+export const useRegisterCommands = (onReady?: () => void) => {
+    const panes = useWorkspaceStore(state => state.panes);
+    const activeLayout = useWorkspaceStore(state => state.activeLayout);
 
-    // --- Command Implementations (Subscribers) ---
-
-
-    // --- Command Implementations (Subscribers) ---
+    useEffect(() => {
+        if (onReady) {
+            onReady();
+        }
+    }, []);
 
     useCommandHandler(COMMAND_NAMES.GRID, (payload) => {
         const d = parseInt(payload.args[0]);
@@ -34,24 +36,27 @@ export const useRegisterCommands = () => {
     });
 
     useCommandHandler(COMMAND_NAMES.SWAP, (payload) => {
-        if (payload.context.sourceId && payload.args[0]) {
-            workspaceActions.swapPanes(payload.context.sourceId, payload.args[0].toUpperCase());
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (sourceId && payload.args[0]) {
+            workspaceActions.swapPanes(sourceId, payload.args[0].toUpperCase());
             return true;
         }
         return false;
     });
 
     useCommandHandler(COMMAND_NAMES.CLOSE, (payload) => {
-        if (payload.context.sourceId) {
-            workspaceActions.archivePane(payload.context.sourceId);
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (sourceId) {
+            workspaceActions.archivePane(sourceId);
             return true;
         }
         return false;
     });
 
     useCommandHandler(COMMAND_NAMES.HIDE, (payload) => {
-        if (payload.context.sourceId) {
-            workspaceActions.archivePane(payload.context.sourceId);
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (sourceId) {
+            workspaceActions.archivePane(sourceId);
             return true;
         }
         return false;
@@ -73,16 +78,18 @@ export const useRegisterCommands = () => {
     });
 
     useCommandHandler(COMMAND_NAMES.UNDO, (payload) => {
-        if (payload.context.sourceId) {
-            workspaceActions.undoPane(payload.context.sourceId);
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (sourceId) {
+            workspaceActions.undoPane(sourceId);
             return true;
         }
         return false;
     });
 
     useCommandHandler(COMMAND_NAMES.REDO, (payload) => {
-        if (payload.context.sourceId) {
-            workspaceActions.redoPane(payload.context.sourceId);
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (sourceId) {
+            workspaceActions.redoPane(sourceId);
             return true;
         }
         return false;
@@ -126,9 +133,10 @@ export const useRegisterCommands = () => {
             workspaceActions.renamePane(potentialId, newTitle);
             return true;
         }
-        if (payload.context.sourceId && payload.args.length > 0) {
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (sourceId && payload.args.length > 0) {
             const newTitle = payload.args.join(' ');
-            workspaceActions.renamePane(payload.context.sourceId, newTitle);
+            workspaceActions.renamePane(sourceId, newTitle);
             return true;
         }
         return false;
@@ -179,24 +187,107 @@ export const useRegisterCommands = () => {
         return false;
     });
 
-    // --- UI Control Handlers ---
+    useCommandHandler(COMMAND_NAMES.CHAT, (payload) => {
+        const initialMessage = payload.action || 'Hello';
+        const targetId = payload.targetId && /^P\d+$/.test(payload.targetId) ? payload.targetId : undefined;
 
-    useCommandHandler(COMMAND_NAMES.UI_HELP, (payload) => {
-        const isOpen = payload.args[0] === 'close' ? false : true;
-        workspaceActions.toggleHelpOverlay(isOpen);
+        const newPaneId = targetId || `P${Object.keys(useWorkspaceStore.getState().panes).length + 1}`;
+
+        workspaceActions.addPane({
+            id: newPaneId,
+            type: 'chat',
+            title: `Chat: ${initialMessage.substring(0, 20)}...`,
+            content: [{ role: 'user', content: initialMessage }],
+            isSticky: false,
+            lineage: {
+                parentIds: payload.context.sourceId ? [payload.context.sourceId] : [],
+                command: payload.original || '/chat',
+                timestamp: new Date().toISOString()
+            }
+        });
+
+        // Mock response
+        setTimeout(() => {
+            const currentPane = useWorkspaceStore.getState().panes[newPaneId];
+            if (currentPane) {
+                const response = {
+                    role: 'assistant',
+                    content: `I've initialized the session. Context link to ${payload.context.sourceId || 'None'} verified.`
+                };
+                workspaceActions.updatePaneContent(newPaneId, [...currentPane.content, response]);
+            }
+        }, 800);
+
         return true;
     });
 
-    useCommandHandler(COMMAND_NAMES.UI_ARCHIVE, (payload) => {
-        const isOpen = payload.args[0] === 'close' ? false : true;
-        workspaceActions.toggleArchiveOverlay(isOpen);
-        return true;
+    useCommandHandler(COMMAND_NAMES.CLIP, (payload) => {
+        const targetId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (!targetId) {
+            workspaceActions.addNotification('No target pane identified for clipping.', 'error');
+            return false;
+        }
+
+        const pane = useWorkspaceStore.getState().panes[targetId];
+        if (!pane) {
+            workspaceActions.addNotification(`Pane ${targetId} not found.`, 'error');
+            return false;
+        }
+
+        let clipboardContent = '';
+        let formatLabel = 'Text';
+
+        try {
+            switch (pane.type) {
+                case 'chat':
+                    clipboardContent = JSON.stringify({
+                        chat_name: pane.title,
+                        history: pane.content
+                    }, null, 2);
+                    formatLabel = 'JSON';
+                    break;
+                case 'code':
+                    clipboardContent = typeof pane.content === 'string' ? pane.content : JSON.stringify(pane.content, null, 2);
+                    break;
+                case 'doc':
+                    if (typeof pane.content === 'string' && pane.content.startsWith('blob:')) {
+                        workspaceActions.addNotification('Binary files (like PDFs) cannot be clipped.', 'error');
+                        return false;
+                    }
+                    clipboardContent = String(pane.content);
+                    break;
+                case 'visual':
+                    clipboardContent = typeof pane.content === 'string' ? pane.content : (pane.content?.url || pane.content?.src || '');
+                    formatLabel = 'URL';
+                    break;
+                case 'data':
+                    clipboardContent = JSON.stringify(pane.content, null, 2);
+                    formatLabel = 'JSON';
+                    break;
+                default:
+                    workspaceActions.addNotification(`Cannot clip pane of type: ${pane.type}`, 'error');
+                    return false;
+            }
+
+            if (!clipboardContent) {
+                workspaceActions.addNotification('Pane content is empty.', 'error');
+                return false;
+            }
+
+            navigator.clipboard.writeText(clipboardContent).then(() => {
+                workspaceActions.addNotification(`Content copied to clipboard as ${formatLabel}`, 'success');
+            }).catch(err => {
+                workspaceActions.addNotification(`failed to copy: ${err}`, 'error');
+            });
+
+            return true;
+        } catch (e) {
+            workspaceActions.addNotification(`Clipping failed: ${e}`, 'error');
+            return false;
+        }
     });
 
-    useCommandHandler(COMMAND_NAMES.UI_PENDING_SET, (payload) => {
-        workspaceActions.setPendingCommand(payload.args[0] || null);
-        return true;
-    });
+    // --- UI Control Handlers Converted ---
 
     // --- Command Metadata Registration ---
 
@@ -204,10 +295,33 @@ export const useRegisterCommands = () => {
         workspaceActions.registerCommands([
             {
                 name: COMMAND_NAMES.LOAD,
-                description: 'Load a file (PDF, CSV, JSON) into a new pane.',
-                parameters: [{ name: 'file', description: 'File to load', required: false, type: 'file' }],
+                description: 'Open file picker to load content.',
+                parameters: [{ name: 'PaneID', description: 'Target pane ID (optional)', required: false, type: 'paneId' }],
                 category: 'system',
                 shortcut: 'alt+o',
+            },
+            {
+                name: COMMAND_NAMES.CLIP,
+                description: 'Copy pane content (text, chat JSON, or image URL) to clipboard.',
+                parameters: [{ name: 'PaneID', description: 'Source pane ID (optional)', required: false, type: 'paneId' }],
+                category: 'pane',
+                shortcut: 'alt+y',
+            },
+            {
+                name: COMMAND_NAMES.CHAT,
+                description: 'Spawn a new chat pane with an initial message.',
+                parameters: [
+                    { name: '@P1', description: 'Parent pane context (optional)', required: false },
+                    { name: 'Message', description: 'Initial message for the chat', required: true }
+                ],
+                category: 'system',
+                shortcut: 'alt+c',
+            },
+            {
+                name: COMMAND_NAMES.CLEAR,
+                description: 'Clear all terminal notifications.',
+                category: 'system',
+                shortcut: 'ctrl+l',
             },
             {
                 name: COMMAND_NAMES.GRID,

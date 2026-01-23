@@ -12,6 +12,7 @@ These commands control the dynamic grid and the "Shelf" (archive).
 | /swap | `/swap P1 P2` | Exchanges the positions of two panes. |
 | /ls | `/ls [query]` | Opens the Visual Gallery overlay to browse archived panes. |
 | /focus | `/focus P3` | Makes P3 the active pane and scrolls to it. |
+| /chat | `/chat [@P1] <message> [> P2]` | Combines allocation and initialization. Spawns a new chat pane. |
 | /rm | `/rm P1 [--force]` | Deletes a pane. Blocked if children exist unless `--force` is used. |
 | /prune | `/prune [--chat\|--force]` | Smart delete for archived Orphans (non-sticky, terminal nodes). |
 
@@ -23,7 +24,7 @@ Commands for getting data into the system and moving it between formats.
 | /load | `/load [filename] [to P1]` | Ingests a PDF, CSV, or Image. Marks pane as Sticky. |
 | /fetch | `/fetch [url] [to P1]` | Grabs content from a web source. |
 | /export | `/export P1 [pdf\|csv\|json]` | Downloads the content of a pane in the specified format. |
-| /clip | `/clip P1 [range]` | Extracts a specific snippet (e.g., rows 1-10 or a paragraph) to a new pane. |
+| /clip | `/clip [P1]` | Copies pane content (text/image) to the clipboard. Files excluded. |
 
 ### 3. Transformation & AI Analysis
 The core analytical engine. Note that if destination is omitted, the content is replaced (versioned).

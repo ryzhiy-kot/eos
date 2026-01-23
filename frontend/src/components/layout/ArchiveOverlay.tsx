@@ -22,7 +22,7 @@ const ArchiveOverlay: React.FC = () => {
             title="The Shelf (Archive)"
             subtitle={`${archive.length} Items`}
             isOpen={isArchiveOpen}
-            onClose={() => commandBus.dispatch({ name: COMMAND_NAMES.UI_ARCHIVE, args: ['close'], context: { focusedPaneId } })}
+            onClose={() => commandBus.dispatch({ name: COMMAND_NAMES.LS, args: ['close'], context: { focusedPaneId } })}
             maxWidth="max-w-none"
         >
             <div className="flex flex-col h-full">

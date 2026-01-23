@@ -1,23 +1,35 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useWorkspaceStore, PaneType, workspaceActions } from '../store/workspaceStore';
 import { parseCommand } from '../lib/parser';
-import { mockExecute } from '../lib/mockBackend';
 import { generatePaneId } from '../lib/terminalUtils';
-import { commandBus, CommandName, COMMAND_NAMES } from '../lib/commandBus';
+import { COMMAND_NAMES, commandBus, CommandName } from '../lib/commandBus';
+import { useCommandHandler } from './useCommandHandler';
 
 export const useCommandTerminal = () => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const pendingLoadTargetRef = useRef<string | null>(null);
 
     const {
         focusedPaneId: activePaneId, panes,
         pendingCommand,
-        isArchiveOpen, isHelpOpen,
+        isOverlayOpen,
         terminalFocusCounter, commandSubmitRequest,
         commands
     } = useWorkspaceStore();
+
+    useCommandHandler(COMMAND_NAMES.LOAD, (payload) => {
+        pendingLoadTargetRef.current = payload.args[0]?.toUpperCase() || null;
+        fileInputRef.current?.click();
+        return true;
+    });
+
+    useCommandHandler(COMMAND_NAMES.CLEAR, () => {
+        workspaceActions.clearNotification();
+        return true;
+    });
 
     const processCommandString = useCallback(async (rawInput: string) => {
         setIsLoading(true);
@@ -42,49 +54,19 @@ export const useCommandTerminal = () => {
                 const executed = await commandBus.dispatch({
                     name: cmdName,
                     args,
+                    action: action || undefined,
+                    targetId: targetId || undefined,
+                    original: rawInput,
                     context: { sourceId: sourceId || undefined, targetId: targetId || undefined, focusedPaneId: activePaneId }
                 });
 
                 if (!executed) {
-                    // 2. Fallback to mock backend
-                    const result = await mockExecute(verb, sourceId || undefined, action || undefined, targetId || undefined);
-
-                    // Determine if we should create a new pane or update existing
-                    let finalTargetId = targetId;
-                    if (finalTargetId === 'new' || !finalTargetId) {
-                        const newId = generatePaneId(panes);
-                        workspaceActions.addPane({
-                            id: newId,
-                            type: result.type,
-                            title: result.title,
-                            content: result.content,
-                            isSticky: false,
-                            lineage: {
-                                parentIds: sourceId ? [sourceId] : [],
-                                command: rawInput,
-                                timestamp: new Date().toISOString()
-                            }
-                        });
-                    } else if (panes[finalTargetId]) {
-                        workspaceActions.updatePaneContent(finalTargetId, result.content);
-                    } else {
-                        workspaceActions.addPane({
-                            id: finalTargetId,
-                            type: result.type,
-                            title: result.title,
-                            content: result.content,
-                            isSticky: false,
-                            lineage: {
-                                parentIds: sourceId ? [sourceId] : [],
-                                command: rawInput,
-                                timestamp: new Date().toISOString()
-                            }
-                        });
-                    }
+                    workspaceActions.addNotification(`Unknown command: /${verb}`, 'error');
                 }
             }
         } catch (error) {
             console.error('Command processing error:', error);
+            workspaceActions.addNotification('An error occurred while processing the command.', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -94,9 +76,11 @@ export const useCommandTerminal = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        const targetId = pendingLoadTargetRef.current;
+        pendingLoadTargetRef.current = null; // Clear immediately
+
         setIsLoading(true);
         try {
-            const newId = generatePaneId(panes);
             let type: PaneType = 'doc';
             let content: any = '';
 
@@ -118,14 +102,29 @@ export const useCommandTerminal = () => {
                 }
             }
 
-            workspaceActions.addPane({
-                id: newId,
-                type,
-                title: file.name,
-                content,
-                isSticky: true,
-                lineage: { parentIds: [], command: `/load ${file.name}`, timestamp: new Date().toISOString() }
-            });
+            if (targetId && panes[targetId]) {
+                // Update existing pane
+                workspaceActions.updatePaneContent(targetId, content, true);
+                // Also update title and type since a new file was loaded
+                useWorkspaceStore.setState((state) => ({
+                    panes: {
+                        ...state.panes,
+                        [targetId]: { ...state.panes[targetId], title: file.name, type }
+                    }
+                }));
+                workspaceActions.focusPane(targetId);
+            } else {
+                // Create new pane
+                const newId = generatePaneId(panes);
+                workspaceActions.addPane({
+                    id: newId,
+                    type,
+                    title: file.name,
+                    content,
+                    isSticky: true,
+                    lineage: { parentIds: [], command: `/load ${file.name}`, timestamp: new Date().toISOString() }
+                });
+            }
         } catch (error) {
             console.error('File load error:', error);
         } finally {
@@ -137,6 +136,9 @@ export const useCommandTerminal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
+
+        workspaceActions.clearNotification();
+
         const rawInput = input;
         setInput('');
         await processCommandString(rawInput);
@@ -145,21 +147,63 @@ export const useCommandTerminal = () => {
     useEffect(() => {
         if (pendingCommand) {
             setInput(pendingCommand);
-            commandBus.dispatch({ name: COMMAND_NAMES.UI_PENDING_SET, args: [], context: { focusedPaneId: activePaneId } });
+            workspaceActions.setPendingCommand(null);
             inputRef.current?.focus();
         }
     }, [pendingCommand, activePaneId]);
 
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === '`' && e.ctrlKey) {
+        const handleInteraction = (e: MouseEvent | KeyboardEvent) => {
+            // Priority 1: Ctrl+` always triggers focus
+            if (e instanceof KeyboardEvent && e.key === '`' && e.ctrlKey) {
                 e.preventDefault();
                 workspaceActions.triggerFocusTerminal();
+                return;
+            }
+
+            // Priority 2: Maintain focus on terminal unless an overlay/dialog input is targeted
+            if (e instanceof MouseEvent) {
+                // Wait for the click to process so we don't block selection or normal browser behavior
+                requestAnimationFrame(() => {
+                    const activeElement = document.activeElement;
+
+                    // If we clicked something that naturally takes focus (like an input or textarea)
+                    // and it's NOT our terminal input, check if it's inside an overlay
+                    if (activeElement &&
+                        (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') &&
+                        activeElement !== inputRef.current) {
+
+                        // If it's in a dialog or overlay, let it keep focus
+                        if (activeElement.closest('.overlay-backdrop, .overlay-window')) {
+                            return;
+                        }
+                    }
+
+                    // For all other clicks (workspace background, pane headers, clocks, etc.)
+                    // OR if the clicked element was an input NOT in an overlay (which shouldn't happen but just in case)
+                    // enforce terminal focus.
+                    if (!isOverlayOpen) {
+                        inputRef.current?.focus();
+                    }
+                });
             }
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+
+        window.addEventListener('keydown', handleInteraction);
+        window.addEventListener('mousedown', handleInteraction);
+
+        return () => {
+            window.removeEventListener('keydown', handleInteraction);
+            window.removeEventListener('mousedown', handleInteraction);
+        };
+    }, [isOverlayOpen]);
+
+    // Refocus when active pane changes or command finishes, if no overlay is open
+    useEffect(() => {
+        if (!isOverlayOpen && !isLoading) {
+            inputRef.current?.focus();
+        }
+    }, [activePaneId, isOverlayOpen, isLoading]);
 
     useEffect(() => {
         inputRef.current?.focus();
@@ -171,6 +215,15 @@ export const useCommandTerminal = () => {
         }
     }, [commandSubmitRequest]);
 
+    // Initial focus on mount (e.g., after login or refresh) - optimized to avoid magic timers
+    useEffect(() => {
+        // We use requestAnimationFrame to ensure the focus happens after the browser has finished layout/paint
+        const frameId = requestAnimationFrame(() => {
+            inputRef.current?.focus();
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, []);
+
     return {
         input,
         setInput,
@@ -179,8 +232,7 @@ export const useCommandTerminal = () => {
         handleFileSelect,
         inputRef,
         fileInputRef,
-        isArchiveOpen,
-        isHelpOpen,
+        isOverlayOpen,
         activePaneId,
         commands
     };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useWorkspaceStore, workspaceActions } from '../../store/workspaceStore';
 import { Search, Terminal, ArrowRight } from 'lucide-react';
 import OverlayWindow from './OverlayWindow';
 import { formatCommandUsage } from '../../lib/commandRegistry';
@@ -22,8 +22,8 @@ const HelpOverlay: React.FC = () => {
     }, [search, isHelpOpen]);
 
     const handleSelect = (name: string) => {
-        commandBus.dispatch({ name: COMMAND_NAMES.UI_PENDING_SET, args: [`/${name} `], context: { focusedPaneId } });
-        commandBus.dispatch({ name: COMMAND_NAMES.UI_HELP, args: ['close'], context: { focusedPaneId } });
+        workspaceActions.setPendingCommand(`/${name} `);
+        commandBus.dispatch({ name: COMMAND_NAMES.HELP, args: ['close'], context: { focusedPaneId } });
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -38,7 +38,7 @@ const HelpOverlay: React.FC = () => {
             if (filteredCommands.length > 0) {
                 handleSelect(filteredCommands[selectedIndex].name);
             } else {
-                commandBus.dispatch({ name: COMMAND_NAMES.UI_HELP, args: ['close'], context: { focusedPaneId } });
+                commandBus.dispatch({ name: COMMAND_NAMES.HELP, args: ['close'], context: { focusedPaneId } });
             }
         }
     };
@@ -48,7 +48,7 @@ const HelpOverlay: React.FC = () => {
             title="Command Center (Help)"
             subtitle="Registry-Driven"
             isOpen={isHelpOpen}
-            onClose={() => commandBus.dispatch({ name: COMMAND_NAMES.UI_HELP, args: ['close'], context: { focusedPaneId } })}
+            onClose={() => commandBus.dispatch({ name: COMMAND_NAMES.HELP, args: ['close'], context: { focusedPaneId } })}
         >
             <div className="flex flex-col h-full">
                 {/* Search */}

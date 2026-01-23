@@ -3,7 +3,9 @@ import AppShell from './components/layout/AppShell';
 import LoginForm from './components/auth/LoginForm';
 
 function App() {
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const { isAuthenticated, isHydrated } = useAuthStore();
+
+    if (!isHydrated) return null;
 
     return (
         isAuthenticated ? <AppShell /> : <LoginForm />

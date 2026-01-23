@@ -2,10 +2,11 @@ import React from 'react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { CommandEntry } from '../../lib/commandRegistry';
-import { useRegisterCommands } from '../../hooks/useRegisterCommands';
 import { useCommandTerminal } from '../../hooks/useCommandTerminal';
 import TerminalInput from './TerminalInput';
 import TerminalStatus from './TerminalStatus';
+import TerminalNotification from './TerminalNotification';
+import { COMMAND_NAMES, commandBus } from '../../lib/commandBus';
 
 const ShortcutHandler: React.FC<{
     cmd: CommandEntry;
@@ -25,17 +26,14 @@ const ShortcutHandler: React.FC<{
 };
 
 const CommandTerminal: React.FC = () => {
-    // 1. Register all system/data commands
-    useRegisterCommands();
-
-    // 2. Terminal logic (input, execution, focus, files)
+    // 1. Terminal logic (input, execution, focus, files)
     const {
         input, setInput,
         isLoading,
-        inputRef, fileInputRef,
         handleSubmit,
         handleFileSelect,
-        processCommandString,
+        inputRef,
+        fileInputRef,
         activePaneId
     } = useCommandTerminal();
 
@@ -44,19 +42,23 @@ const CommandTerminal: React.FC = () => {
     const activePane = activePaneId ? panes[activePaneId] : null;
 
     return (
-        <div className="bg-panel-light dark:bg-panel-dark rounded p-4 flex items-center gap-3 transition-all duration-300">
+        <div className="relative bg-panel-light dark:bg-panel-dark rounded p-4 flex items-center gap-3 transition-all duration-300">
             {/* Dynamic Shortcut Registration */}
             {commands.map(cmd => cmd.shortcut && (
                 <ShortcutHandler
                     key={cmd.name}
                     cmd={cmd}
-                    onTrigger={(name) => processCommandString(`/${name}`)}
+                    onTrigger={(name) => commandBus.dispatch({ name: COMMAND_NAMES.SHOW, args: [name], context: { sourceId: name, focusedPaneId: activePaneId } })}
                     onPopulate={(name) => {
                         setInput(`/${name} `);
-                        inputRef.current?.focus();
                     }}
                 />
             ))}
+
+            {/* Notification Section */}
+            <div className="absolute left-4 right-4 bottom-full mb-1">
+                <TerminalNotification />
+            </div>
 
             {/* Input Section */}
             <TerminalInput

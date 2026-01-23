@@ -1,6 +1,7 @@
 export const COMMAND_NAMES = {
     LOAD: 'load',
     GRID: 'grid',
+    CLEAR: 'clear',
     FOCUS: 'focus',
     SWAP: 'swap',
     CLOSE: 'close',
@@ -23,9 +24,8 @@ export const COMMAND_NAMES = {
     REMOVE_CLOCK: 'rmclock',
     REMOVE_TIMER: 'rmtimer',
     INIT: 'init',
-    UI_HELP: 'ui-help',
-    UI_ARCHIVE: 'ui-ls',
-    UI_PENDING_SET: 'ui-pending-set',
+    CHAT: 'chat',
+    CLIP: 'clip',
 } as const;
 
 export type CommandName = typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES];
@@ -33,6 +33,9 @@ export type CommandName = typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES];
 export interface CommandPayload {
     name: CommandName;
     args: string[];
+    action?: string;
+    targetId?: string;
+    original?: string;
     context: {
         sourceId?: string;
         targetId?: string;
@@ -68,7 +71,8 @@ class CommandBus {
     async dispatch(payload: CommandPayload): Promise<boolean> {
         const subscribers = this.subscribers.get(payload.name);
         if (!subscribers || subscribers.size === 0) {
-            console.warn(`No subscribers for command: ${payload.name}`);
+            // Log as debug rather than warn to avoid console clutter for user-typed typos
+            console.debug(`No subscribers for command: ${payload.name}`);
             payload.onComplete?.(false);
             return false;
         }

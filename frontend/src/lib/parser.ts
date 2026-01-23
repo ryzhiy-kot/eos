@@ -41,12 +41,15 @@ export const parseCommand = (input: string, activePaneId: string | null): Parsed
     let sourceId: string | undefined = undefined;
     let actionStartIdx = 1;
 
-    // Check if second token is a Pane ID (P1, P2, etc.)
-    if (tokens[1] && /^P\d+$/.test(tokens[1])) {
-        sourceId = tokens[1];
-        actionStartIdx = 2;
-    } else {
-        sourceId = activePaneId || undefined;
+    // Check if second token is a Pane ID (P1, P2, etc.) or @P1
+    if (tokens[1]) {
+        if (/^@P\d+$/.test(tokens[1])) {
+            sourceId = tokens[1].substring(1).toUpperCase();
+            actionStartIdx = 2;
+        } else if (/^P\d+$/.test(tokens[1])) {
+            sourceId = tokens[1].toUpperCase();
+            actionStartIdx = 2;
+        }
     }
 
     const action = tokens.slice(actionStartIdx).join(' ');

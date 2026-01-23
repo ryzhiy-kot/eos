@@ -48,6 +48,8 @@ interface WorkspaceState {
     timers: TimerConfig[];
     isArchiveOpen: boolean; // For visual catalog overlay
     isHelpOpen: boolean;
+    isOverlayOpen: boolean;
+    notifications: Array<{ id: string, message: string, type: 'error' | 'success' | 'info' }>;
     pendingCommand: string | null;
     commands: CommandEntry[];
 
@@ -71,6 +73,8 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
     timers: [],
     isArchiveOpen: false,
     isHelpOpen: false,
+    isOverlayOpen: false,
+    notifications: [],
     pendingCommand: null,
     commands: [],
 
@@ -191,7 +195,7 @@ export const workspaceActions = {
 
     restorePane: (id: string) => useWorkspaceStore.setState((state) => {
         if (state.activeLayout.includes(id)) {
-            return { focusedPaneId: id, isArchiveOpen: false };
+            return { focusedPaneId: id, isArchiveOpen: false, isOverlayOpen: false };
         }
 
         let newLayout = [...state.activeLayout];
@@ -229,15 +233,23 @@ export const workspaceActions = {
         return { activeLayout: layout };
     }),
 
-    toggleArchiveOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => ({
-        isArchiveOpen: isOpen !== undefined ? isOpen : !state.isArchiveOpen,
-        isHelpOpen: false
-    })),
+    toggleArchiveOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => {
+        const nextOpen = isOpen !== undefined ? isOpen : !state.isArchiveOpen;
+        return {
+            isArchiveOpen: nextOpen,
+            isHelpOpen: false,
+            isOverlayOpen: nextOpen
+        };
+    }),
 
-    toggleHelpOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => ({
-        isHelpOpen: isOpen !== undefined ? isOpen : !state.isHelpOpen,
-        isArchiveOpen: false
-    })),
+    toggleHelpOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => {
+        const nextOpen = isOpen !== undefined ? isOpen : !state.isHelpOpen;
+        return {
+            isHelpOpen: nextOpen,
+            isArchiveOpen: false,
+            isOverlayOpen: nextOpen
+        };
+    }),
 
     setPendingCommand: (cmd: string | null) => useWorkspaceStore.setState({ pendingCommand: cmd }),
 
@@ -312,4 +324,13 @@ export const workspaceActions = {
         });
         return { commands: newCommands };
     }),
+
+    addNotification: (message: string, type: 'error' | 'success' | 'info' = 'info') =>
+        useWorkspaceStore.setState((state) => ({
+            notifications: [...state.notifications, { id: `notif_${Date.now()}_${Math.random()}`, message, type }]
+        })),
+
+    clearNotification: (id?: string) => useWorkspaceStore.setState((state) => ({
+        notifications: id ? state.notifications.filter(n => n.id !== id) : []
+    })),
 };

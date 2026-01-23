@@ -18,18 +18,6 @@ export const mockExecute = async (
     await delay(600); // Simulate network latency
 
     switch (verb) {
-        case 'load':
-            // Logic moved to frontend, but if called via backend fallback:
-            return {
-                type: 'data',
-                title: `Data: ${action || 'Untitled'}`,
-                content: [
-                    { id: 1, name: 'Alpha', value: 100 },
-                    { id: 2, name: 'Beta', value: 200 },
-                    { id: 3, name: 'Gamma', value: 150 },
-                ]
-            };
-
         case 'plot':
             return {
                 type: 'visual',
