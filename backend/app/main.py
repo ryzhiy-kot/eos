@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 from contextlib import asynccontextmanager
+import asyncio
+import json
 
 from .database import engine, Base, get_db
 from . import models, schemas
@@ -28,7 +31,7 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/", response_model=schemas.RootResponse)
 async def root():
     return {"message": "Welcome to Elyon API"}
 
@@ -117,7 +120,9 @@ async def update_workspace(
     return workspace
 
 
-@app.delete("/api/workspaces/{workspace_id}")
+@app.delete(
+    "/api/workspaces/{workspace_id}", response_model=schemas.DeleteWorkspaceResponse
+)
 async def delete_workspace(workspace_id: str, db: AsyncSession = Depends(get_db)):
     # Soft archive
     result = await db.execute(
@@ -129,9 +134,93 @@ async def delete_workspace(workspace_id: str, db: AsyncSession = Depends(get_db)
 
     workspace.is_archived = True
     await db.commit()
-    return {"status": "archived"}
+    return {"success": True, "status": "archived"}
 
 
-@app.get("/api/health")
+# Data Command Endpoints
+@app.post("/api/commands/plot", response_model=schemas.PlotResponse)
+async def plot_command(req: schemas.PlotRequest):
+    # Mock implementation - replace with actual plotting logic
+    return {
+        "success": True,
+        "result": {
+            "type": "visual",
+            "url": f"data:image/svg+xml,<svg>Mock plot for {req.pane_id}</svg>",
+            "description": f"Generated plot based on: {req.prompt}",
+        },
+    }
+
+
+@app.post("/api/commands/run", response_model=schemas.RunResponse)
+async def run_command(req: schemas.RunRequest):
+    # Mock implementation - replace with actual code execution
+    return {
+        "success": True,
+        "result": {
+            "type": "code",
+            "output": f"Executed code on pane {req.pane_id}",
+            "status": "success",
+        },
+    }
+
+
+@app.post("/api/commands/diff", response_model=schemas.DiffResponse)
+async def diff_command(req: schemas.DiffRequest):
+    # Mock implementation - replace with actual diff logic
+    return {
+        "success": True,
+        "result": {
+            "type": "data",
+            "differences": f"Comparing {req.pane_id_1} and {req.pane_id_2}",
+            "summary": "Mock diff result",
+        },
+    }
+
+
+@app.post("/api/commands/summarize", response_model=schemas.SummarizeResponse)
+async def summarize_command(req: schemas.SummarizeRequest):
+    # Mock implementation - replace with actual summarization
+    return {
+        "success": True,
+        "result": {
+            "type": "doc",
+            "summary": f"Summary of pane {req.pane_id}",
+            "key_points": ["Point 1", "Point 2", "Point 3"],
+        },
+    }
+
+
+# SSE Event Stream Endpoint
+async def event_generator():
+    """Generate SSE events for real-time communication"""
+    try:
+        while True:
+            # Send heartbeat every 30 seconds
+            heartbeat = {
+                "type": "heartbeat",
+                "timestamp": asyncio.get_event_loop().time(),
+            }
+            yield f"data: {json.dumps(heartbeat)}\n\n"
+            await asyncio.sleep(30)
+    except asyncio.CancelledError:
+        # Client disconnected
+        pass
+
+
+@app.get("/api/events/stream")
+async def event_stream():
+    """SSE endpoint for real-time server-to-client communication"""
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )
+
+
+@app.get("/api/health", response_model=schemas.HealthCheckResponse)
 async def health_check():
     return {"status": "healthy"}

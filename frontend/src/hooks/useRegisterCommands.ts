@@ -289,6 +289,149 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     // --- UI Control Handlers Converted ---
 
+    // --- Data Command Handlers ---
+    useCommandHandler(COMMAND_NAMES.PLOT, async (payload) => {
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (!sourceId) {
+            workspaceActions.addNotification('No pane selected for plotting', 'error');
+            return false;
+        }
+
+        const prompt = payload.action || 'Generate visualization';
+
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            const response = await apiClient.plot(sourceId, prompt);
+
+            const newPaneId = `P${Date.now()}`;
+            workspaceActions.addPane({
+                id: newPaneId,
+                type: 'visual',
+                title: `Plot: ${sourceId}`,
+                content: response.result.url,
+                isSticky: false,
+                lineage: {
+                    parentIds: [sourceId],
+                    command: payload.original || `/plot ${sourceId} "${prompt}"`,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            workspaceActions.addNotification('Plot generated successfully', 'success');
+            return true;
+        } catch (error) {
+            workspaceActions.addNotification(`Plot failed: ${error}`, 'error');
+            return false;
+        }
+    });
+
+    useCommandHandler(COMMAND_NAMES.RUN, async (payload) => {
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (!sourceId) {
+            workspaceActions.addNotification('No pane selected for code execution', 'error');
+            return false;
+        }
+
+        const code = payload.action || '';
+        if (!code) {
+            workspaceActions.addNotification('No code provided', 'error');
+            return false;
+        }
+
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            const response = await apiClient.run(sourceId, code);
+
+            const newPaneId = `P${Date.now()}`;
+            workspaceActions.addPane({
+                id: newPaneId,
+                type: 'code',
+                title: `Run: ${sourceId}`,
+                content: response.result.output,
+                isSticky: false,
+                lineage: {
+                    parentIds: [sourceId],
+                    command: payload.original || `/run ${sourceId} "${code}"`,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            workspaceActions.addNotification('Code executed successfully', 'success');
+            return true;
+        } catch (error) {
+            workspaceActions.addNotification(`Execution failed: ${error}`, 'error');
+            return false;
+        }
+    });
+
+    useCommandHandler(COMMAND_NAMES.DIFF, async (payload) => {
+        const paneIds = payload.args;
+        if (paneIds.length < 2) {
+            workspaceActions.addNotification('Need two pane IDs for diff', 'error');
+            return false;
+        }
+
+        const [id1, id2] = paneIds.map(id => id.toUpperCase());
+
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            const response = await apiClient.diff(id1, id2);
+
+            const newPaneId = `P${Date.now()}`;
+            workspaceActions.addPane({
+                id: newPaneId,
+                type: 'data',
+                title: `Diff: ${id1} vs ${id2}`,
+                content: response.result,
+                isSticky: false,
+                lineage: {
+                    parentIds: [id1, id2],
+                    command: payload.original || `/diff ${id1},${id2}`,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            workspaceActions.addNotification('Diff completed', 'success');
+            return true;
+        } catch (error) {
+            workspaceActions.addNotification(`Diff failed: ${error}`, 'error');
+            return false;
+        }
+    });
+
+    useCommandHandler(COMMAND_NAMES.SUMMARIZE, async (payload) => {
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (!sourceId) {
+            workspaceActions.addNotification('No pane selected for summarization', 'error');
+            return false;
+        }
+
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            const response = await apiClient.summarize(sourceId);
+
+            const newPaneId = `P${Date.now()}`;
+            workspaceActions.addPane({
+                id: newPaneId,
+                type: 'doc',
+                title: `Summary: ${sourceId}`,
+                content: response.result.summary,
+                isSticky: false,
+                lineage: {
+                    parentIds: [sourceId],
+                    command: payload.original || `/summarize ${sourceId}`,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            workspaceActions.addNotification('Summary generated', 'success');
+            return true;
+        } catch (error) {
+            workspaceActions.addNotification(`Summarization failed: ${error}`, 'error');
+            return false;
+        }
+    });
+
     // --- Command Metadata Registration ---
 
     useEffect(() => {

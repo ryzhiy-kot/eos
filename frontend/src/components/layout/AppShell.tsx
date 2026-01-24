@@ -1,13 +1,27 @@
 import React from 'react';
-import ChronoHeader from './ChronoHeader';
+import Header from './Header';
 import WorkspaceGrid from '../grid/WorkspaceGrid';
 import CommandTerminal from '../terminal/CommandTerminal';
 import ArchiveOverlay from './ArchiveOverlay';
 import HelpOverlay from './HelpOverlay';
 import { useRegisterCommands } from '../../hooks/useRegisterCommands';
+import { useSSE } from '../../hooks/useSSE';
 
 const AppShell: React.FC = () => {
     const [isRegistryReady, setIsRegistryReady] = React.useState(false);
+
+    // Initialize SSE connection for real-time communication
+    const { status: connectionStatus } = useSSE({
+        onMessage: (message) => {
+            // Handle different message types
+            if (message.type === 'notification') {
+                console.log('SSE notification:', message);
+            }
+        },
+        onError: (error) => {
+            console.error('SSE error:', error);
+        }
+    });
 
     // Register commands at the top level and track readiness
     useRegisterCommands(() => setIsRegistryReady(true));
@@ -17,7 +31,7 @@ const AppShell: React.FC = () => {
             <ArchiveOverlay />
             <HelpOverlay />
 
-            <ChronoHeader />
+            <Header connectionStatus={connectionStatus} />
 
             <main className="flex-1 relative overflow-hidden p-2">
                 {isRegistryReady && <WorkspaceGrid />}

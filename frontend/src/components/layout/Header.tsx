@@ -3,7 +3,13 @@ import { ShieldCheck, Activity, Wifi, Clock, Timer, X } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 
-const ChronoHeader: React.FC = () => {
+type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | 'error';
+
+interface HeaderProps {
+    connectionStatus?: ConnectionStatus;
+}
+
+const Header: React.FC<HeaderProps> = ({ connectionStatus = 'disconnected' }) => {
     const [time, setTime] = useState(new Date());
     const { clocks, timers, focusedPaneId } = useWorkspaceStore();
 
@@ -81,21 +87,17 @@ const ChronoHeader: React.FC = () => {
 
             {/* Right: System Status */}
             <div className="flex items-center space-x-6 whitespace-nowrap hidden md:flex">
-                <div className="flex items-center space-x-2 text-emerald-500">
-                    <ShieldCheck size={14} />
-                    <span>SYSTEM NORMAL</span>
-                </div>
-                <div className="flex items-center space-x-2 text-neutral-500">
-                    <Activity size={14} />
-                    <span>LATENCY: 12ms</span>
-                </div>
-                <div className="flex items-center space-x-2 text-neutral-500">
-                    <Wifi size={14} />
-                    <span>CONNECTED</span>
+                <div className={`flex items-center space-x-2 ${connectionStatus === 'connected' ? 'text-emerald-500' :
+                    connectionStatus === 'connecting' ? 'text-yellow-500' :
+                        connectionStatus === 'error' ? 'text-red-500' :
+                            'text-neutral-500'
+                    }`}>
+                    <Wifi size={14} className={connectionStatus === 'connected' ? '' : 'animate-pulse'} />
+                    <span>{connectionStatus.toUpperCase()}</span>
                 </div>
             </div>
         </div>
     );
 };
 
-export default ChronoHeader;
+export default Header;
