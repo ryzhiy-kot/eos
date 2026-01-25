@@ -4,6 +4,7 @@ import { parseCommand } from '../lib/parser';
 import { generatePaneId } from '../lib/terminalUtils';
 import { COMMAND_NAMES, commandBus, CommandName } from '../lib/commandBus';
 import { useCommandHandler } from './useCommandHandler';
+import { apiClient } from '../lib/apiClient';
 
 export const useCommandTerminal = () => {
     const [input, setInput] = useState('');
@@ -13,12 +14,25 @@ export const useCommandTerminal = () => {
     const pendingLoadTargetRef = useRef<string | null>(null);
 
     const {
-        focusedPaneId: activePaneId, panes,
+        focusedPaneId: activePaneId,
         pendingCommand,
         isOverlayOpen,
         terminalFocusCounter, commandSubmitRequest,
         commands
     } = useWorkspaceStore();
+
+    // Load sessions on mount
+    useEffect(() => {
+        const loadSessions = async () => {
+            try {
+                const sessions = await apiClient.listSessions('default_workspace');
+                workspaceActions.setChatSessions(sessions);
+            } catch (error) {
+                console.error('Failed to load sessions:', error);
+            }
+        };
+        loadSessions();
+    }, []);
 
     useCommandHandler(COMMAND_NAMES.LOAD, (payload) => {
         pendingLoadTargetRef.current = payload.args[0]?.toUpperCase() || null;
@@ -36,20 +50,121 @@ export const useCommandTerminal = () => {
         try {
             const { type, verb, sourceId, action, targetId } = parseCommand(rawInput, activePaneId);
             const args = action ? action.split(' ') : [];
-            const activePane = activePaneId ? panes[activePaneId] : null;
+            const state = useWorkspaceStore.getState();
+            const activePane = activePaneId ? state.panes[activePaneId] : null;
 
             if (type === 'message') {
-                if (activePane && activePane.type === 'chat') {
-                    const newContent = [...(activePane.content || []), { role: 'user', content: rawInput }];
-                    workspaceActions.updatePaneContent(activePane.id, newContent);
+                // Chat logic: Find or create a chat pane
+                let chatPane = activePane && activePane.type === 'chat' ? activePane : null;
 
-                    setTimeout(() => {
-                        const response = { role: 'assistant', content: `Echo: ${rawInput}` };
-                        workspaceActions.updatePaneContent(activePane.id, [...newContent, response]);
-                    }, 500);
+                if (!chatPane) {
+                    const allPanes = Object.values(state.panes);
+                    const chatPanes = allPanes
+                        .filter(p => p.type === 'chat')
+                        .sort((a, b) => {
+                            const timeA = new Date(a.lineage?.timestamp || 0).getTime();
+                            const timeB = new Date(b.lineage?.timestamp || 0).getTime();
+                            return timeB - timeA;
+                        });
+
+                    if (chatPanes.length > 0) {
+                        chatPane = chatPanes[0];
+                        workspaceActions.focusPane(chatPane.id);
+                    }
+                }
+
+                if (!chatPane) {
+                    const artifactId = `A_CHAT_${Date.now()}`;
+                    const paneId = generatePaneId(state.panes);
+
+                    const newArtifact = {
+                        id: artifactId,
+                        type: 'chat' as PaneType,
+                        payload: { messages: [] },
+                        session_id: `SESSION_${paneId}`,
+                        mutations: []
+                    };
+
+                    try { await apiClient.createArtifact(newArtifact); }
+                    catch (e) { console.error('Failed to persist auto-chat artifact:', e); }
+
+                    workspaceActions.addArtifact(newArtifact);
+                    const newPane = {
+                        id: paneId,
+                        artifactId: artifactId,
+                        type: 'chat' as PaneType,
+                        title: `Chat ${paneId}`,
+                        isSticky: false,
+                        lineage: {
+                            parentIds: [],
+                            command: 'initial_chat',
+                            timestamp: new Date().toISOString()
+                        }
+                    };
+                    workspaceActions.addPane(newPane);
+                    chatPane = newPane;
+                }
+
+                const artifactId = chatPane.artifactId;
+                const artifact = state.artifacts[artifactId];
+                if (!artifact) return;
+
+                const paneRefs = rawInput.match(/@P\d+/gi) || [];
+                const contextArtifacts: Record<string, any> = {};
+                const referencedArtifactIds: string[] = [];
+                const optimisticArtifacts: any[] = [];
+
+                paneRefs.forEach(ref => {
+                    const id = ref.substring(1).toUpperCase();
+                    const p = state.panes[id];
+                    if (p) {
+                        const r = state.artifacts[p.artifactId];
+                        if (r) {
+                            contextArtifacts[p.artifactId] = r;
+                            referencedArtifactIds.push(p.artifactId);
+                            optimisticArtifacts.push(r);
+                        }
+                    }
+                });
+
+                const userMsg = {
+                    role: 'user' as const,
+                    content: rawInput,
+                    referenced_artifact_ids: referencedArtifactIds,
+                    artifacts: optimisticArtifacts
+                };
+                const updatedMessages = [...(artifact.payload.messages || []), userMsg];
+                workspaceActions.updateArtifactPayload(artifactId, { messages: updatedMessages });
+
+                try {
+                    const sessionId = `SESSION_${chatPane.id}`;
+                    const response = await apiClient.execute({
+                        type: 'chat',
+                        session_id: sessionId,
+                        action: rawInput,
+                        context_artifacts: contextArtifacts,
+                        referenced_artifact_ids: referencedArtifactIds
+                    });
+
+                    if (response.success && response.result.output_message) {
+                        const assistantMsg = response.result.output_message;
+
+                        // Register any full artifacts returned in artifacts
+                        if (assistantMsg.artifacts) {
+                            assistantMsg.artifacts.forEach((art: any) => {
+                                workspaceActions.addArtifact(art);
+                            });
+                        }
+
+                        workspaceActions.updateArtifactPayload(artifactId, { messages: [...updatedMessages, assistantMsg] });
+                        const sessions = await apiClient.listSessions('default_workspace');
+                        workspaceActions.setChatSessions(sessions);
+                    }
+                } catch (error) {
+                    console.error('Chat error:', error);
+                    workspaceActions.addNotification('Failed to get chat response', 'error');
                 }
             } else if (verb) {
-                // 1. Try to dispatch as an internal command via the Bus
                 const cmdName = verb.toLowerCase() as CommandName;
                 const executed = await commandBus.dispatch({
                     name: cmdName,
@@ -70,57 +185,77 @@ export const useCommandTerminal = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [activePaneId, panes]);
+    }, [activePaneId]);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         const targetId = pendingLoadTargetRef.current;
-        pendingLoadTargetRef.current = null; // Clear immediately
+        pendingLoadTargetRef.current = null;
 
         setIsLoading(true);
         try {
+            const state = useWorkspaceStore.getState();
             let type: PaneType = 'doc';
-            let content: any = '';
+            let payload: any = null;
 
             if (file.type.startsWith('image/')) {
                 type = 'visual';
-                content = URL.createObjectURL(file);
+                payload = { format: 'img', url: URL.createObjectURL(file) };
             } else if (file.type === 'application/pdf') {
                 type = 'doc';
-                content = URL.createObjectURL(file);
+                payload = { format: 'pdf', value: URL.createObjectURL(file), is_url: true };
             } else {
-                // Default to text-based reading for code/data/docs
-                content = await file.text();
+                const text = await file.text();
                 if (file.type.includes('json') || file.name.endsWith('.json')) {
                     type = 'data';
+                    payload = { format: 'json', data: JSON.parse(text) };
                 } else if (file.type.includes('javascript') || file.type.includes('python')) {
                     type = 'code';
+                    payload = { language: file.type.includes('python') ? 'python' : 'javascript', source: text, filename: file.name };
                 } else {
-                    type = file.name.endsWith('.py') || file.name.endsWith('.js') || file.name.endsWith('.ts') ? 'code' : 'doc';
+                    const isCodeExtension = file.name.endsWith('.py') || file.name.endsWith('.js') || file.name.endsWith('.ts');
+                    type = isCodeExtension ? 'code' : 'doc';
+                    if (type === 'code') {
+                        payload = { language: file.name.endsWith('.py') ? 'python' : 'typescript', source: text, filename: file.name };
+                    } else {
+                        payload = { format: 'md', value: text, is_url: false };
+                    }
                 }
             }
 
-            if (targetId && panes[targetId]) {
-                // Update existing pane
-                workspaceActions.updatePaneContent(targetId, content, true);
-                // Also update title and type since a new file was loaded
-                useWorkspaceStore.setState((state) => ({
-                    panes: {
-                        ...state.panes,
-                        [targetId]: { ...state.panes[targetId], title: file.name, type }
-                    }
-                }));
+            if (targetId && state.panes[targetId]) {
+                const artifactId = state.panes[targetId].artifactId;
+                const updatedArtifact = { ...state.artifacts[artifactId], payload };
+                workspaceActions.updateArtifactPayload(artifactId, payload, true);
+                workspaceActions.renamePane(targetId, file.name);
                 workspaceActions.focusPane(targetId);
+
+                // Persist update
+                try { await apiClient.createArtifact(updatedArtifact); }
+                catch (e) { console.error('Failed to persist artifact update:', e); }
             } else {
-                // Create new pane
-                const newId = generatePaneId(panes);
+                const artifactId = `A_FILE_${Date.now()}`;
+                const paneId = generatePaneId(state.panes);
+                const newArtifact = {
+                    id: artifactId,
+                    type,
+                    payload,
+                    session_id: 'default_session',
+                    mutations: []
+                };
+
+                // Persist new artifact first
+                try { await apiClient.createArtifact(newArtifact); }
+                catch (e) { console.error('Failed to persist new artifact:', e); }
+
+                workspaceActions.addArtifact(newArtifact);
                 workspaceActions.addPane({
-                    id: newId,
+                    id: paneId,
+                    artifactId: artifactId,
                     type,
                     title: file.name,
-                    content,
                     isSticky: true,
                     lineage: { parentIds: [], command: `/load ${file.name}`, timestamp: new Date().toISOString() }
                 });
@@ -154,34 +289,22 @@ export const useCommandTerminal = () => {
 
     useEffect(() => {
         const handleInteraction = (e: MouseEvent | KeyboardEvent) => {
-            // Priority 1: Ctrl+` always triggers focus
             if (e instanceof KeyboardEvent && e.key === '`' && e.ctrlKey) {
                 e.preventDefault();
                 workspaceActions.triggerFocusTerminal();
                 return;
             }
 
-            // Priority 2: Maintain focus on terminal unless an overlay/dialog input is targeted
             if (e instanceof MouseEvent) {
-                // Wait for the click to process so we don't block selection or normal browser behavior
                 requestAnimationFrame(() => {
                     const activeElement = document.activeElement;
-
-                    // If we clicked something that naturally takes focus (like an input or textarea)
-                    // and it's NOT our terminal input, check if it's inside an overlay
                     if (activeElement &&
                         (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') &&
                         activeElement !== inputRef.current) {
-
-                        // If it's in a dialog or overlay, let it keep focus
                         if (activeElement.closest('.overlay-backdrop, .overlay-window')) {
                             return;
                         }
                     }
-
-                    // For all other clicks (workspace background, pane headers, clocks, etc.)
-                    // OR if the clicked element was an input NOT in an overlay (which shouldn't happen but just in case)
-                    // enforce terminal focus.
                     if (!isOverlayOpen) {
                         inputRef.current?.focus();
                     }
@@ -198,7 +321,6 @@ export const useCommandTerminal = () => {
         };
     }, [isOverlayOpen]);
 
-    // Refocus when active pane changes or command finishes, if no overlay is open
     useEffect(() => {
         if (!isOverlayOpen && !isLoading) {
             inputRef.current?.focus();
@@ -215,9 +337,7 @@ export const useCommandTerminal = () => {
         }
     }, [commandSubmitRequest]);
 
-    // Initial focus on mount (e.g., after login or refresh) - optimized to avoid magic timers
     useEffect(() => {
-        // We use requestAnimationFrame to ensure the focus happens after the browser has finished layout/paint
         const frameId = requestAnimationFrame(() => {
             inputRef.current?.focus();
         });

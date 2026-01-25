@@ -1,0 +1,56 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
+from app.db.session import get_db
+from app.schemas.workspace import (
+    Workspace,
+    WorkspaceCreate,
+    WorkspaceUpdate,
+    DeleteWorkspaceResponse,
+)
+from app.services.workspace_service import WorkspaceService
+
+router = APIRouter()
+
+
+@router.get("/", response_model=List[Workspace], tags=["workspaces"])
+async def list_workspaces(db: AsyncSession = Depends(get_db)):
+    return await WorkspaceService.get_workspaces(db)
+
+
+@router.post(
+    "/",
+    response_model=Workspace,
+    status_code=status.HTTP_201_CREATED,
+    tags=["workspaces"],
+)
+async def create_workspace(
+    workspace_in: WorkspaceCreate, db: AsyncSession = Depends(get_db)
+):
+    return await WorkspaceService.create_workspace(db, workspace_in)
+
+
+@router.get("/{id}", response_model=Workspace, tags=["workspaces"])
+async def get_workspace(id: str, db: AsyncSession = Depends(get_db)):
+    db_obj = await WorkspaceService.get_workspace(db, id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return db_obj
+
+
+@router.patch("/{id}", response_model=Workspace, tags=["workspaces"])
+async def update_workspace(
+    id: str, workspace_in: WorkspaceUpdate, db: AsyncSession = Depends(get_db)
+):
+    db_obj = await WorkspaceService.update_workspace(db, id, workspace_in)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return db_obj
+
+
+@router.delete("/{id}", response_model=DeleteWorkspaceResponse, tags=["workspaces"])
+async def delete_workspace(id: str, db: AsyncSession = Depends(get_db)):
+    success = await WorkspaceService.delete_workspace(db, id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return {"status": "archived"}

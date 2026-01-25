@@ -14,3 +14,10 @@ dist-ssr/
 .vscode/
 .idea/
 .DS_Store
+
+
+#database
+**/*.db
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm

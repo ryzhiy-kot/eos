@@ -16,7 +16,7 @@ interface UseSSEOptions {
 }
 
 export function useSSE({
-    url = 'http://localhost:8000/api/events/stream',
+    url = 'http://localhost:8000/api/v1/events/stream',
     onMessage,
     onError,
     reconnectInterval = 1000,

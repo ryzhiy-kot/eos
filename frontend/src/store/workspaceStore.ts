@@ -9,11 +9,52 @@ export interface PaneLineage {
     timestamp: string;
 }
 
-export interface Pane {
+export interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    artifacts?: Artifact[];
+    created_at?: string;
+}
+
+export interface ChatArtifactPayload {
+    messages: ChatMessage[];
+}
+
+export interface MutationOrigin {
+    type: 'adhoc_command' | 'chat_inference' | 'manual_edit';
+    sessionId?: string;
+    prompt?: string;
+    triggeringCommand?: string;
+}
+
+export interface MutationRecord {
+    id: number;
+    artifact_id: string;
+    version_id: string;
+    parent_id?: string;
+    timestamp: string;
+    origin: MutationOrigin;
+    change_summary?: string;
+    payload: any;
+    checksum?: string;
+    status: 'ghost' | 'committed' | 'reverted';
+}
+
+export interface Artifact {
     id: string;
     type: PaneType;
+    payload: any; // Current/Latest payload
+    metadata?: Record<string, any>;
+    session_id?: string;
+    created_at?: string;
+    mutations: MutationRecord[];
+}
+
+export interface Pane {
+    id: string;
+    artifactId: string;
+    type: PaneType;
     title: string;
-    content: any;
     isSticky: boolean;
     lineage?: PaneLineage;
 }
@@ -32,14 +73,16 @@ export interface TimerConfig {
 }
 
 interface WorkspaceState {
-    panes: Record<string, Pane>; // All panes (active + archived)
+    panes: Record<string, Pane>; // All visual panes
+    artifacts: Record<string, Artifact>; // All data artifacts
     activeLayout: string[]; // IDs of visible panes
     focusedPaneId: string | null;
+    activeVersions: Record<string, string>; // artifactId -> version_id (Current version being viewed)
     archive: string[]; // IDs of archived panes (shelf)
     density: 1 | 2 | 4 | 9;
 
-    // History (Simple stack of snapshots for undo/redo on key panes)
-    // Map of PaneID -> Stack of Content
+    // History (Simple stack of snapshots for undo/redo on artifact payload)
+    // Map of ArtifactID -> Stack of Payload
     history: Record<string, any[]>;
     future: Record<string, any[]>;
 
@@ -49,18 +92,21 @@ interface WorkspaceState {
     isArchiveOpen: boolean; // For visual catalog overlay
     isHelpOpen: boolean;
     isOverlayOpen: boolean;
-    notifications: Array<{ id: string, message: string, type: 'error' | 'success' | 'info' }>;
+    notifications: Array<{ id: string; message: string; type: 'error' | 'success' | 'info' }>;
     pendingCommand: string | null;
     commands: CommandEntry[];
 
     terminalFocusCounter: number;
     commandSubmitRequest: { command: string; timestamp: number } | null;
+    chatSessions: any[]; // Chat sessions from backend
 }
 
 export const useWorkspaceStore = create<WorkspaceState>(() => ({
     panes: {},
+    artifacts: {},
     activeLayout: [],
     focusedPaneId: null,
+    activeVersions: {},
     archive: [],
     density: 9,
     history: {},
@@ -80,6 +126,7 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
 
     terminalFocusCounter: 0,
     commandSubmitRequest: null,
+    chatSessions: [],
 }));
 
 /**
@@ -160,21 +207,52 @@ export const workspaceActions = {
         };
     }),
 
-    updatePaneContent: (id: string, content: any, pushToHistory = true) => useWorkspaceStore.setState((state) => {
-        const currentContent = state.panes[id]?.content;
+    addArtifact: (artifact: Artifact) => useWorkspaceStore.setState((state) => {
+        const latestVersion = artifact.mutations && artifact.mutations.length > 0
+            ? artifact.mutations[artifact.mutations.length - 1].version_id
+            : 'v1';
+
+        return {
+            artifacts: { ...state.artifacts, [artifact.id]: artifact },
+            activeVersions: { ...state.activeVersions, [artifact.id]: latestVersion }
+        };
+    }),
+
+    commitMutation: (artifactId: string, mutation: MutationRecord) => useWorkspaceStore.setState((state) => {
+        const artifact = state.artifacts[artifactId];
+        if (!artifact) return {};
+
+        const newMutations = [...artifact.mutations, mutation];
+        return {
+            artifacts: {
+                ...state.artifacts,
+                [artifactId]: { ...artifact, mutations: newMutations, payload: mutation.payload }
+            },
+            activeVersions: { ...state.activeVersions, [artifactId]: mutation.version_id }
+        };
+    }),
+
+    setArtifactVersion: (artifactId: string, versionId: string) => useWorkspaceStore.setState((state) => ({
+        activeVersions: { ...state.activeVersions, [artifactId]: versionId }
+    })),
+
+    updateArtifactPayload: (artifactId: string, payload: any, pushToHistory = true) => useWorkspaceStore.setState((state) => {
+        const currentArtifact = state.artifacts[artifactId];
+        if (!currentArtifact) return {};
+
         const newHistory = { ...state.history };
         const newFuture = { ...state.future };
 
         if (pushToHistory) {
-            if (!newHistory[id]) newHistory[id] = [];
-            newHistory[id].push(currentContent);
-            newFuture[id] = [];
+            if (!newHistory[artifactId]) newHistory[artifactId] = [];
+            newHistory[artifactId].push(currentArtifact.payload);
+            newFuture[artifactId] = [];
         }
 
         return {
-            panes: {
-                ...state.panes,
-                [id]: { ...state.panes[id], content }
+            artifacts: {
+                ...state.artifacts,
+                [artifactId]: { ...currentArtifact, payload }
             },
             history: newHistory,
             future: newFuture
@@ -253,41 +331,47 @@ export const workspaceActions = {
 
     setPendingCommand: (cmd: string | null) => useWorkspaceStore.setState({ pendingCommand: cmd }),
 
-    undoPane: (id: string) => useWorkspaceStore.setState((state) => {
-        const past = state.history[id] || [];
+    undoArtifact: (artifactId: string) => useWorkspaceStore.setState((state) => {
+        const past = state.history[artifactId] || [];
         if (past.length === 0) return {};
+
+        const artifact = state.artifacts[artifactId];
+        if (!artifact) return {};
 
         const previous = past[past.length - 1];
         const newPast = past.slice(0, -1);
-        const current = state.panes[id]?.content;
+        const current = artifact.payload;
 
         const newFuture = { ...state.future };
-        if (!newFuture[id]) newFuture[id] = [];
-        newFuture[id].push(current);
+        if (!newFuture[artifactId]) newFuture[artifactId] = [];
+        newFuture[artifactId].push(current);
 
         return {
-            panes: { ...state.panes, [id]: { ...state.panes[id], content: previous } },
-            history: { ...state.history, [id]: newPast },
+            artifacts: { ...state.artifacts, [artifactId]: { ...artifact, payload: previous } },
+            history: { ...state.history, [artifactId]: newPast },
             future: newFuture
         };
     }),
 
-    redoPane: (id: string) => useWorkspaceStore.setState((state) => {
-        const future = state.future[id] || [];
+    redoArtifact: (artifactId: string) => useWorkspaceStore.setState((state) => {
+        const future = state.future[artifactId] || [];
         if (future.length === 0) return {};
+
+        const artifact = state.artifacts[artifactId];
+        if (!artifact) return {};
 
         const next = future[future.length - 1];
         const newFuture = future.slice(0, -1);
-        const current = state.panes[id]?.content;
+        const current = artifact.payload;
 
         const newHistory = { ...state.history };
-        if (!newHistory[id]) newHistory[id] = [];
-        newHistory[id].push(current);
+        if (!newHistory[artifactId]) newHistory[artifactId] = [];
+        newHistory[artifactId].push(current);
 
         return {
-            panes: { ...state.panes, [id]: { ...state.panes[id], content: next } },
+            artifacts: { ...state.artifacts, [artifactId]: { ...artifact, payload: next } },
             history: newHistory,
-            future: { ...state.future, [id]: newFuture }
+            future: { ...state.future, [artifactId]: newFuture }
         };
     }),
 
@@ -332,5 +416,15 @@ export const workspaceActions = {
 
     clearNotification: (id?: string) => useWorkspaceStore.setState((state) => ({
         notifications: id ? state.notifications.filter(n => n.id !== id) : []
+    })),
+
+    setChatSessions: (sessions: any[]) => useWorkspaceStore.setState({ chatSessions: sessions }),
+
+    addChatSession: (session: any) => useWorkspaceStore.setState((state) => ({
+        chatSessions: [session, ...state.chatSessions.filter(s => s.id !== session.id)]
+    })),
+
+    removeChatSession: (sessionId: string) => useWorkspaceStore.setState((state) => ({
+        chatSessions: state.chatSessions.filter(s => s.id !== sessionId)
     })),
 };

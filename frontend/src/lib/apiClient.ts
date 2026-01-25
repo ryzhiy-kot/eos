@@ -67,38 +67,44 @@ class ApiClient {
         }
     }
 
-    // Data Command APIs
-    async plot(paneId: string, prompt: string): Promise<{ result: any }> {
-        return this.request('/api/commands/plot', {
+    // Infrastructure APIs
+    async execute(request: {
+        type: 'command' | 'chat';
+        session_id: string;
+        command_name?: string;
+        args?: string[];
+        action?: string;
+        context_artifacts?: Record<string, any>;
+        referenced_artifact_ids?: string[];
+    }): Promise<{ success: boolean; result: any }> {
+        return this.request('/api/v1/sessions/execute', {
             method: 'POST',
-            body: JSON.stringify({ pane_id: paneId, prompt }),
+            body: JSON.stringify(request),
         });
     }
 
-    async run(paneId: string, code: string): Promise<{ result: any }> {
-        return this.request('/api/commands/run', {
-            method: 'POST',
-            body: JSON.stringify({ pane_id: paneId, code }),
-        });
+    // Session Management
+    async listSessions(workspaceId: string): Promise<any[]> {
+        return this.request(`/api/v1/sessions/workspace/${workspaceId}`);
     }
 
-    async diff(paneId1: string, paneId2: string): Promise<{ result: any }> {
-        return this.request('/api/commands/diff', {
-            method: 'POST',
-            body: JSON.stringify({ pane_id_1: paneId1, pane_id_2: paneId2 }),
-        });
-    }
-
-    async summarize(paneId: string): Promise<{ result: any }> {
-        return this.request('/api/commands/summarize', {
-            method: 'POST',
-            body: JSON.stringify({ pane_id: paneId }),
+    async updateSession(sessionId: string, updates: { name?: string; is_active?: boolean }): Promise<any> {
+        return this.request(`/api/v1/sessions/${sessionId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates),
         });
     }
 
     // Health check
     async health(): Promise<{ status: string }> {
-        return this.request('/api/health');
+        return this.request('/api/v1/health');
+    }
+
+    async createArtifact(artifact: any): Promise<any> {
+        return this.request('/api/v1/artifacts', {
+            method: 'POST',
+            body: JSON.stringify(artifact),
+        });
     }
 }
 

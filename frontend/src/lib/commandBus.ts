@@ -26,6 +26,7 @@ export const COMMAND_NAMES = {
     INIT: 'init',
     CHAT: 'chat',
     CLIP: 'clip',
+    OPTIMIZE: 'optimize',
 } as const;
 
 export type CommandName = typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES];

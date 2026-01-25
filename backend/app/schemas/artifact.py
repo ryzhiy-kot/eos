@@ -1,0 +1,40 @@
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional, Any, Dict, List
+from datetime import datetime
+
+
+class MutationOrigin(BaseModel):
+    type: str  # adhoc_command, chat_inference, manual_edit
+    sessionId: Optional[str] = None
+    prompt: Optional[str] = None
+    triggeringCommand: Optional[str] = None
+
+
+class MutationRecord(BaseModel):
+    id: int
+    artifact_id: str
+    version_id: str
+    parent_id: Optional[str] = None
+    timestamp: datetime
+    origin: MutationOrigin
+    change_summary: Optional[str] = None
+    payload: Any
+    checksum: Optional[str] = None
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Artifact Structured Payloads
+class Artifact(BaseModel):
+    id: str
+    type: str  # chat, visual, code, doc, data
+    payload: Any
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, validation_alias="artifact_metadata"
+    )
+    session_id: str
+    created_at: Optional[datetime] = None
+    mutations: List[MutationRecord] = []
+
+    model_config = ConfigDict(from_attributes=True)

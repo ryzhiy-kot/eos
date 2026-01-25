@@ -2,13 +2,13 @@ import { useEffect } from 'react';
 import { useWorkspaceStore, workspaceActions } from '../store/workspaceStore';
 import { useAuthStore } from '../store/authStore';
 import { CommandEntry } from '../lib/commandRegistry';
-import { parseDurationExpression } from '../lib/terminalUtils';
+import { parseDurationExpression, generatePaneId } from '../lib/terminalUtils';
 import { COMMAND_NAMES } from '../lib/commandBus';
 import { useCommandHandler } from './useCommandHandler';
 
 export const useRegisterCommands = (onReady?: () => void) => {
-    const panes = useWorkspaceStore(state => state.panes);
     const activeLayout = useWorkspaceStore(state => state.activeLayout);
+    const COMMAND_SESSION_ID = 'elyon_command_session_v1';
 
     useEffect(() => {
         if (onReady) {
@@ -28,7 +28,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
     useCommandHandler(COMMAND_NAMES.FOCUS, (payload) => {
         const rawTarget = payload.args[0] || payload.context.sourceId;
         const target = rawTarget?.toUpperCase();
-        if (target && panes[target]) {
+        if (target && useWorkspaceStore.getState().panes[target]) {
             workspaceActions.focusPane(target);
             return true;
         }
@@ -79,8 +79,10 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     useCommandHandler(COMMAND_NAMES.UNDO, (payload) => {
         const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
-        if (sourceId) {
-            workspaceActions.undoPane(sourceId);
+        const state = useWorkspaceStore.getState();
+        const pane = sourceId ? state.panes[sourceId] : null;
+        if (pane) {
+            workspaceActions.undoArtifact(pane.artifactId);
             return true;
         }
         return false;
@@ -88,8 +90,10 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     useCommandHandler(COMMAND_NAMES.REDO, (payload) => {
         const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
-        if (sourceId) {
-            workspaceActions.redoPane(sourceId);
+        const state = useWorkspaceStore.getState();
+        const pane = sourceId ? state.panes[sourceId] : null;
+        if (pane) {
+            workspaceActions.redoArtifact(pane.artifactId);
             return true;
         }
         return false;
@@ -128,6 +132,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     useCommandHandler(COMMAND_NAMES.RENAME, (payload) => {
         const potentialId = payload.args[0]?.toUpperCase();
+        const panes = useWorkspaceStore.getState().panes;
         if (potentialId && panes[potentialId] && payload.args.length > 1) {
             const newTitle = payload.args.slice(1).join(' ');
             workspaceActions.renamePane(potentialId, newTitle);
@@ -174,11 +179,26 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     useCommandHandler(COMMAND_NAMES.INIT, () => {
         if (activeLayout.length === 0) {
+            const artifactId = `A_INIT_${Date.now()}`;
+            const initArtifact = {
+                id: artifactId,
+                type: 'chat' as const,
+                payload: { messages: [{ role: 'system', content: 'Welcome to Elyon. System ready.' }] },
+                session_id: 'SESSION_INIT',
+                mutations: []
+            };
+
+            // Persist
+            import('../lib/apiClient').then(({ apiClient }) => {
+                apiClient.createArtifact(initArtifact).catch(e => console.error('Failed to persist INIT artifact:', e));
+            });
+
+            workspaceActions.addArtifact(initArtifact);
             workspaceActions.addPane({
                 id: 'P1',
+                artifactId: artifactId,
                 type: 'chat',
                 title: 'System Initialized',
-                content: [{ role: 'system', content: 'Welcome to Elyon. System ready.' }],
                 isSticky: true,
                 lineage: { parentIds: [], command: 'init', timestamp: new Date().toISOString() }
             });
@@ -187,17 +207,34 @@ export const useRegisterCommands = (onReady?: () => void) => {
         return false;
     });
 
-    useCommandHandler(COMMAND_NAMES.CHAT, (payload) => {
+    useCommandHandler(COMMAND_NAMES.CHAT, async (payload) => {
         const initialMessage = payload.action || 'Hello';
         const targetId = payload.targetId && /^P\d+$/.test(payload.targetId) ? payload.targetId : undefined;
+        const state = useWorkspaceStore.getState();
+        const paneId = targetId || generatePaneId(state.panes);
+        const sessionId = `SESSION_${paneId}`;
+        const artifactId = `A_CHAT_${Date.now()}`;
 
-        const newPaneId = targetId || `P${Object.keys(useWorkspaceStore.getState().panes).length + 1}`;
+        const newArtifact = {
+            id: artifactId,
+            type: 'chat' as const,
+            payload: { messages: [{ role: 'user', content: initialMessage }] },
+            session_id: sessionId,
+            mutations: []
+        };
+
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            await apiClient.createArtifact(newArtifact);
+        } catch (e) { console.error('Failed to persist CHAT artifact:', e); }
+
+        workspaceActions.addArtifact(newArtifact);
 
         workspaceActions.addPane({
-            id: newPaneId,
+            id: paneId,
+            artifactId: artifactId,
             type: 'chat',
             title: `Chat: ${initialMessage.substring(0, 20)}...`,
-            content: [{ role: 'user', content: initialMessage }],
             isSticky: false,
             lineage: {
                 parentIds: payload.context.sourceId ? [payload.context.sourceId] : [],
@@ -206,17 +243,31 @@ export const useRegisterCommands = (onReady?: () => void) => {
             }
         });
 
-        // Mock response
-        setTimeout(() => {
-            const currentPane = useWorkspaceStore.getState().panes[newPaneId];
-            if (currentPane) {
-                const response = {
-                    role: 'assistant',
-                    content: `I've initialized the session. Context link to ${payload.context.sourceId || 'None'} verified.`
-                };
-                workspaceActions.updatePaneContent(newPaneId, [...currentPane.content, response]);
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            const response = await apiClient.execute({
+                type: 'chat',
+                session_id: sessionId,
+                action: initialMessage
+            });
+
+            if (response.success && response.result.output_message) {
+                const assistantMsg = response.result.output_message;
+                if (assistantMsg.artifacts) {
+                    assistantMsg.artifacts.forEach((art: any) => {
+                        workspaceActions.addArtifact(art);
+                    });
+                }
+                const currentArtifact = useWorkspaceStore.getState().artifacts[artifactId];
+                if (currentArtifact) {
+                    workspaceActions.updateArtifactPayload(artifactId, {
+                        messages: [...currentArtifact.payload.messages, assistantMsg]
+                    });
+                }
             }
-        }, 800);
+        } catch (error) {
+            workspaceActions.addNotification(`Chat failed: ${error}`, 'error');
+        }
 
         return true;
     });
@@ -228,9 +279,16 @@ export const useRegisterCommands = (onReady?: () => void) => {
             return false;
         }
 
-        const pane = useWorkspaceStore.getState().panes[targetId];
+        const state = useWorkspaceStore.getState();
+        const pane = state.panes[targetId];
         if (!pane) {
             workspaceActions.addNotification(`Pane ${targetId} not found.`, 'error');
+            return false;
+        }
+
+        const artifact = state.artifacts[pane.artifactId];
+        if (!artifact) {
+            workspaceActions.addNotification(`Artifact for pane ${targetId} not found.`, 'error');
             return false;
         }
 
@@ -238,39 +296,39 @@ export const useRegisterCommands = (onReady?: () => void) => {
         let formatLabel = 'Text';
 
         try {
-            switch (pane.type) {
+            switch (artifact.type) {
                 case 'chat':
                     clipboardContent = JSON.stringify({
                         chat_name: pane.title,
-                        history: pane.content
+                        history: artifact.payload.messages
                     }, null, 2);
                     formatLabel = 'JSON';
                     break;
                 case 'code':
-                    clipboardContent = typeof pane.content === 'string' ? pane.content : JSON.stringify(pane.content, null, 2);
+                    clipboardContent = typeof artifact.payload === 'string' ? artifact.payload : artifact.payload.source;
                     break;
                 case 'doc':
-                    if (typeof pane.content === 'string' && pane.content.startsWith('blob:')) {
-                        workspaceActions.addNotification('Binary files (like PDFs) cannot be clipped.', 'error');
+                    if (artifact.payload.format === 'pdf' || artifact.payload.is_url) {
+                        workspaceActions.addNotification('External links or PDFs cannot be clipped directly.', 'error');
                         return false;
                     }
-                    clipboardContent = String(pane.content);
+                    clipboardContent = String(artifact.payload.value);
                     break;
                 case 'visual':
-                    clipboardContent = typeof pane.content === 'string' ? pane.content : (pane.content?.url || pane.content?.src || '');
+                    clipboardContent = typeof artifact.payload === 'string' ? artifact.payload : (artifact.payload.url || '');
                     formatLabel = 'URL';
                     break;
                 case 'data':
-                    clipboardContent = JSON.stringify(pane.content, null, 2);
+                    clipboardContent = JSON.stringify(artifact.payload.data, null, 2);
                     formatLabel = 'JSON';
                     break;
                 default:
-                    workspaceActions.addNotification(`Cannot clip pane of type: ${pane.type}`, 'error');
+                    workspaceActions.addNotification(`Cannot clip artifact of type: ${artifact.type}`, 'error');
                     return false;
             }
 
             if (!clipboardContent) {
-                workspaceActions.addNotification('Pane content is empty.', 'error');
+                workspaceActions.addNotification('Artifact payload is empty.', 'error');
                 return false;
             }
 
@@ -290,144 +348,132 @@ export const useRegisterCommands = (onReady?: () => void) => {
     // --- UI Control Handlers Converted ---
 
     // --- Data Command Handlers ---
-    useCommandHandler(COMMAND_NAMES.PLOT, async (payload) => {
+    const handleDataCommand = async (payload: any, commandName: string) => {
         const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
         if (!sourceId) {
-            workspaceActions.addNotification('No pane selected for plotting', 'error');
+            workspaceActions.addNotification(`No pane selected for ${commandName}`, 'error');
             return false;
         }
 
-        const prompt = payload.action || 'Generate visualization';
+        const state = useWorkspaceStore.getState();
+        const pane = state.panes[sourceId];
+        if (!pane) return false;
+
+        const artifactId = pane.artifactId;
+        const artifact = state.artifacts[artifactId];
+        if (!artifact) return false;
 
         try {
             const { apiClient } = await import('../lib/apiClient');
-            const response = await apiClient.plot(sourceId, prompt);
-
-            const newPaneId = `P${Date.now()}`;
-            workspaceActions.addPane({
-                id: newPaneId,
-                type: 'visual',
-                title: `Plot: ${sourceId}`,
-                content: response.result.url,
-                isSticky: false,
-                lineage: {
-                    parentIds: [sourceId],
-                    command: payload.original || `/plot ${sourceId} "${prompt}"`,
-                    timestamp: new Date().toISOString()
-                }
+            const response = await apiClient.execute({
+                type: 'command',
+                session_id: COMMAND_SESSION_ID,
+                command_name: commandName,
+                action: payload.action,
+                args: payload.args,
+                context_artifacts: { [artifactId]: artifact },
+                referenced_artifact_ids: [artifactId]
             });
 
-            workspaceActions.addNotification('Plot generated successfully', 'success');
-            return true;
+            if (response.success) {
+                // Register any full artifacts returned in artifacts or new_artifacts
+                if (response.result.new_artifacts) {
+                    response.result.new_artifacts.forEach((art: any) => {
+                        workspaceActions.addArtifact(art);
+                        const newPaneId = generatePaneId(useWorkspaceStore.getState().panes);
+                        workspaceActions.addPane({
+                            id: newPaneId,
+                            artifactId: art.id,
+                            type: art.type,
+                            title: `${commandName.charAt(0).toUpperCase() + commandName.slice(1)}: ${sourceId}`,
+                            isSticky: false,
+                            lineage: {
+                                parentIds: [sourceId],
+                                command: payload.original,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    });
+                }
+
+                if (response.result.output_message?.artifacts) {
+                    response.result.output_message.artifacts.forEach((art: any) => {
+                        workspaceActions.addArtifact(art);
+                    });
+                }
+
+                workspaceActions.addNotification(`${commandName} completed`, 'success');
+                return true;
+            }
+            return false;
         } catch (error) {
-            workspaceActions.addNotification(`Plot failed: ${error}`, 'error');
+            workspaceActions.addNotification(`${commandName} failed: ${error}`, 'error');
             return false;
         }
-    });
+    };
 
-    useCommandHandler(COMMAND_NAMES.RUN, async (payload) => {
+    useCommandHandler(COMMAND_NAMES.PLOT, (payload) => handleDataCommand(payload, 'plot'));
+    useCommandHandler(COMMAND_NAMES.RUN, (payload) => handleDataCommand(payload, 'run'));
+    useCommandHandler(COMMAND_NAMES.DIFF, (payload) => handleDataCommand(payload, 'diff'));
+    useCommandHandler(COMMAND_NAMES.SUMMARIZE, (payload) => handleDataCommand(payload, 'summarize'));
+
+    useCommandHandler(COMMAND_NAMES.OPTIMIZE as any, async (payload) => {
         const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
         if (!sourceId) {
-            workspaceActions.addNotification('No pane selected for code execution', 'error');
+            workspaceActions.addNotification('No pane selected for optimization', 'error');
             return false;
         }
 
-        const code = payload.action || '';
-        if (!code) {
-            workspaceActions.addNotification('No code provided', 'error');
-            return false;
-        }
+        const state = useWorkspaceStore.getState();
+        const pane = state.panes[sourceId];
+        if (!pane) return false;
+
+        const artifactId = pane.artifactId;
+        const artifact = state.artifacts[artifactId];
+        if (!artifact) return false;
 
         try {
             const { apiClient } = await import('../lib/apiClient');
-            const response = await apiClient.run(sourceId, code);
-
-            const newPaneId = `P${Date.now()}`;
-            workspaceActions.addPane({
-                id: newPaneId,
-                type: 'code',
-                title: `Run: ${sourceId}`,
-                content: response.result.output,
-                isSticky: false,
-                lineage: {
-                    parentIds: [sourceId],
-                    command: payload.original || `/run ${sourceId} "${code}"`,
-                    timestamp: new Date().toISOString()
-                }
+            const response = await apiClient.execute({
+                type: 'command',
+                session_id: COMMAND_SESSION_ID,
+                command_name: 'optimize',
+                action: payload.action,
+                args: payload.args,
+                context_artifacts: { [artifactId]: artifact },
+                referenced_artifact_ids: [artifactId]
             });
 
-            workspaceActions.addNotification('Code executed successfully', 'success');
-            return true;
+            if (response.success && response.result.new_artifacts?.length > 0) {
+                const newArt = response.result.new_artifacts[0];
+                const activeVersion = state.activeVersions[artifactId] || 'v1';
+
+                // Instead of adding as new artifact, add as GHOST mutation to current artifact
+                const ghostMutation = {
+                    id: Math.random() * 10000,
+                    artifact_id: artifactId,
+                    version_id: `v_ghost_${Date.now()}`,
+                    parent_id: activeVersion,
+                    timestamp: new Date().toISOString(),
+                    origin: {
+                        type: 'adhoc_command' as const,
+                        sessionId: COMMAND_SESSION_ID,
+                        prompt: payload.action,
+                        triggeringCommand: '/optimize'
+                    },
+                    change_summary: 'AI Optimization (Preview)',
+                    payload: newArt.payload,
+                    status: 'ghost' as const
+                };
+
+                // Add to store as ghost
+                workspaceActions.commitMutation(artifactId, ghostMutation);
+                workspaceActions.addNotification('Optimization preview ready (Ghost Layout)', 'info');
+                return true;
+            }
+            return false;
         } catch (error) {
-            workspaceActions.addNotification(`Execution failed: ${error}`, 'error');
-            return false;
-        }
-    });
-
-    useCommandHandler(COMMAND_NAMES.DIFF, async (payload) => {
-        const paneIds = payload.args;
-        if (paneIds.length < 2) {
-            workspaceActions.addNotification('Need two pane IDs for diff', 'error');
-            return false;
-        }
-
-        const [id1, id2] = paneIds.map(id => id.toUpperCase());
-
-        try {
-            const { apiClient } = await import('../lib/apiClient');
-            const response = await apiClient.diff(id1, id2);
-
-            const newPaneId = `P${Date.now()}`;
-            workspaceActions.addPane({
-                id: newPaneId,
-                type: 'data',
-                title: `Diff: ${id1} vs ${id2}`,
-                content: response.result,
-                isSticky: false,
-                lineage: {
-                    parentIds: [id1, id2],
-                    command: payload.original || `/diff ${id1},${id2}`,
-                    timestamp: new Date().toISOString()
-                }
-            });
-
-            workspaceActions.addNotification('Diff completed', 'success');
-            return true;
-        } catch (error) {
-            workspaceActions.addNotification(`Diff failed: ${error}`, 'error');
-            return false;
-        }
-    });
-
-    useCommandHandler(COMMAND_NAMES.SUMMARIZE, async (payload) => {
-        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
-        if (!sourceId) {
-            workspaceActions.addNotification('No pane selected for summarization', 'error');
-            return false;
-        }
-
-        try {
-            const { apiClient } = await import('../lib/apiClient');
-            const response = await apiClient.summarize(sourceId);
-
-            const newPaneId = `P${Date.now()}`;
-            workspaceActions.addPane({
-                id: newPaneId,
-                type: 'doc',
-                title: `Summary: ${sourceId}`,
-                content: response.result.summary,
-                isSticky: false,
-                lineage: {
-                    parentIds: [sourceId],
-                    command: payload.original || `/summarize ${sourceId}`,
-                    timestamp: new Date().toISOString()
-                }
-            });
-
-            workspaceActions.addNotification('Summary generated', 'success');
-            return true;
-        } catch (error) {
-            workspaceActions.addNotification(`Summarization failed: ${error}`, 'error');
+            workspaceActions.addNotification(`Optimization failed: ${error}`, 'error');
             return false;
         }
     });
@@ -564,6 +610,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
             { name: COMMAND_NAMES.RUN, description: 'Execute code against pane data.', example: '/run [P1] "code"', category: 'data', shortcut: 'alt+x' },
             { name: COMMAND_NAMES.DIFF, description: 'Compare two panes.', example: '/diff [P1],[P2]', category: 'data', shortcut: 'alt+d' },
             { name: COMMAND_NAMES.SUMMARIZE, description: 'Summarize pane content.', example: '/summarize [P1]', category: 'data', shortcut: 'alt+s' },
+            { name: 'OPTIMIZE' as any, description: 'Preview an AI-driven optimization of a pane.', example: '/optimize [P1] "prompt"', category: 'data' as any, shortcut: 'alt+z' },
         ] as CommandEntry[]);
     }, []); // Static registry, run once
 };
