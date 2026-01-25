@@ -6,6 +6,7 @@ import ArchiveOverlay from './ArchiveOverlay';
 import HelpOverlay from './HelpOverlay';
 import { useRegisterCommands } from '../../hooks/useRegisterCommands';
 import { useSSE } from '../../hooks/useSSE';
+import { useWorkspaceSync } from '../../hooks/useWorkspaceSync';
 
 const AppShell: React.FC = () => {
     const [isRegistryReady, setIsRegistryReady] = React.useState(false);
@@ -22,6 +23,9 @@ const AppShell: React.FC = () => {
             console.error('SSE error:', error);
         }
     });
+
+    // Sync Workspace State
+    useWorkspaceSync();
 
     // Register commands at the top level and track readiness
     useRegisterCommands(() => setIsRegistryReady(true));

@@ -24,21 +24,26 @@ export const useAuthStore = create<AuthState>()(
             login: async (username, password) => {
                 set({ isLoading: true, error: null });
 
-                // Mock API delay
-                await new Promise(resolve => setTimeout(resolve, 800));
+                try {
+                    const { apiClient } = await import('../lib/apiClient');
+                    const { workspaceActions } = await import('./workspaceStore');
+                    const user = await apiClient.login(username);
 
-                if (username && password) {
+                    if (user.memberships && user.memberships.length > 0) {
+                        workspaceActions.setWorkspaceId(user.memberships[0].workspace_id);
+                    }
+
                     set({
                         isAuthenticated: true,
-                        user: username,
+                        user: user.user_id,
                         isLoading: false,
                         error: null
                     });
                     return true;
-                } else {
+                } catch (err: any) {
                     set({
                         isLoading: false,
-                        error: 'ACCESS DENIED: Invalid credentials.'
+                        error: err.message || 'ACCESS DENIED: Invalid credentials.'
                     });
                     return false;
                 }

@@ -106,6 +106,26 @@ class ApiClient {
             body: JSON.stringify(artifact),
         });
     }
+
+    // Auth
+    async login(username: string): Promise<any> {
+        return this.request('/api/v1/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username }),
+        });
+    }
+
+    // Workspace
+    async getWorkspace(id: string): Promise<any> {
+        return this.request(`/api/v1/workspaces/${id}`);
+    }
+
+    async updateWorkspace(id: string, updates: any): Promise<any> {
+        return this.request(`/api/v1/workspaces/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates),
+        });
+    }
 }
 
 export const apiClient = new ApiClient();

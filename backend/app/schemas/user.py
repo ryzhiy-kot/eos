@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 
 
 class UserBase(BaseModel):
@@ -14,6 +14,7 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
+    memberships: List["WorkspaceMember"] = []
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -29,3 +30,8 @@ class WorkspaceMember(WorkspaceMemberBase):
 
 class AuthSyncRequest(BaseModel):
     user_id: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: Optional[str] = None

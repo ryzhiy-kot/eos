@@ -99,6 +99,7 @@ interface WorkspaceState {
     terminalFocusCounter: number;
     commandSubmitRequest: { command: string; timestamp: number } | null;
     chatSessions: any[]; // Chat sessions from backend
+    activeWorkspaceId: string | null;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>(() => ({
@@ -127,6 +128,7 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
     terminalFocusCounter: 0,
     commandSubmitRequest: null,
     chatSessions: [],
+    activeWorkspaceId: null,
 }));
 
 /**
@@ -297,7 +299,8 @@ export const workspaceActions = {
             activeLayout: newLayout,
             archive: newArchive,
             focusedPaneId: id,
-            isArchiveOpen: false
+            isArchiveOpen: false,
+            isOverlayOpen: false
         };
     }),
 
@@ -427,4 +430,47 @@ export const workspaceActions = {
     removeChatSession: (sessionId: string) => useWorkspaceStore.setState((state) => ({
         chatSessions: state.chatSessions.filter(s => s.id !== sessionId)
     })),
+
+    setWorkspaceId: (id: string) => useWorkspaceStore.setState({ activeWorkspaceId: id }),
+
+    // Workspace Sync
+    initializeWorkspace: async (id: string | null = null) => {
+        const targetId = id || 'default_workspace';
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            const ws = await apiClient.getWorkspace(targetId);
+            if (ws && ws.state) {
+                // Merge persisted state
+                useWorkspaceStore.setState({
+                    panes: ws.state.panes || {},
+                    artifacts: ws.state.artifacts || {},
+                    activeLayout: ws.state.activeLayout || [],
+                    archive: ws.state.archive || [],
+                });
+            }
+        } catch (e) {
+            console.error('Failed to initialize workspace:', e);
+            workspaceActions.addNotification('Failed to load workspace state.', 'error');
+        }
+    },
+
+    syncWorkspace: async () => {
+        const state = useWorkspaceStore.getState();
+
+        if (!state.activeWorkspaceId) return;
+
+        const payload = {
+            panes: state.panes,
+            artifacts: state.artifacts,
+            activeLayout: state.activeLayout,
+            archive: state.archive
+        };
+
+        try {
+            const { apiClient } = await import('../lib/apiClient');
+            await apiClient.updateWorkspace(state.activeWorkspaceId, { state: payload });
+        } catch (e) {
+            console.error('Failed to sync workspace:', e);
+        }
+    }
 };

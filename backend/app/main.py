@@ -16,6 +16,52 @@ async def lifespan(app: FastAPI):
     # Startup: Create tables if they don't exist
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Initialize default user and workspace
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User, WorkspaceMember
+    from app.models.workspace import Workspace
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as session:
+        # Check if admin user exists
+        stmt = select(User).where(User.user_id == "admin")
+        result = await session.execute(stmt)
+        admin_user = result.scalar_one_or_none()
+
+        if not admin_user:
+            admin_user = User(
+                user_id="admin", profile={"name": "Administrator"}, enabled=True
+            )
+            session.add(admin_user)
+            await session.flush()
+            print("✓ Created default 'admin' user")
+
+        # Check if default workspace exists
+        stmt = select(Workspace).where(Workspace.id == "default_workspace")
+        result = await session.execute(stmt)
+        default_ws = result.scalar_one_or_none()
+
+        if not default_ws:
+            default_ws = Workspace(
+                id="default_workspace",
+                name="Default Workspace",
+                state={"panes": {}, "artifacts": {}, "activeLayout": [], "archive": []},
+                is_archived=False,
+            )
+            session.add(default_ws)
+            await session.flush()
+            print("✓ Created default workspace")
+
+            # Link admin to default workspace
+            member = WorkspaceMember(
+                workspace_id=default_ws.id, user_id=admin_user.id, role="OWNER"
+            )
+            session.add(member)
+            print("✓ Linked admin to default workspace")
+
+        await session.commit()
+
     yield
     # Shutdown logic (if any)
 
