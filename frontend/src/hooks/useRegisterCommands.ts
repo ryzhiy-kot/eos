@@ -47,8 +47,32 @@ export const useRegisterCommands = (onReady?: () => void) => {
     useCommandHandler(COMMAND_NAMES.CLOSE, (payload) => {
         const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
         if (sourceId) {
-            workspaceActions.archivePane(sourceId);
+            workspaceActions.closePane(sourceId); // Moves to shelf
             return true;
+        }
+        return false;
+    });
+
+    useCommandHandler(COMMAND_NAMES.ARCHIVE, async (payload) => {
+        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+        if (!sourceId || !workspaceId) return false;
+
+        const pane = useWorkspaceStore.getState().panes[sourceId];
+        if (!pane) return false;
+
+        const confirmed = window.confirm(`Are you sure you want to PERMANENTLY archive pane ${sourceId} (${pane.title})? It will be removed from local state and saved to audit logs.`);
+        if (confirmed) {
+            try {
+                const { apiClient } = await import('../lib/apiClient');
+                await apiClient.archivePane(workspaceId, pane);
+                workspaceActions.removePane(sourceId);
+                workspaceActions.addNotification(`Pane ${sourceId} archived and persisted.`, 'success');
+                return true;
+            } catch (error) {
+                workspaceActions.addNotification(`Archiving failed: ${error}`, 'error');
+                return false;
+            }
         }
         return false;
     });
@@ -56,7 +80,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
     useCommandHandler(COMMAND_NAMES.HIDE, (payload) => {
         const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
         if (sourceId) {
-            workspaceActions.archivePane(sourceId);
+            workspaceActions.closePane(sourceId);
             return true;
         }
         return false;
@@ -64,7 +88,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     useCommandHandler(COMMAND_NAMES.LS, (payload) => {
         const isOpen = payload.args[0] === 'close' ? false : true;
-        workspaceActions.toggleArchiveOverlay(isOpen);
+        workspaceActions.toggleShelfOverlay(isOpen);
         return true;
     });
 
@@ -533,15 +557,21 @@ export const useRegisterCommands = (onReady?: () => void) => {
             },
             {
                 name: COMMAND_NAMES.CLOSE,
-                description: 'Archive a pane (alias for /hide).',
+                description: 'Move a pane to the shelf (temporary remove).',
                 parameters: [{ name: 'PaneID', description: 'ID of the pane to close', required: false, type: 'paneId' }],
                 category: 'pane',
                 shortcut: 'alt+w',
             },
             {
                 name: COMMAND_NAMES.HIDE,
-                description: 'Archive a pane (alias for /close).',
+                description: 'Move a pane to the shelf (temporary remove).',
                 parameters: [{ name: 'PaneID', description: 'ID of the pane to hide', required: false, type: 'paneId' }],
+                category: 'pane',
+            },
+            {
+                name: COMMAND_NAMES.ARCHIVE,
+                description: 'Permanently archive a pane (remove from shelf).',
+                parameters: [{ name: 'PaneID', description: 'ID of the pane to archive', required: false, type: 'paneId' }],
                 category: 'pane',
             },
             {

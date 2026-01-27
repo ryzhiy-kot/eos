@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from typing import List, Optional
 from app.models.workspace import Workspace
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
@@ -57,5 +57,23 @@ class WorkspaceService:
             return False
 
         db_obj.is_archived = True
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def archive_pane(
+        db: AsyncSession,
+        workspace_id: str,
+        pane_data: dict,
+        user_id: Optional[int] = None,
+    ) -> bool:
+        from app.models.archived_pane import ArchivedPane
+
+        db_obj = ArchivedPane(
+            workspace_id=workspace_id,
+            user_id=user_id,
+            pane_data=pane_data,
+        )
+        db.add(db_obj)
         await db.commit()
         return True

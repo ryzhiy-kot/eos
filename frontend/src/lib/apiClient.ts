@@ -126,6 +126,20 @@ class ApiClient {
             body: JSON.stringify(updates),
         });
     }
+
+    async updateActiveWorkspace(userId: string, workspaceId: string): Promise<any> {
+        return this.request('/api/v1/auth/update-active-workspace', {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId, workspace_id: workspaceId }),
+        });
+    }
+
+    async archivePane(workspaceId: string, paneData: any): Promise<any> {
+        return this.request(`/api/v1/workspaces/${workspaceId}/archive-pane`, {
+            method: 'POST',
+            body: JSON.stringify(paneData),
+        });
+    }
 }
 
 export const apiClient = new ApiClient();

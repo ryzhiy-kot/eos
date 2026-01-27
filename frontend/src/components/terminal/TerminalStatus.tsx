@@ -4,10 +4,9 @@ import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 
 interface TerminalStatusProps {
     isLoading: boolean;
-    executionTime?: string;
 }
 
-const TerminalStatus: React.FC<TerminalStatusProps> = ({ isLoading, executionTime = '12ms' }) => {
+const TerminalStatus: React.FC<TerminalStatusProps> = ({ isLoading }) => {
 
     return (
         <div className="flex items-center gap-3">
@@ -22,11 +21,6 @@ const TerminalStatus: React.FC<TerminalStatusProps> = ({ isLoading, executionTim
             ) : (
                 <span className="text-slate-500 text-sm whitespace-nowrap hidden sm:inline-block">Ready</span>
             )}
-
-            {/* Execution Time Mock */}
-            <div className="ml-auto text-slate-500 text-xs hidden md:block mr-4">
-                &gt; {executionTime}
-            </div>
 
             {/* Logout Button */}
             <button

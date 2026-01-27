@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Activity, Wifi, Clock, Timer, X } from 'lucide-react';
+import { Wifi, Clock, Timer, X } from 'lucide-react';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
 

@@ -56,46 +56,24 @@ class UserService:
     @staticmethod
     async def ensure_personal_workspace(db: AsyncSession, user: User) -> User:
         """
-        Ensures the user has at least one workspace.
-        If not, creates a personal workspace and links it.
+        Ensures the user has at least one workspace and an active workspace set.
         Returns the updated user object with memberships reloaded.
         """
         if user.memberships:
+            if not user.active_workspace_id and len(user.memberships) > 0:
+                user.active_workspace_id = user.memberships[0].workspace_id
+                await db.commit()
             return user
 
         # Logic to create workspace
         ws_id = str(uuid.uuid4())
-        workspace = None
-
-        if user.user_id == "admin":
-            # Try to find/link default_workspace
-            stmt = select(Workspace).where(Workspace.id == "default_workspace")
-            result = await db.execute(stmt)
-            existing_ws = result.scalar_one_or_none()
-
-            if existing_ws:
-                workspace = existing_ws
-            else:
-                workspace = Workspace(
-                    id="default_workspace",
-                    name="Default Workspace",
-                    state={
-                        "panes": {},
-                        "artifacts": {},
-                        "activeLayout": [],
-                        "archive": [],
-                    },
-                    is_archived=False,
-                )
-                db.add(workspace)
-        else:
-            workspace = Workspace(
-                id=ws_id,
-                name=f"{user.user_id}'s Workspace",
-                state={"panes": {}, "artifacts": {}, "activeLayout": [], "archive": []},
-                is_archived=False,
-            )
-            db.add(workspace)
+        workspace = Workspace(
+            id=ws_id,
+            name=f"{user.user_id}'s Workspace",
+            state={"panes": {}, "artifacts": {}, "activeLayout": [], "archive": []},
+            is_archived=False,
+        )
+        db.add(workspace)
 
         await db.flush()
 
@@ -103,10 +81,25 @@ class UserService:
             workspace_id=workspace.id, user_id=user.id, role="OWNER"
         )
         db.add(member)
+
+        # Set active workspace id
+        user.active_workspace_id = workspace.id
+
         await db.commit()
 
         # Refresh user
         return await UserService.get_by_user_id(db, user.user_id)
+
+    @staticmethod
+    async def update_active_workspace(
+        db: AsyncSession, user_id: str, workspace_id: str
+    ) -> Optional[User]:
+        user = await UserService.get_by_user_id(db, user_id)
+        if user:
+            user.active_workspace_id = workspace_id
+            await db.commit()
+            await db.refresh(user)
+        return user
 
     @staticmethod
     async def initialize_defaults(db: AsyncSession):

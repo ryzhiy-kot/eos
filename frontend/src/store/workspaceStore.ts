@@ -89,7 +89,7 @@ interface WorkspaceState {
     // Utilities
     clocks: ClockConfig[];
     timers: TimerConfig[];
-    isArchiveOpen: boolean; // For visual catalog overlay
+    isShelfOpen: boolean; // For visual catalog overlay
     isHelpOpen: boolean;
     isOverlayOpen: boolean;
     notifications: Array<{ id: string; message: string; type: 'error' | 'success' | 'info' }>;
@@ -100,6 +100,7 @@ interface WorkspaceState {
     commandSubmitRequest: { command: string; timestamp: number } | null;
     chatSessions: any[]; // Chat sessions from backend
     activeWorkspaceId: string | null;
+    isInitializing: boolean;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>(() => ({
@@ -116,9 +117,11 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
         { id: 'c1', city: 'NYC', timezone: 'America/New_York' },
         { id: 'c2', city: 'LON', timezone: 'Europe/London' },
         { id: 'c3', city: 'TKY', timezone: 'Asia/Tokyo' },
+        { id: 'c4', city: 'SGP', timezone: 'Asia/Singapore' },
+        { id: 'c6', city: 'AUS/MEL', timezone: 'Australia/Melbourne' },
     ],
     timers: [],
-    isArchiveOpen: false,
+    isShelfOpen: false,
     isHelpOpen: false,
     isOverlayOpen: false,
     notifications: [],
@@ -129,6 +132,7 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
     commandSubmitRequest: null,
     chatSessions: [],
     activeWorkspaceId: null,
+    isInitializing: false,
 }));
 
 /**
@@ -181,11 +185,12 @@ export const workspaceActions = {
 
     removePane: (id: string) => useWorkspaceStore.setState((state) => {
         const { [id]: removed, ...remainingPanes } = state.panes;
+        const newLayout = state.activeLayout.filter(pid => pid !== id);
         return {
             panes: remainingPanes,
-            activeLayout: state.activeLayout.filter(pid => pid !== id),
+            activeLayout: newLayout,
             archive: state.archive.filter(pid => pid !== id),
-            focusedPaneId: state.focusedPaneId === id ? null : state.focusedPaneId,
+            focusedPaneId: state.focusedPaneId === id ? (newLayout[0] || null) : state.focusedPaneId,
         };
     }),
 
@@ -205,7 +210,10 @@ export const workspaceActions = {
         return {
             density,
             activeLayout: newLayout,
-            archive: newArchive
+            archive: newArchive,
+            focusedPaneId: (state.focusedPaneId && !newLayout.includes(state.focusedPaneId))
+                ? (newLayout[0] || null)
+                : state.focusedPaneId
         };
     }),
 
@@ -268,14 +276,18 @@ export const workspaceActions = {
         }
     })),
 
-    archivePane: (id: string) => useWorkspaceStore.setState((state) => ({
-        activeLayout: state.activeLayout.filter(pid => pid !== id),
-        archive: [...state.archive, id]
-    })),
+    closePane: (id: string) => useWorkspaceStore.setState((state) => {
+        const newLayout = state.activeLayout.filter(pid => pid !== id);
+        return {
+            activeLayout: newLayout,
+            archive: [...state.archive.filter(pid => pid !== id), id],
+            focusedPaneId: state.focusedPaneId === id ? (newLayout[0] || null) : state.focusedPaneId,
+        };
+    }),
 
     restorePane: (id: string) => useWorkspaceStore.setState((state) => {
         if (state.activeLayout.includes(id)) {
-            return { focusedPaneId: id, isArchiveOpen: false, isOverlayOpen: false };
+            return { focusedPaneId: id, isShelfOpen: false, isOverlayOpen: false };
         }
 
         let newLayout = [...state.activeLayout];
@@ -299,7 +311,7 @@ export const workspaceActions = {
             activeLayout: newLayout,
             archive: newArchive,
             focusedPaneId: id,
-            isArchiveOpen: false,
+            isShelfOpen: false,
             isOverlayOpen: false
         };
     }),
@@ -314,10 +326,10 @@ export const workspaceActions = {
         return { activeLayout: layout };
     }),
 
-    toggleArchiveOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => {
-        const nextOpen = isOpen !== undefined ? isOpen : !state.isArchiveOpen;
+    toggleShelfOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => {
+        const nextOpen = isOpen !== undefined ? isOpen : !state.isShelfOpen;
         return {
-            isArchiveOpen: nextOpen,
+            isShelfOpen: nextOpen,
             isHelpOpen: false,
             isOverlayOpen: nextOpen
         };
@@ -327,7 +339,7 @@ export const workspaceActions = {
         const nextOpen = isOpen !== undefined ? isOpen : !state.isHelpOpen;
         return {
             isHelpOpen: nextOpen,
-            isArchiveOpen: false,
+            isShelfOpen: false,
             isOverlayOpen: nextOpen
         };
     }),
@@ -431,11 +443,24 @@ export const workspaceActions = {
         chatSessions: state.chatSessions.filter(s => s.id !== sessionId)
     })),
 
-    setWorkspaceId: (id: string) => useWorkspaceStore.setState({ activeWorkspaceId: id }),
+    setWorkspaceId: (id: string) => {
+        useWorkspaceStore.setState({ activeLayout: [], archive: [], activeWorkspaceId: id }); // Reset local caches for fresh load
+        // Persist to backend
+        import('./authStore').then(({ useAuthStore }) => {
+            const auth = useAuthStore.getState();
+            if (auth.isAuthenticated && auth.user) {
+                import('../lib/apiClient').then(({ apiClient }) => {
+                    apiClient.updateActiveWorkspace(auth.user!, id).catch(e => console.error('Failed to update active workspace:', e));
+                });
+            }
+        });
+    },
 
     // Workspace Sync
     initializeWorkspace: async (id: string | null = null) => {
         const targetId = id || 'default_workspace';
+        useWorkspaceStore.setState({ isInitializing: true, activeWorkspaceId: targetId });
+
         try {
             const { apiClient } = await import('../lib/apiClient');
             const ws = await apiClient.getWorkspace(targetId);
@@ -446,11 +471,15 @@ export const workspaceActions = {
                     artifacts: ws.state.artifacts || {},
                     activeLayout: ws.state.activeLayout || [],
                     archive: ws.state.archive || [],
+                    isInitializing: false
                 });
+            } else {
+                useWorkspaceStore.setState({ isInitializing: false });
             }
         } catch (e) {
             console.error('Failed to initialize workspace:', e);
             workspaceActions.addNotification('Failed to load workspace state.', 'error');
+            useWorkspaceStore.setState({ isInitializing: false });
         }
     },
 

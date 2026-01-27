@@ -2,7 +2,7 @@ import React from 'react';
 import Header from './Header';
 import WorkspaceGrid from '../grid/WorkspaceGrid';
 import CommandTerminal from '../terminal/CommandTerminal';
-import ArchiveOverlay from './ArchiveOverlay';
+import ShelfOverlay from './ShelfOverlay';
 import HelpOverlay from './HelpOverlay';
 import { useRegisterCommands } from '../../hooks/useRegisterCommands';
 import { useSSE } from '../../hooks/useSSE';
@@ -32,7 +32,7 @@ const AppShell: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden font-mono relative">
-            <ArchiveOverlay />
+            <ShelfOverlay />
             <HelpOverlay />
 
             <Header connectionStatus={connectionStatus} />

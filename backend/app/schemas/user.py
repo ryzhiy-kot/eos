@@ -6,6 +6,7 @@ class UserBase(BaseModel):
     user_id: str
     profile: Dict[str, Any] = {}
     enabled: bool = True
+    active_workspace_id: Optional[str] = None
 
 
 class UserCreate(UserBase):
@@ -30,6 +31,11 @@ class WorkspaceMember(WorkspaceMemberBase):
 
 class AuthSyncRequest(BaseModel):
     user_id: str
+
+
+class UpdateActiveWorkspaceRequest(BaseModel):
+    user_id: str
+    workspace_id: str
 
 
 class LoginRequest(BaseModel):

@@ -10,6 +10,7 @@ class User(Base):
     user_id = Column(String, unique=True, index=True, nullable=False)  # LDAP Login
     profile = Column(JSON, default=dict)
     enabled = Column(Boolean, default=True)
+    active_workspace_id = Column(String, nullable=True)
 
     memberships = relationship("WorkspaceMember", back_populates="user")
 

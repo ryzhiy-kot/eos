@@ -54,3 +54,16 @@ async def delete_workspace(id: str, db: AsyncSession = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return {"status": "archived"}
+
+
+@router.post("/{id}/archive-pane", tags=["workspaces"])
+async def archive_pane(
+    id: str,
+    pane_data: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    # For now, we don't have user_id in the request, could be added later
+    success = await WorkspaceService.archive_pane(db, id, pane_data)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to archive pane")
+    return {"status": "success"}

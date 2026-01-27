@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from app.schemas.user import UpdateActiveWorkspaceRequest
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.user import AuthSyncRequest, User as UserSchema
-from fastapi import HTTPException
 from app.schemas.user import LoginRequest
 
 router = APIRouter()
@@ -17,6 +17,9 @@ async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
         user = await UserService.create_user(db, req.user_id)
         await db.commit()
         await db.refresh(user)
+
+    # Ensure workspace and active ID
+    user = await UserService.ensure_personal_workspace(db, user)
     return user
 
 
@@ -33,4 +36,16 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     # Ensure workspace
     user = await UserService.ensure_personal_workspace(db, user)
 
+    return user
+
+
+@router.post("/update-active-workspace", response_model=UserSchema, tags=["auth"])
+async def update_active_workspace(
+    req: UpdateActiveWorkspaceRequest, db: AsyncSession = Depends(get_db)
+):
+    from app.services.user_service import UserService
+
+    user = await UserService.update_active_workspace(db, req.user_id, req.workspace_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     return user

@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 interface AuthState {
     isAuthenticated: boolean;
     user: string | null;
+    active_workspace_id: string | null;
     error: string | null;
     isLoading: boolean;
     isHydrated: boolean;
@@ -17,6 +18,7 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             isAuthenticated: false,
             user: null,
+            active_workspace_id: null,
             error: null,
             isLoading: false,
             isHydrated: false,
@@ -30,12 +32,15 @@ export const useAuthStore = create<AuthState>()(
                     const user = await apiClient.login(username);
 
                     if (user.memberships && user.memberships.length > 0) {
-                        workspaceActions.setWorkspaceId(user.memberships[0].workspace_id);
+                        // Priority: active_workspace_id if valid, else first membership
+                        const targetWs = user.active_workspace_id || user.memberships[0].workspace_id;
+                        workspaceActions.setWorkspaceId(targetWs);
                     }
 
                     set({
                         isAuthenticated: true,
                         user: user.user_id,
+                        active_workspace_id: user.active_workspace_id || null,
                         isLoading: false,
                         error: null
                     });
@@ -49,14 +54,15 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            logout: () => set({ isAuthenticated: false, user: null }),
+            logout: () => set({ isAuthenticated: false, user: null, active_workspace_id: null }),
             setHasHydrated: () => set({ isHydrated: true })
         }),
         {
             name: 'elyon-auth-storage',
             partialize: (state) => ({
                 isAuthenticated: state.isAuthenticated,
-                user: state.user
+                user: state.user,
+                active_workspace_id: state.active_workspace_id
             }),
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated();

@@ -33,18 +33,11 @@ async def get_session(id: str, db: AsyncSession = Depends(get_db)):
 async def update_session(
     id: str, session_in: ChatSessionUpdate, db: AsyncSession = Depends(get_db)
 ):
-    # Simple logic here as proof of concept for the refactor
-    db_obj = await SessionService.get_session(db, id)
+    db_obj = await SessionService.update_session(
+        db, id, name=session_in.name, is_active=session_in.is_active
+    )
     if not db_obj:
         raise HTTPException(status_code=404, detail="Session not found")
-
-    if session_in.name:
-        db_obj.name = session_in.name
-    if session_in.is_active is not None:
-        db_obj.is_active = session_in.is_active
-
-    await db.commit()
-    await db.refresh(db_obj)
     return db_obj
 
 

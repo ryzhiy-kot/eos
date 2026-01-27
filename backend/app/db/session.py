@@ -3,7 +3,9 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.SQLALCHEMY_DATABASE_URL, echo=True)
+engine = create_async_engine(
+    settings.SQLALCHEMY_DATABASE_URL, echo=settings.SQLALCHEMY_ECHO
+)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

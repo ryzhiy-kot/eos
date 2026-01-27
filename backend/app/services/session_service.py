@@ -77,3 +77,23 @@ class SessionService:
         )
         result = await db.execute(stmt)
         return result.scalar_one()
+
+    @staticmethod
+    async def update_session(
+        db: AsyncSession,
+        session_id: str,
+        name: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> Optional[ChatSession]:
+        db_obj = await SessionService.get_session(db, session_id)
+        if not db_obj:
+            return None
+
+        if name is not None:
+            db_obj.name = name
+        if is_active is not None:
+            db_obj.is_active = is_active
+
+        await db.commit()
+        await db.refresh(db_obj)
+        return db_obj
