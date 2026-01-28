@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { useWorkspaceStore, workspaceActions } from '../store/workspaceStore';
-import { useAuthStore } from '../store/authStore';
-import { CommandEntry } from '../lib/commandRegistry';
-import { parseDurationExpression, generatePaneId } from '../lib/terminalUtils';
-import { COMMAND_NAMES } from '../lib/commandBus';
-import { useCommandHandler } from './useCommandHandler';
+import { useWorkspaceStore, workspaceActions } from '@/store/workspaceStore';
+import { useAuthStore } from '@/store/authStore';
+import { CommandEntry } from '@/lib/commandRegistry';
+import { parseDurationExpression, generatePaneId } from '@/lib/terminalUtils';
+import { COMMAND_NAMES } from '@/lib/commandBus';
+import { useCommandHandler } from '@/hooks/useCommandHandler';
+import { extractPaneId } from '@/lib/parser';
 
 export const useRegisterCommands = (onReady?: () => void) => {
     const activeLayout = useWorkspaceStore(state => state.activeLayout);
@@ -27,7 +28,8 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
     useCommandHandler(COMMAND_NAMES.FOCUS, (payload) => {
         const rawTarget = payload.args[0] || payload.context.sourceId;
-        const target = rawTarget?.toUpperCase();
+        let target = rawTarget?.toUpperCase();
+        if (target?.startsWith('@')) target = extractPaneId(target);
         if (target && useWorkspaceStore.getState().panes[target]) {
             workspaceActions.focusPane(target);
             return true;
@@ -36,18 +38,25 @@ export const useRegisterCommands = (onReady?: () => void) => {
     });
 
     useCommandHandler(COMMAND_NAMES.SWAP, (payload) => {
-        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
-        if (sourceId && payload.args[0]) {
-            workspaceActions.swapPanes(sourceId, payload.args[0].toUpperCase());
+        let sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+        let targetId = payload.args[0];
+        if (sourceId?.startsWith('@')) sourceId = extractPaneId(sourceId);
+        if (targetId?.startsWith('@')) targetId = extractPaneId(targetId);
+
+        if (sourceId && targetId) {
+            workspaceActions.swapPanes(sourceId, targetId.toUpperCase());
             return true;
         }
         return false;
     });
 
-    useCommandHandler(COMMAND_NAMES.CLOSE, (payload) => {
-        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
-        if (sourceId) {
-            workspaceActions.closePane(sourceId); // Moves to shelf
+    useCommandHandler(COMMAND_NAMES.SHELF, (payload) => {
+        // Use provided targetId (from > P1), sourceId (from /shelf P1), or fallback to focusedPaneId
+        let targetId = payload.context.sourceId || payload.context.focusedPaneId;
+        if (targetId?.startsWith('@')) targetId = extractPaneId(targetId);
+
+        if (targetId) {
+            workspaceActions.closePane(targetId); // Moves to shelf
             return true;
         }
         return false;
@@ -143,16 +152,14 @@ export const useRegisterCommands = (onReady?: () => void) => {
         return false;
     });
 
-    useCommandHandler(COMMAND_NAMES.HELP, (payload) => {
-        const isOpen = payload.args[0] === 'close' ? false : true;
+    const handleHelp = (payload: any) => {
+        const isOpen = payload?.args?.[0] === 'close' ? false : true;
         workspaceActions.toggleHelpOverlay(isOpen);
         return true;
-    });
+    };
 
-    useCommandHandler(COMMAND_NAMES.QUESTION, () => {
-        workspaceActions.toggleHelpOverlay(true);
-        return true;
-    });
+    useCommandHandler(COMMAND_NAMES.HELP, handleHelp);
+    useCommandHandler(COMMAND_NAMES.QUESTION, () => handleHelp({}));
 
     useCommandHandler(COMMAND_NAMES.RENAME, (payload) => {
         const potentialId = payload.args[0]?.toUpperCase();
@@ -389,14 +396,23 @@ export const useRegisterCommands = (onReady?: () => void) => {
 
         try {
             const { apiClient } = await import('../lib/apiClient');
+            const context_artifacts = {
+                [artifactId]: artifact,
+                ...(payload.context.contextArtifacts || {})
+            };
+            const referenced_artifact_ids = Array.from(new Set([
+                artifactId,
+                ...(payload.context.referencedArtifactIds || [])
+            ]));
+
             const response = await apiClient.execute({
                 type: 'command',
                 session_id: COMMAND_SESSION_ID,
                 command_name: commandName,
                 action: payload.action,
                 args: payload.args,
-                context_artifacts: { [artifactId]: artifact },
-                referenced_artifact_ids: [artifactId]
+                context_artifacts,
+                referenced_artifact_ids
             });
 
             if (response.success) {
@@ -509,14 +525,14 @@ export const useRegisterCommands = (onReady?: () => void) => {
             {
                 name: COMMAND_NAMES.LOAD,
                 description: 'Open file picker to load content.',
-                parameters: [{ name: 'PaneID', description: 'Target pane ID (optional)', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'Target pane ID (optional)', required: false, type: 'paneId' }],
                 category: 'system',
                 shortcut: 'alt+o',
             },
             {
                 name: COMMAND_NAMES.CLIP,
                 description: 'Copy pane content (text, chat JSON, or image URL) to clipboard.',
-                parameters: [{ name: 'PaneID', description: 'Source pane ID (optional)', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'Source pane ID (optional)', required: false, type: 'paneId' }],
                 category: 'pane',
                 shortcut: 'alt+y',
             },
@@ -545,33 +561,33 @@ export const useRegisterCommands = (onReady?: () => void) => {
             {
                 name: COMMAND_NAMES.FOCUS,
                 description: 'Switch focus to a specific pane.',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to focus', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'ID of the pane to focus', required: false, type: 'paneId' }],
                 category: 'pane',
                 shortcut: 'ctrl+`',
             },
             {
                 name: COMMAND_NAMES.SWAP,
                 description: 'Swap the positions of two panes.',
-                parameters: [{ name: 'P1', description: 'First pane ID', required: true, type: 'paneId' }, { name: 'P2', description: 'Second pane ID', required: true, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'First pane ID', required: true, type: 'paneId' }, { name: '@P2', description: 'Second pane ID', required: true, type: 'paneId' }],
                 category: 'pane',
             },
             {
-                name: COMMAND_NAMES.CLOSE,
-                description: 'Move a pane to the shelf (temporary remove).',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to close', required: false, type: 'paneId' }],
+                name: COMMAND_NAMES.SHELF,
+                description: 'Close the mentioned pane and move it to the shelf.',
+                parameters: [{ name: '@P1', description: 'ID of the pane to close', required: false, type: 'paneId' }],
                 category: 'pane',
                 shortcut: 'alt+w',
             },
             {
                 name: COMMAND_NAMES.HIDE,
                 description: 'Move a pane to the shelf (temporary remove).',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to hide', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'ID of the pane to hide', required: false, type: 'paneId' }],
                 category: 'pane',
             },
             {
                 name: COMMAND_NAMES.ARCHIVE,
                 description: 'Permanently archive a pane (remove from shelf).',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to archive', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'ID of the pane to archive', required: false, type: 'paneId' }],
                 category: 'pane',
             },
             {
@@ -583,19 +599,19 @@ export const useRegisterCommands = (onReady?: () => void) => {
             {
                 name: COMMAND_NAMES.SHOW,
                 description: 'Restore a pane from the archive.',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to restore', required: true, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'ID of the pane to restore', required: true, type: 'paneId' }],
                 category: 'utility',
             },
             {
                 name: COMMAND_NAMES.UNDO,
                 description: 'Undo the last change in a pane.',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to undo', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'ID of the pane to undo', required: false, type: 'paneId' }],
                 category: 'pane',
             },
             {
                 name: COMMAND_NAMES.REDO,
                 description: 'Redo the last undone change.',
-                parameters: [{ name: 'PaneID', description: 'ID of the pane to redo', required: false, type: 'paneId' }],
+                parameters: [{ name: '@P1', description: 'ID of the pane to redo', required: false, type: 'paneId' }],
                 category: 'pane',
             },
             {
@@ -619,7 +635,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
             {
                 name: COMMAND_NAMES.RENAME,
                 description: 'Rename a pane.',
-                parameters: [{ name: 'PaneID', description: 'ID of pane to rename (optional)', required: false, type: 'paneId' }, { name: 'Name', description: 'New title', required: true }],
+                parameters: [{ name: '@P1', description: 'ID of pane to rename (optional)', required: false, type: 'paneId' }, { name: 'Name', description: 'New title', required: true }],
                 category: 'pane',
                 shortcut: 'alt+r',
             },
@@ -636,11 +652,11 @@ export const useRegisterCommands = (onReady?: () => void) => {
                 shortcut: 'shift+?',
             },
             // Data/Mock commands
-            { name: COMMAND_NAMES.PLOT, description: 'Generate a chart from data.', example: '/plot [P1] "prompt"', category: 'data', shortcut: 'alt+p' },
-            { name: COMMAND_NAMES.RUN, description: 'Execute code against pane data.', example: '/run [P1] "code"', category: 'data', shortcut: 'alt+x' },
-            { name: COMMAND_NAMES.DIFF, description: 'Compare two panes.', example: '/diff [P1],[P2]', category: 'data', shortcut: 'alt+d' },
-            { name: COMMAND_NAMES.SUMMARIZE, description: 'Summarize pane content.', example: '/summarize [P1]', category: 'data', shortcut: 'alt+s' },
-            { name: 'OPTIMIZE' as any, description: 'Preview an AI-driven optimization of a pane.', example: '/optimize [P1] "prompt"', category: 'data' as any, shortcut: 'alt+z' },
+            { name: COMMAND_NAMES.PLOT, description: 'Generate a chart from data. Supports @P1, @file refs.', example: '/plot @P1 "chart type"', category: 'data', shortcut: 'alt+p' },
+            { name: COMMAND_NAMES.RUN, description: 'Execute code against pane data. Supports @P1, @file refs.', example: '/run @P1 "code"', category: 'data', shortcut: 'alt+x' },
+            { name: COMMAND_NAMES.DIFF, description: 'Compare two panes or a pane and a file.', example: '/diff @P1,@P2 or /diff @P1,@file', category: 'data', shortcut: 'alt+d' },
+            { name: COMMAND_NAMES.SUMMARIZE, description: 'Summarize pane content or an attached file.', example: '/summarize @P1 or /summarize @file', category: 'data', shortcut: 'alt+s' },
+            { name: 'OPTIMIZE' as any, description: 'Preview an AI-driven optimization of a pane.', example: '/optimize @P1 "prompt"', category: 'data' as any, shortcut: 'alt+z' },
         ] as CommandEntry[]);
     }, []); // Static registry, run once
 };

@@ -7,6 +7,8 @@ export interface ParsedCommand {
     original: string;
 }
 
+export const extractPaneId = (id: string) => (id.startsWith('@') ? id.substring(1) : id);
+
 export const parseCommand = (input: string, activePaneId: string | null): ParsedCommand => {
     const trimmed = input.trim();
 
@@ -43,17 +45,21 @@ export const parseCommand = (input: string, activePaneId: string | null): Parsed
 
     // Check if second token is a Pane ID (P1, P2, etc.) or @P1
     if (tokens[1]) {
-        if (/^@P\d+$/.test(tokens[1])) {
-            sourceId = tokens[1].substring(1).toUpperCase();
+        if (/^@?P\d+$/.test(tokens[1])) {
+            sourceId = tokens[1].startsWith('@') ? tokens[1].substring(1).toUpperCase() : tokens[1].toUpperCase();
             actionStartIdx = 2;
-        } else if (/^P\d+$/.test(tokens[1])) {
-            sourceId = tokens[1].toUpperCase();
+        } else if (/^@?A_\w+$/.test(tokens[1])) {
+            // Direct Artifact ID reference
+            sourceId = tokens[1].startsWith('@') ? tokens[1].substring(1) : tokens[1];
             actionStartIdx = 2;
         }
     }
 
     const action = tokens.slice(actionStartIdx).join(' ');
-    const targetId = targetPart; // 'P2', 'new', or undefined
+    let targetId = targetPart; // 'P2', 'new', or undefined
+    if (targetId && targetId.startsWith('@')) {
+        targetId = targetId.substring(1).toUpperCase();
+    }
 
     return {
         type: 'command',

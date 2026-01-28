@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useWorkspaceStore, PaneType, workspaceActions } from '../store/workspaceStore';
-import { parseCommand } from '../lib/parser';
-import { generatePaneId } from '../lib/terminalUtils';
-import { COMMAND_NAMES, commandBus, CommandName } from '../lib/commandBus';
-import { useCommandHandler } from './useCommandHandler';
-import { apiClient } from '../lib/apiClient';
+import { useWorkspaceStore, PaneType, workspaceActions } from '@/store/workspaceStore';
+import { parseCommand } from '@/lib/parser';
+import { generatePaneId } from '@/lib/terminalUtils';
+import { COMMAND_NAMES, commandBus, CommandName } from '@/lib/commandBus';
+import { useCommandHandler } from '@/hooks/useCommandHandler';
+import { apiClient } from '@/lib/apiClient';
 
 export const useCommandTerminal = () => {
     const [input, setInput] = useState('');
@@ -16,7 +16,7 @@ export const useCommandTerminal = () => {
     const {
         focusedPaneId: activePaneId,
         pendingCommand,
-        isOverlayOpen,
+        activeOverlay,
         terminalFocusCounter, commandSubmitRequest,
         commands
     } = useWorkspaceStore();
@@ -45,12 +45,53 @@ export const useCommandTerminal = () => {
         return true;
     });
 
+    useEffect(() => {
+        if (input.includes('@file')) {
+            // Trigger if space or enter followed @file, or if it's the only thing
+            if (input.endsWith('@file ') || input === '@file') {
+                pendingLoadTargetRef.current = 'ATTACH'; // Special marker for attachment
+                fileInputRef.current?.click();
+                // We'll replace @file with @pending once triggered to avoid loop
+                // or just wait for fileSelect to replace it with @A_ID
+            }
+        }
+    }, [input]);
+
     const processCommandString = useCallback(async (rawInput: string) => {
         setIsLoading(true);
         try {
+            const state = useWorkspaceStore.getState();
+
+            // Resolve all @ references in the rawInput
+            // Matches @P1, @A_XYZ
+            const resourceRefs = rawInput.match(/@(P\d+|A_\w+)/gi) || [];
+            const contextArtifacts: Record<string, any> = {};
+            const referencedArtifactIds: string[] = [];
+            const optimisticArtifacts: any[] = [];
+
+            resourceRefs.forEach(ref => {
+                const id = ref.substring(1).toUpperCase();
+                let artifactId: string | null = null;
+
+                if (id.startsWith('P')) {
+                    const p = state.panes[id];
+                    if (p) artifactId = p.artifactId;
+                } else if (id.startsWith('A_')) {
+                    artifactId = id;
+                }
+
+                if (artifactId) {
+                    const art = state.artifacts[artifactId];
+                    if (art) {
+                        contextArtifacts[artifactId] = art;
+                        referencedArtifactIds.push(artifactId);
+                        optimisticArtifacts.push(art);
+                    }
+                }
+            });
+
             const { type, verb, sourceId, action, targetId } = parseCommand(rawInput, activePaneId);
             const args = action ? action.split(' ') : [];
-            const state = useWorkspaceStore.getState();
             const activePane = activePaneId ? state.panes[activePaneId] : null;
 
             if (type === 'message') {
@@ -109,24 +150,6 @@ export const useCommandTerminal = () => {
                 const artifact = state.artifacts[artifactId];
                 if (!artifact) return;
 
-                const paneRefs = rawInput.match(/@P\d+/gi) || [];
-                const contextArtifacts: Record<string, any> = {};
-                const referencedArtifactIds: string[] = [];
-                const optimisticArtifacts: any[] = [];
-
-                paneRefs.forEach(ref => {
-                    const id = ref.substring(1).toUpperCase();
-                    const p = state.panes[id];
-                    if (p) {
-                        const r = state.artifacts[p.artifactId];
-                        if (r) {
-                            contextArtifacts[p.artifactId] = r;
-                            referencedArtifactIds.push(p.artifactId);
-                            optimisticArtifacts.push(r);
-                        }
-                    }
-                });
-
                 const userMsg = {
                     role: 'user' as const,
                     content: rawInput,
@@ -172,7 +195,13 @@ export const useCommandTerminal = () => {
                     action: action || undefined,
                     targetId: targetId || undefined,
                     original: rawInput,
-                    context: { sourceId: sourceId || undefined, targetId: targetId || undefined, focusedPaneId: activePaneId }
+                    context: {
+                        sourceId: sourceId || undefined,
+                        targetId: targetId || undefined,
+                        focusedPaneId: activePaneId,
+                        referencedArtifactIds,
+                        contextArtifacts
+                    }
                 });
 
                 if (!executed) {
@@ -225,7 +254,26 @@ export const useCommandTerminal = () => {
                 }
             }
 
-            if (targetId && state.panes[targetId]) {
+            if (targetId === 'ATTACH') {
+                const artifactId = `A_FILE_${Date.now()}`;
+                const newArtifact = {
+                    id: artifactId,
+                    type,
+                    payload,
+                    session_id: 'default_session',
+                    mutations: [],
+                    metadata: { filename: file.name }
+                };
+
+                // Persist new artifact first
+                try { await apiClient.createArtifact(newArtifact); }
+                catch (e) { console.error('Failed to persist attached artifact:', e); }
+
+                workspaceActions.addArtifact(newArtifact);
+
+                // Replace @file in the input with @A_ID
+                setInput(prev => prev.replace(/@file\s?/, `@${artifactId} `));
+            } else if (targetId && state.panes[targetId]) {
                 const artifactId = state.panes[targetId].artifactId;
                 const updatedArtifact = { ...state.artifacts[artifactId], payload };
                 workspaceActions.updateArtifactPayload(artifactId, payload, true);
@@ -243,7 +291,8 @@ export const useCommandTerminal = () => {
                     type,
                     payload,
                     session_id: 'default_session',
-                    mutations: []
+                    mutations: [],
+                    metadata: { filename: file.name }
                 };
 
                 // Persist new artifact first
@@ -271,6 +320,13 @@ export const useCommandTerminal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
+
+        // If @file is present and we haven't handled it yet, trigger it
+        if (input.includes('@file')) {
+            pendingLoadTargetRef.current = 'ATTACH';
+            fileInputRef.current?.click();
+            return;
+        }
 
         workspaceActions.clearNotification();
 
@@ -305,7 +361,7 @@ export const useCommandTerminal = () => {
                             return;
                         }
                     }
-                    if (!isOverlayOpen) {
+                    if (!activeOverlay) {
                         inputRef.current?.focus();
                     }
                 });
@@ -319,13 +375,13 @@ export const useCommandTerminal = () => {
             window.removeEventListener('keydown', handleInteraction);
             window.removeEventListener('mousedown', handleInteraction);
         };
-    }, [isOverlayOpen]);
+    }, [activeOverlay]);
 
     useEffect(() => {
-        if (!isOverlayOpen && !isLoading) {
+        if (!activeOverlay && !isLoading) {
             inputRef.current?.focus();
         }
-    }, [activePaneId, isOverlayOpen, isLoading]);
+    }, [activePaneId, activeOverlay, isLoading]);
 
     useEffect(() => {
         inputRef.current?.focus();
@@ -352,7 +408,7 @@ export const useCommandTerminal = () => {
         handleFileSelect,
         inputRef,
         fileInputRef,
-        isOverlayOpen,
+        activeOverlay,
         activePaneId,
         commands
     };

@@ -10,6 +10,7 @@ interface OverlayWindowProps {
     subtitle?: string;
     maxWidth?: string;
     className?: string;
+    scrollable?: boolean;
 }
 
 const OverlayWindow: React.FC<OverlayWindowProps> = ({
@@ -19,7 +20,8 @@ const OverlayWindow: React.FC<OverlayWindowProps> = ({
     children,
     subtitle,
     maxWidth = 'max-w-4xl',
-    className
+    className,
+    scrollable = true
 }) => {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,7 +59,10 @@ const OverlayWindow: React.FC<OverlayWindowProps> = ({
                 </div>
 
                 {/* Content Container */}
-                <div className="flex-1 overflow-y-auto w-full mx-auto p-6 scrollbar-thin scrollbar-thumb-terminal-700 scrollbar-track-transparent">
+                <div className={clsx(
+                    "flex-1 w-full mx-auto scrollbar-thin scrollbar-thumb-terminal-700 scrollbar-track-transparent flex flex-col min-h-0",
+                    scrollable ? "overflow-y-auto p-6" : "overflow-hidden"
+                )}>
                     {children}
                 </div>
 

@@ -110,7 +110,7 @@
     }
 
     .overlay-window {
-        @apply w-full max-w-2xl border shadow-2xl rounded-lg overflow-hidden flex flex-col animate-scale-in;
+        @apply w-full max-h-[90vh] border shadow-2xl rounded-lg overflow-hidden flex flex-col animate-scale-in;
         background-color: #0a0a0f;
         /* terminal-900 */
         border-color: #1f1f26;

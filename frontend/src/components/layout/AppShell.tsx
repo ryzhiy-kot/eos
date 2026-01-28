@@ -2,13 +2,14 @@ import React from 'react';
 import Header from './Header';
 import WorkspaceGrid from '../grid/WorkspaceGrid';
 import CommandTerminal from '../terminal/CommandTerminal';
-import ShelfOverlay from './ShelfOverlay';
-import HelpOverlay from './HelpOverlay';
-import { useRegisterCommands } from '../../hooks/useRegisterCommands';
-import { useSSE } from '../../hooks/useSSE';
-import { useWorkspaceSync } from '../../hooks/useWorkspaceSync';
+import { ShelfOverlay, HelpOverlay } from '@/features/overlays';
+import { useRegisterCommands } from '@/hooks/useRegisterCommands';
+import { useSSE } from '@/hooks/useSSE';
+import { useWorkspaceSync } from '@/hooks/useWorkspaceSync';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 
 const AppShell: React.FC = () => {
+    const { activeOverlay } = useWorkspaceStore();
     const [isRegistryReady, setIsRegistryReady] = React.useState(false);
 
     // Initialize SSE connection for real-time communication
@@ -32,8 +33,8 @@ const AppShell: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden font-mono relative">
-            <ShelfOverlay />
-            <HelpOverlay />
+            {activeOverlay === 'shelf' && <ShelfOverlay />}
+            {activeOverlay === 'help' && <HelpOverlay />}
 
             <Header connectionStatus={connectionStatus} />
 

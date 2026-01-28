@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CommandEntry } from '../lib/commandRegistry';
+import { CommandEntry } from '@/lib/commandRegistry';
 
 export type PaneType = 'chat' | 'data' | 'doc' | 'visual' | 'code' | 'empty';
 
@@ -68,9 +68,10 @@ export interface ClockConfig {
 export interface TimerConfig {
     id: string;
     label: string;
-    durationSec: number;
     endsAt: number; // Timestamp
 }
+
+export type OverlayType = 'shelf' | 'help' | 'lookup' | null;
 
 interface WorkspaceState {
     panes: Record<string, Pane>; // All visual panes
@@ -89,9 +90,7 @@ interface WorkspaceState {
     // Utilities
     clocks: ClockConfig[];
     timers: TimerConfig[];
-    isShelfOpen: boolean; // For visual catalog overlay
-    isHelpOpen: boolean;
-    isOverlayOpen: boolean;
+    activeOverlay: OverlayType;
     notifications: Array<{ id: string; message: string; type: 'error' | 'success' | 'info' }>;
     pendingCommand: string | null;
     commands: CommandEntry[];
@@ -121,9 +120,7 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
         { id: 'c6', city: 'AUS/MEL', timezone: 'Australia/Melbourne' },
     ],
     timers: [],
-    isShelfOpen: false,
-    isHelpOpen: false,
-    isOverlayOpen: false,
+    activeOverlay: null,
     notifications: [],
     pendingCommand: null,
     commands: [],
@@ -311,8 +308,7 @@ export const workspaceActions = {
             activeLayout: newLayout,
             archive: newArchive,
             focusedPaneId: id,
-            isShelfOpen: false,
-            isOverlayOpen: false
+            activeOverlay: null
         };
     }),
 
@@ -326,21 +322,19 @@ export const workspaceActions = {
         return { activeLayout: layout };
     }),
 
+    setOverlay: (type: OverlayType) => useWorkspaceStore.setState({ activeOverlay: type }),
+
     toggleShelfOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => {
-        const nextOpen = isOpen !== undefined ? isOpen : !state.isShelfOpen;
+        const nextOpen = isOpen !== undefined ? isOpen : state.activeOverlay !== 'shelf';
         return {
-            isShelfOpen: nextOpen,
-            isHelpOpen: false,
-            isOverlayOpen: nextOpen
+            activeOverlay: nextOpen ? 'shelf' : null
         };
     }),
 
     toggleHelpOverlay: (isOpen?: boolean) => useWorkspaceStore.setState((state) => {
-        const nextOpen = isOpen !== undefined ? isOpen : !state.isHelpOpen;
+        const nextOpen = isOpen !== undefined ? isOpen : state.activeOverlay !== 'help';
         return {
-            isHelpOpen: nextOpen,
-            isShelfOpen: false,
-            isOverlayOpen: nextOpen
+            activeOverlay: nextOpen ? 'help' : null
         };
     }),
 

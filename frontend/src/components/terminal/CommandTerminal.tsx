@@ -1,12 +1,12 @@
 import React from 'react';
-import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { CommandEntry } from '../../lib/commandRegistry';
-import { useCommandTerminal } from '../../hooks/useCommandTerminal';
-import TerminalInput from './TerminalInput';
-import TerminalStatus from './TerminalStatus';
-import TerminalNotification from './TerminalNotification';
-import { COMMAND_NAMES, commandBus } from '../../lib/commandBus';
+import { CommandEntry } from '@/lib/commandRegistry';
+import { useCommandTerminal } from '@/hooks/useCommandTerminal';
+import TerminalInput from '@/components/terminal/TerminalInput';
+import TerminalStatus from '@/components/terminal/TerminalStatus';
+import TerminalNotification from '@/components/terminal/TerminalNotification';
+import { COMMAND_NAMES, commandBus } from '@/lib/commandBus';
 
 const ShortcutHandler: React.FC<{
     cmd: CommandEntry;

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { useWorkspaceStore } from '../../store/workspaceStore';
-import PaneFrame from '../panes/PaneFrame';
-import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import PaneFrame from '@/components/panes/PaneFrame';
+import { commandBus, COMMAND_NAMES } from '@/lib/commandBus';
 
 const WorkspaceGrid: React.FC = () => {
     const { panes, activeLayout } = useWorkspaceStore();

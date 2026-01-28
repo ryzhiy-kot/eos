@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, Clock, Timer, X } from 'lucide-react';
-import { useWorkspaceStore } from '../../store/workspaceStore';
-import { commandBus, COMMAND_NAMES } from '../../lib/commandBus';
+import { useWorkspaceStore } from '@/store/workspaceStore';
+import { commandBus, COMMAND_NAMES } from '@/lib/commandBus';
 
 type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | 'error';
 

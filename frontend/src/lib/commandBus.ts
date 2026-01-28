@@ -4,7 +4,7 @@ export const COMMAND_NAMES = {
     CLEAR: 'clear',
     FOCUS: 'focus',
     SWAP: 'swap',
-    CLOSE: 'close',
+    SHELF: 'shelf',
     HIDE: 'hide',
     LS: 'ls',
     SHOW: 'show',
