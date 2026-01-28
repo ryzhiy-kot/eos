@@ -1,4 +1,4 @@
-Project: [[Elyon]]
+Project: [[monad]]
 To resolve the conflict between "Command Execution" and "Conversational Flow" in a multi-agent environment, you need to implement a Stateful Terminal.
 Instead of a "Global Input" that forces you to guess where the text goes, the Terminal adapts its behavior based on the currently focused pane.
 Here is the UX specification to keep the user experience coherent.

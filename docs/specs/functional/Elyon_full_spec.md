@@ -1,4 +1,4 @@
-Project [[Elyon]]
+Project [[monad]]
 This document serves as the comprehensive Master Specification for the Terminal-Centric AI Workspace. It consolidates all architectural decisions, user interaction models, and technical requirements defined in previous iterations.
 Project Specification: The Polyglot AI Orchestrator
 1. Executive Summary

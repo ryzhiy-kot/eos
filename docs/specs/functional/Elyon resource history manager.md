@@ -1,5 +1,5 @@
 ---
-project: "[[Elyon]]"
+project: "[[monad]]"
 type: Spec
 ---
 

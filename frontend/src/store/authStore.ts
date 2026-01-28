@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState>()(
             setHasHydrated: () => set({ isHydrated: true })
         }),
         {
-            name: 'elyon-auth-storage',
+            name: 'monad-auth-storage',
             partialize: (state) => ({
                 isAuthenticated: state.isAuthenticated,
                 user: state.user,

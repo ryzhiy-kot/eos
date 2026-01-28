@@ -1,4 +1,4 @@
-// API Client for Elyon Backend Communication
+// API Client for monad Backend Communication
 
 const API_BASE_URL = typeof window !== 'undefined'
     ? (window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin)

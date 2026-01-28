@@ -9,7 +9,7 @@ import { extractPaneId } from '@/lib/parser';
 
 export const useRegisterCommands = (onReady?: () => void) => {
     const activeLayout = useWorkspaceStore(state => state.activeLayout);
-    const COMMAND_SESSION_ID = 'elyon_command_session_v1';
+    const COMMAND_SESSION_ID = 'monad_command_session_v1';
 
     useEffect(() => {
         if (onReady) {
@@ -214,7 +214,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
             const initArtifact = {
                 id: artifactId,
                 type: 'chat' as const,
-                payload: { messages: [{ role: 'system', content: 'Welcome to Elyon. System ready.' }] },
+                payload: { messages: [{ role: 'system', content: 'Welcome to monad. System ready.' }] },
                 session_id: 'SESSION_INIT',
                 mutations: []
             };
