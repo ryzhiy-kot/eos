@@ -19,14 +19,13 @@ import React, { useState, useEffect } from 'react';
 import { Wifi, Clock, Timer, X } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { commandBus, COMMAND_NAMES } from '@/lib/commandBus';
-
-type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | 'error';
+import { ConnectionStatus } from '@/types/constants';
 
 interface HeaderProps {
     connectionStatus?: ConnectionStatus;
 }
 
-const Header: React.FC<HeaderProps> = ({ connectionStatus = 'disconnected' }) => {
+const Header: React.FC<HeaderProps> = ({ connectionStatus = ConnectionStatus.DISCONNECTED }) => {
     const [time, setTime] = useState(new Date());
     const { clocks, timers, focusedPaneId } = useWorkspaceStore();
 
@@ -104,12 +103,12 @@ const Header: React.FC<HeaderProps> = ({ connectionStatus = 'disconnected' }) =>
 
             {/* Right: System Status */}
             <div className="flex items-center space-x-6 whitespace-nowrap hidden md:flex">
-                <div className={`flex items-center space-x-2 ${connectionStatus === 'connected' ? 'text-emerald-500' :
-                    connectionStatus === 'connecting' ? 'text-yellow-500' :
-                        connectionStatus === 'error' ? 'text-red-500' :
+                <div className={`flex items-center space-x-2 ${connectionStatus === ConnectionStatus.CONNECTED ? 'text-emerald-500' :
+                    connectionStatus === ConnectionStatus.CONNECTING ? 'text-yellow-500' :
+                        connectionStatus === ConnectionStatus.ERROR ? 'text-red-500' :
                             'text-neutral-500'
                     }`}>
-                    <Wifi size={14} className={connectionStatus === 'connected' ? '' : 'animate-pulse'} />
+                    <Wifi size={14} className={connectionStatus === ConnectionStatus.CONNECTED ? '' : 'animate-pulse'} />
                     <span>{connectionStatus.toUpperCase()}</span>
                 </div>
             </div>

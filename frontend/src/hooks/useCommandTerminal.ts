@@ -16,12 +16,13 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useWorkspaceStore, PaneType, workspaceActions } from '@/store/workspaceStore';
+import { useWorkspaceStore, workspaceActions } from '@/store/workspaceStore';
 import { parseCommand } from '@/lib/parser';
 import { generatePaneId } from '@/lib/terminalUtils';
 import { COMMAND_NAMES, commandBus, CommandName } from '@/lib/commandBus';
 import { useCommandHandler } from '@/hooks/useCommandHandler';
 import { apiClient } from '@/lib/apiClient';
+import { ChatRole, PaneType } from '@/types/constants'
 
 export const useCommandTerminal = () => {
     const [input, setInput] = useState('');
@@ -113,12 +114,12 @@ export const useCommandTerminal = () => {
 
             if (type === 'message') {
                 // Chat logic: Find or create a chat pane
-                let chatPane = activePane && activePane.type === 'chat' ? activePane : null;
+                let chatPane = activePane && activePane.type === PaneType.CHAT ? activePane : null;
 
                 if (!chatPane) {
                     const allPanes = Object.values(state.panes);
                     const chatPanes = allPanes
-                        .filter(p => p.type === 'chat')
+                        .filter(p => p.type === PaneType.CHAT)
                         .sort((a, b) => {
                             const timeA = new Date(a.lineage?.timestamp || 0).getTime();
                             const timeB = new Date(b.lineage?.timestamp || 0).getTime();
@@ -137,7 +138,7 @@ export const useCommandTerminal = () => {
 
                     const newArtifact = {
                         id: artifactId,
-                        type: 'chat' as PaneType,
+                        type: PaneType.CHAT,
                         payload: { messages: [] },
                         session_id: `SESSION_${paneId}`,
                         mutations: []
@@ -150,7 +151,7 @@ export const useCommandTerminal = () => {
                     const newPane = {
                         id: paneId,
                         artifactId: artifactId,
-                        type: 'chat' as PaneType,
+                        type: PaneType.CHAT,
                         title: `Chat ${paneId}`,
                         isSticky: false,
                         lineage: {
@@ -168,7 +169,7 @@ export const useCommandTerminal = () => {
                 if (!artifact) return;
 
                 const userMsg = {
-                    role: 'user' as const,
+                    role: ChatRole.USER,
                     content: rawInput,
                     referenced_artifact_ids: referencedArtifactIds,
                     artifacts: optimisticArtifacts
@@ -243,27 +244,27 @@ export const useCommandTerminal = () => {
         setIsLoading(true);
         try {
             const state = useWorkspaceStore.getState();
-            let type: PaneType = 'doc';
+            let type: PaneType = PaneType.DOC;
             let payload: any = null;
 
             if (file.type.startsWith('image/')) {
-                type = 'visual';
+                type = PaneType.VISUAL;
                 payload = { format: 'img', url: URL.createObjectURL(file) };
             } else if (file.type === 'application/pdf') {
-                type = 'doc';
+                type = PaneType.DOC;
                 payload = { format: 'pdf', value: URL.createObjectURL(file), is_url: true };
             } else {
                 const text = await file.text();
                 if (file.type.includes('json') || file.name.endsWith('.json')) {
-                    type = 'data';
+                    type = PaneType.DATA;
                     payload = { format: 'json', data: JSON.parse(text) };
                 } else if (file.type.includes('javascript') || file.type.includes('python')) {
-                    type = 'code';
+                    type = PaneType.CODE;
                     payload = { language: file.type.includes('python') ? 'python' : 'javascript', source: text, filename: file.name };
                 } else {
                     const isCodeExtension = file.name.endsWith('.py') || file.name.endsWith('.js') || file.name.endsWith('.ts');
-                    type = isCodeExtension ? 'code' : 'doc';
-                    if (type === 'code') {
+                    type = isCodeExtension ? PaneType.CODE : PaneType.DOC;
+                    if (type === PaneType.CODE) {
                         payload = { language: file.name.endsWith('.py') ? 'python' : 'typescript', source: text, filename: file.name };
                     } else {
                         payload = { format: 'md', value: text, is_url: false };

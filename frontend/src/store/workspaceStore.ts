@@ -17,8 +17,16 @@
 
 import { create } from 'zustand';
 import { CommandEntry } from '@/lib/commandRegistry';
+import {
+    PaneType,
+    ChatRole,
+    MutationOriginType,
+    MutationStatus,
+    NotificationType,
+    OverlayType,
+    LayoutDensity
+} from '@/types/constants';
 
-export type PaneType = 'chat' | 'data' | 'doc' | 'visual' | 'code' | 'empty';
 
 export interface PaneLineage {
     parentIds: string[];
@@ -27,7 +35,7 @@ export interface PaneLineage {
 }
 
 export interface ChatMessage {
-    role: 'user' | 'assistant' | 'system';
+    role: ChatRole;
     content: string;
     artifacts?: Artifact[];
     created_at?: string;
@@ -38,7 +46,7 @@ export interface ChatArtifactPayload {
 }
 
 export interface MutationOrigin {
-    type: 'adhoc_command' | 'chat_inference' | 'manual_edit';
+    type: MutationOriginType;
     sessionId?: string;
     prompt?: string;
     triggeringCommand?: string;
@@ -54,7 +62,7 @@ export interface MutationRecord {
     change_summary?: string;
     payload: any;
     checksum?: string;
-    status: 'ghost' | 'committed' | 'reverted';
+    status: MutationStatus;
 }
 
 export interface Artifact {
@@ -88,7 +96,7 @@ export interface TimerConfig {
     endsAt: number; // Timestamp
 }
 
-export type OverlayType = 'shelf' | 'help' | 'lookup' | null;
+// OverlayType is now imported from @/types/constants
 
 interface WorkspaceState {
     panes: Record<string, Pane>; // All visual panes
@@ -97,7 +105,7 @@ interface WorkspaceState {
     focusedPaneId: string | null;
     activeVersions: Record<string, string>; // artifactId -> version_id (Current version being viewed)
     archive: string[]; // IDs of archived panes (shelf)
-    density: 1 | 2 | 4 | 9;
+    density: LayoutDensity;
 
     // History (Simple stack of snapshots for undo/redo on artifact payload)
     // Map of ArtifactID -> Stack of Payload
@@ -108,7 +116,7 @@ interface WorkspaceState {
     clocks: ClockConfig[];
     timers: TimerConfig[];
     activeOverlay: OverlayType;
-    notifications: Array<{ id: string; message: string; type: 'error' | 'success' | 'info' }>;
+    notifications: Array<{ id: string; message: string; type: NotificationType }>;
     pendingCommand: string | null;
     commands: CommandEntry[];
 
@@ -435,7 +443,7 @@ export const workspaceActions = {
         return { commands: newCommands };
     }),
 
-    addNotification: (message: string, type: 'error' | 'success' | 'info' = 'info') =>
+    addNotification: (message: string, type: NotificationType = NotificationType.INFO) =>
         useWorkspaceStore.setState((state) => ({
             notifications: [...state.notifications, { id: `notif_${Date.now()}_${Math.random()}`, message, type }]
         })),

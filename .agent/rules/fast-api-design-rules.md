@@ -77,3 +77,17 @@ Async Everywhere: Use async def for I/O bound operations (DB calls, external API
 Singleton Pattern for Config: Use a cached get_settings() dependency in core/config.py to avoid re-reading .env files on every request.
 
 Log Contextual Data: Logs should include a Request-ID or User-ID to trace issues through the service layer.
+
+4. Enumerations & Constants
+- **Consistent Interface**: When defining variables that represent a fixed set of states, follow a pattern consistent with the frontend.
+- **Python Implementation**: Use standard library `Enum` or `StrEnum` (preferred for Python 3.11+).
+- **JSON Serialization**: Always ensure Enums are serialized as their string values in API responses to maintain compatibility with frontend "const object" patterns.
+
+```python
+from enum import Enum
+
+class PaneType(str, Enum):
+    CHAT = "chat"
+    DATA = "data"
+    DOC = "doc"
+```

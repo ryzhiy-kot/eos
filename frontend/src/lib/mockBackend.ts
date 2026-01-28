@@ -15,7 +15,7 @@
  * without explicit, visible credit to Kyrylo Yatsenko as the original author.
  */
 
-import { PaneType } from '../store/workspaceStore';
+import { PaneType, ChatRole } from '@/types/constants'
 
 // Types mimicking the backend response
 type BackendResponse = {
@@ -37,7 +37,7 @@ export const mockExecute = async (
     switch (verb) {
         case 'plot':
             return {
-                type: 'visual',
+                type: PaneType.VISUAL,
                 title: `Plot: ${action || 'Analysis'}`,
                 content: { chartType: 'bar', data: [100, 200, 150], note: 'Mock visualization' }
             };
@@ -45,28 +45,28 @@ export const mockExecute = async (
         case 'ask':
         case 'chat':
             return {
-                type: 'chat',
+                type: PaneType.CHAT,
                 title: 'Chat Assistant',
-                content: [{ role: 'assistant', content: `I processed your request: "${action}"\n\nIs there anything else I can help you with regarding **${sourceId || 'this context'}**?` }]
+                content: [{ role: ChatRole.ASSISTANT, content: `I processed your request: "${action}"\n\nIs there anything else I can help you with regarding **${sourceId || 'this context'}**?` }]
             };
 
         case 'diff':
             return {
-                type: 'code',
+                type: PaneType.CODE,
                 title: `Diff: ${sourceId} vs ...`,
                 content: `--- ${sourceId}\n+++ ${targetId || 'Comparison'}\n@@ -1,3 +1,3 @@\n- Old Value\n+ New Value\n Unchanged line`
             };
 
         case 'run':
             return {
-                type: 'code',
+                type: PaneType.CODE,
                 title: 'Execution Output',
                 content: `> Executing python script...\n> [DETAILS] Processing data from ${sourceId}\n> Done.\n\nResult: 42`
             };
 
         case 'tab':
             return {
-                type: 'data',
+                type: PaneType.DATA,
                 title: 'Extracted Table',
                 content: [
                     { Row: 1, ColA: 'Data 1', ColB: 'Data 2' },
@@ -76,16 +76,16 @@ export const mockExecute = async (
 
         case 'summarize':
             return {
-                type: 'chat',
+                type: PaneType.CHAT,
                 title: `Summary: ${sourceId || 'Context'}`,
-                content: [{ role: 'assistant', content: `**Summary of ${sourceId || 'context'}**:\n\nBased on the analysis, the key indicators suggest a positive trend with 15% growth in efficiency. Risk factors remain low, but monitoring of ${targetId || 'external variables'} is recommended.\n\n*   **Key Point 1**: Optimization successful.\n*   **Key Point 2**: Latency reduced by 25%.\n*   **Action Item**: Proceed with Phase 2 deployment.` }]
+                content: [{ role: ChatRole.ASSISTANT, content: `**Summary of ${sourceId || 'context'}**:\n\nBased on the analysis, the key indicators suggest a positive trend with 15% growth in efficiency. Risk factors remain low, but monitoring of ${targetId || 'external variables'} is recommended.\n\n*   **Key Point 1**: Optimization successful.\n*   **Key Point 2**: Latency reduced by 25%.\n*   **Action Item**: Proceed with Phase 2 deployment.` }]
             };
 
         default:
             return {
-                type: 'chat',
+                type: PaneType.CHAT,
                 title: 'Default',
-                content: [{ role: 'system', content: `Unknown command: ${verb}` }]
+                content: [{ role: ChatRole.SYSTEM, content: `Unknown command: ${verb}` }]
             };
     }
 };

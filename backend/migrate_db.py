@@ -3,11 +3,11 @@
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
 # © 2026 Kyrylo Yatsenko. All rights reserved.
-# 
+#
 # This work represents a proprietary methodology for Human-Machine Interaction (HMI).
 # All source code, logic structures, and User Experience (UX) frameworks
 # contained herein are the sole intellectual property of Kyrylo Yatsenko.
-# 
+#
 # ATTRIBUTION REQUIREMENT:
 # Any use of this program, or any portion thereof (including code snippets and
 # interaction patterns), may not be used, redistributed, or adapted
@@ -18,7 +18,7 @@ import os
 
 
 def migrate():
-    db_path = "elyon.db"
+    db_path = "monad.db"
     if not os.path.exists(db_path):
         print(f"Database {db_path} not found. Skipping migration.")
         return

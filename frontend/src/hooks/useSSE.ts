@@ -15,9 +15,9 @@
  * without explicit, visible credit to Kyrylo Yatsenko as the original author.
  */
 
+import { ConnectionStatus } from '@/types/constants';
 import { useEffect, useState, useRef, useCallback } from 'react';
 
-type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | 'error';
 
 interface SSEMessage {
     type: string;
@@ -39,7 +39,7 @@ export function useSSE({
     reconnectInterval = 1000,
     maxReconnectAttempts = 10,
 }: UseSSEOptions = {}) {
-    const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+    const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
     const [lastHeartbeat, setLastHeartbeat] = useState<number | null>(null);
     const eventSourceRef = useRef<EventSource | null>(null);
     const reconnectAttemptsRef = useRef(0);
@@ -64,11 +64,11 @@ export function useSSE({
         // Don't attempt to connect if max reconnection attempts reached
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
             console.warn('Max reconnection attempts reached. Connection abandoned.');
-            setStatus('disconnected');
+            setStatus(ConnectionStatus.DISCONNECTED);
             return;
         }
 
-        setStatus('connecting');
+        setStatus(ConnectionStatus.CONNECTING);
         console.log(`Attempting to connect to SSE (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
 
         try {
@@ -77,7 +77,7 @@ export function useSSE({
 
             eventSource.onopen = () => {
                 console.log('SSE connection established');
-                setStatus('connected');
+                setStatus(ConnectionStatus.CONNECTED);
                 reconnectAttemptsRef.current = 0;
             };
 
@@ -97,7 +97,7 @@ export function useSSE({
 
             eventSource.onerror = (error) => {
                 console.error('SSE connection error:', error);
-                setStatus('error');
+                setStatus(ConnectionStatus.ERROR);
                 onErrorRef.current?.(error);
                 eventSource.close();
 
@@ -115,12 +115,12 @@ export function useSSE({
                     }, delay);
                 } else {
                     console.warn('Max reconnection attempts reached or component unmounted');
-                    setStatus('disconnected');
+                    setStatus(ConnectionStatus.DISCONNECTED);
                 }
             };
         } catch (error) {
             console.error('Failed to create EventSource:', error);
-            setStatus('error');
+            setStatus(ConnectionStatus.ERROR);
         }
     }, [url, reconnectInterval, maxReconnectAttempts]);
 
@@ -135,7 +135,7 @@ export function useSSE({
             eventSourceRef.current = null;
         }
 
-        setStatus('disconnected');
+        setStatus(ConnectionStatus.DISCONNECTED);
         reconnectAttemptsRef.current = 0;
     }, []);
 

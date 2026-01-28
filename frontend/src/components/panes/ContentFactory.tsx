@@ -23,6 +23,7 @@ import ReactMarkdown from 'react-markdown';
 import PDFRenderer from '../renderers/PDFRenderer';
 import DataGridRenderer from '../renderers/DataGridRenderer';
 import VisualRenderer from '../renderers/VisualRenderer';
+import { PaneType, ChatRole, MutationStatus } from '@/types/constants';
 
 interface ContentFactoryProps {
     pane: Pane;
@@ -45,7 +46,7 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
     // Resolve what to display based on active versionId
     const currentMutation = artifact.mutations?.find(m => m.version_id === activeVersionId);
     const displayPayload = currentMutation ? currentMutation.payload : artifact.payload;
-    const isGhost = currentMutation?.status === 'ghost';
+    const isGhost = currentMutation?.status === MutationStatus.GHOST;
 
     const renderVersionToolbar = () => {
         if (!isGhost) return null;
@@ -55,7 +56,7 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
                     Ghost Preview ({activeVersionId})
                 </span>
                 <button
-                    onClick={() => workspaceActions.commitMutation(artifact.id, { ...currentMutation!, status: 'committed' })}
+                    onClick={() => workspaceActions.commitMutation(artifact.id, { ...currentMutation!, status: MutationStatus.COMMITTED })}
                     className="px-2 py-1 bg-accent-green text-white text-[10px] rounded hover:bg-green-600 transition-colors uppercase font-bold"
                 >
                     Accept
@@ -74,27 +75,27 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
 
     const renderMainContent = () => {
         switch (pane.type) {
-            case 'chat':
+            case PaneType.CHAT:
                 return (
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6 text-sm">
-                        <div className="text-slate-500 border-l-2 border-border-light dark:border-border-dark pl-3 italic text-xs">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3 text-sm">
+                        <div className="text-[10px] text-neutral-500 border-l border-neutral-800 pl-2 italic uppercase tracking-tight">
                             Context: {artifact.metadata?.context_description || "Dynamic Session"}
                         </div>
 
                         {displayPayload?.messages && Array.isArray(displayPayload.messages) ? (
                             displayPayload.messages.map((msg: any, i: number) => {
-                                const isUser = msg.role === 'user';
+                                const isUser = msg.role === ChatRole.USER;
                                 return (
-                                    <div key={i} className="flex gap-4">
-                                        <div className={`w-20 flex-shrink-0 font-bold ${isUser ? 'text-accent-green' : 'text-primary'}`}>
+                                    <div key={i} className="flex gap-2 items-start leading-snug">
+                                        <div className={`min-w-[64px] font-bold text-[10px] uppercase pt-0.5 ${isUser ? 'text-accent-green' : 'text-sky-500'}`}>
                                             {isUser ? 'User' : 'Assistant'}
                                         </div>
-                                        <div className="text-slate-700 dark:text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0">
+                                        <div className="flex-1 text-neutral-300 prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p]:mb-1 [&>pre]:my-2 [&>ul]:my-1 [&>ol]:my-1">
                                             <ReactMarkdown>{msg.content}</ReactMarkdown>
                                             {msg.artifacts && msg.artifacts.length > 0 && (
-                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                <div className="mt-1 flex flex-wrap gap-1.5">
                                                     {msg.artifacts.map((art: any) => (
-                                                        <span key={art.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                                                        <span key={art.id} className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-neutral-900 text-neutral-500 border border-neutral-800 uppercase">
                                                             📎 {art.id}
                                                         </span>
                                                     ))}
@@ -105,20 +106,20 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
                                 );
                             })
                         ) : (
-                            <div className="opacity-50 italic">New conversation started...</div>
+                            <div className="opacity-30 italic text-[10px] uppercase text-center py-4">New conversation started...</div>
                         )}
                     </div>
                 );
-            case 'data':
+            case PaneType.DATA:
                 return <DataGridRenderer data={displayPayload.data} />;
-            case 'code':
+            case PaneType.CODE:
                 return <CodeRenderer content={displayPayload.source} language={displayPayload.language || "python"} />;
-            case 'doc':
+            case PaneType.DOC:
                 if (displayPayload.format === 'pdf' || displayPayload.is_url) {
                     return <PDFRenderer url={displayPayload.value} />;
                 }
                 return <MarkdownRenderer content={String(displayPayload.value)} />;
-            case 'visual':
+            case PaneType.VISUAL:
                 return <VisualRenderer src={displayPayload.url} title={pane.title} />;
             default:
                 return (

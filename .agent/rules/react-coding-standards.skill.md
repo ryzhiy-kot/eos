@@ -27,13 +27,24 @@ The UI is a pure function of state: $UI = f(state)$. Avoid manual DOM manipulati
 🛠️ Technical StandardsTypeScript
 Mandatory Strict Mode. Define Action and State types explicitly to ensure the agent doesn't hallucinate invalid state transitions.Functional Components: 100% Hooks-based. No Class components.Naming Conventions:use[Action]: For hooks that trigger state changes.handle[Event]: For terminal input parsing.Absolute Paths: Always use @/features/ or @/core/ to prevent pathing issues during agent-led refactoring.
 
-🏷️ Strict Enumeration & Type
-StandardsMandatory Enums: Use enum for any variable representing a fixed set of states (e.g., CommandType, OverlayType, ConnectionStatus, PaneView).State Comparisons: You are strictly forbidden from using raw strings for state checks. All logic must evaluate against Enum members to facilitate IDE navigation and safe refactoring.
-Correct: if (state === ViewState.GRID)
-Incorrect: if (state === 'grid')
+🏷️ Strict Enumeration & Type Standards
+Mandatory Const Objects: Use a `const` object combined with a type alias for any variable representing a fixed set of states (e.g., `CommandType`, `OverlayType`, `ConnectionStatus`, `PaneType`). This pattern is preferred over native TypeScript `enum` for better string literal compatibility and transparency.
+Pattern:
+```typescript
+export const Status = {
+    IDLE: 'idle',
+    BUSY: 'busy'
+} as const;
+export type Status = typeof Status[keyof typeof Status];
+```
+State Comparisons: You are strictly forbidden from using raw strings for state checks. All logic must evaluate against member references to facilitate IDE navigation and safe refactoring.
+Correct: `if (state === ViewState.GRID)`
+Incorrect: `if (state === 'grid')`
+
 
 TypeScript Purity
-Adhere to strict mode. Avoid any at all costs. Use discriminated unions in conjunction with Enums for complex state payloads to ensure the "Reaction" logic is perfectly typed.🏗️ Architecture & UI ConstraintsThe Three Pillars: Only use the Login Screen, Main Window (Header/Grid/Command), and Lookup Overlays.State-Driven Logic: $UI = f(state)$. Introduce logical branches in JSX only when absolutely required for high-level layout switching.Dependency Injection: Services and API clients must be provided via React Context or hooks to maintain isolation between the terminal shell and business logic.Component Reusability: Do not create new visual components for new functionality. Map new features to the existing Pane, Grid, or Overlay primitives.🧪 Testing & ValidationEnum-Based Testing: Test suites must use Enum values for assertions. This ensures that if an Enum member is renamed, the tests fail at the compiler level rather than during runtime.Action -> Reaction Flow: Validate that terminal inputs correctly trigger the intended state transitions.
+Adhere to strict mode. Avoid any at all costs. Use discriminated unions in conjunction with Enums for complex state payloads to ensure the "Reaction" logic is perfectly typed.🏗️ Architecture & UI ConstraintsThe Three Pillars: Only use the Login Screen, Main Window (Header/Grid/Command), and Lookup Overlays.State-Driven Logic: $UI = f(state)$. Introduce logical branches in JSX only when absolutely required for high-level layout switching.Dependency Injection: Services and API clients must be provided via React Context or hooks to maintain isolation between the terminal shell and business logic.Component Reusability: Do not create new visual components for new functionality. Map new features to the existing Pane, Grid, or Overlay primitives.
+🧪 Testing & ValidationEnum-Based Testing: Test suites must use Enum values for assertions. This ensures that if an Enum member is renamed, the tests fail at the compiler level rather than during runtime.Action -> Reaction Flow: Validate that terminal inputs correctly trigger the intended state transitions.
 
 🧪 Quality & ValidationState Snapshots: Since the app is state-driven, prefer testing the State Container rather than the UI. If the state is correct, the terminal UI is assumed correct.
 

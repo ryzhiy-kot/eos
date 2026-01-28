@@ -23,10 +23,11 @@ import ContentFactory from '@/components/panes/ContentFactory';
 import { commandBus, COMMAND_NAMES } from '@/lib/commandBus';
 import LookupOverlay from '@/features/overlays/components/LookupOverlay';
 import { Pane } from '@/store/workspaceStore';
+import { PaneType, OverlayType } from '@/types/constants';
 
 const ShelfOverlay: React.FC = () => {
     const { archive, panes, activeOverlay, focusedPaneId } = useWorkspaceStore();
-    const isOpen = activeOverlay === 'shelf';
+    const isOpen = activeOverlay === OverlayType.SHELF;
 
     const handleSelect = (pane: Pane) => {
         commandBus.dispatch({
@@ -61,7 +62,7 @@ const ShelfOverlay: React.FC = () => {
                 )}>
                     <span className={clsx(
                         "font-bold font-mono text-xs",
-                        isSelected ? "text-blue-300" : (pane.type === 'chat' ? 'text-blue-400' : 'text-emerald-400')
+                        isSelected ? "text-blue-300" : (pane.type === PaneType.CHAT ? 'text-blue-400' : 'text-emerald-400')
                     )}>
                         [{pane.type.toUpperCase()}: {pane.id}]
                     </span>

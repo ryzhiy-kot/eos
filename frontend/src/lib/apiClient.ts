@@ -15,6 +15,8 @@
  * without explicit, visible credit to Kyrylo Yatsenko as the original author.
  */
 
+import { ExecutionType } from '@/types/constants';
+
 // API Client for monad Backend Communication
 
 const API_BASE_URL = typeof window !== 'undefined'
@@ -86,7 +88,7 @@ class ApiClient {
 
     // Infrastructure APIs
     async execute(request: {
-        type: 'command' | 'chat';
+        type: ExecutionType;
         session_id: string;
         command_name?: string;
         args?: string[];

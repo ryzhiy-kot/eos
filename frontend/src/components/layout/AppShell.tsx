@@ -24,6 +24,7 @@ import { useRegisterCommands } from '@/hooks/useRegisterCommands';
 import { useSSE } from '@/hooks/useSSE';
 import { useWorkspaceSync } from '@/hooks/useWorkspaceSync';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { OverlayType } from '@/types/constants';
 
 const AppShell: React.FC = () => {
     const { activeOverlay } = useWorkspaceStore();
@@ -50,8 +51,8 @@ const AppShell: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden font-mono relative">
-            {activeOverlay === 'shelf' && <ShelfOverlay />}
-            {activeOverlay === 'help' && <HelpOverlay />}
+            {activeOverlay === OverlayType.SHELF && <ShelfOverlay />}
+            {activeOverlay === OverlayType.HELP && <HelpOverlay />}
 
             <Header connectionStatus={connectionStatus} />
 

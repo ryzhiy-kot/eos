@@ -16,12 +16,13 @@
  */
 
 import { CommandName } from './commandBus';
+import { CommandParameterType, CommandCategory } from '@/types/constants';
 
 export interface CommandParameter {
     name: string;
     description: string;
     required: boolean;
-    type?: 'string' | 'number' | 'paneId' | 'file';
+    type?: CommandParameterType;
 }
 
 
@@ -31,7 +32,7 @@ export interface CommandEntry {
     parameters?: CommandParameter[];
     example?: string;
     shortcut?: string; // e.g., 'ctrl+/' or 'alt+l'
-    category?: 'system' | 'pane' | 'utility' | 'data';
+    category?: CommandCategory;
 }
 
 /**
