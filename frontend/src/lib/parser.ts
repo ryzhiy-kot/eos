@@ -1,3 +1,20 @@
+/**
+ * PROJECT: MONAD
+ * AUTHOR: Kyrylo Yatsenko
+ * YEAR: 2026
+ * * COPYRIGHT NOTICE:
+ * © 2026 Kyrylo Yatsenko. All rights reserved.
+ * 
+ * This work represents a proprietary methodology for Human-Machine Interaction (HMI).
+ * All source code, logic structures, and User Experience (UX) frameworks
+ * contained herein are the sole intellectual property of Kyrylo Yatsenko.
+ * 
+ * ATTRIBUTION REQUIREMENT:
+ * Any use of this program, or any portion thereof (including code snippets and
+ * interaction patterns), may not be used, redistributed, or adapted
+ * without explicit, visible credit to Kyrylo Yatsenko as the original author.
+ */
+
 export interface ParsedCommand {
     type: 'command' | 'message';
     verb?: string;
@@ -6,6 +23,8 @@ export interface ParsedCommand {
     targetId?: string;
     original: string;
 }
+
+export const extractPaneId = (id: string) => (id.startsWith('@') ? id.substring(1) : id);
 
 export const parseCommand = (input: string, activePaneId: string | null): ParsedCommand => {
     const trimmed = input.trim();
@@ -41,16 +60,23 @@ export const parseCommand = (input: string, activePaneId: string | null): Parsed
     let sourceId: string | undefined = undefined;
     let actionStartIdx = 1;
 
-    // Check if second token is a Pane ID (P1, P2, etc.)
-    if (tokens[1] && /^P\d+$/.test(tokens[1])) {
-        sourceId = tokens[1];
-        actionStartIdx = 2;
-    } else {
-        sourceId = activePaneId || undefined;
+    // Check if second token is a Pane ID (P1, P2, etc.) or @P1
+    if (tokens[1]) {
+        if (/^@?P\d+$/.test(tokens[1])) {
+            sourceId = tokens[1].startsWith('@') ? tokens[1].substring(1).toUpperCase() : tokens[1].toUpperCase();
+            actionStartIdx = 2;
+        } else if (/^@?A_\w+$/.test(tokens[1])) {
+            // Direct Artifact ID reference
+            sourceId = tokens[1].startsWith('@') ? tokens[1].substring(1) : tokens[1];
+            actionStartIdx = 2;
+        }
     }
 
     const action = tokens.slice(actionStartIdx).join(' ');
-    const targetId = targetPart; // 'P2', 'new', or undefined
+    let targetId = targetPart; // 'P2', 'new', or undefined
+    if (targetId && targetId.startsWith('@')) {
+        targetId = targetId.substring(1).toUpperCase();
+    }
 
     return {
         type: 'command',

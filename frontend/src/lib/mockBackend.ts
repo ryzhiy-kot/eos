@@ -1,4 +1,21 @@
-import { PaneType } from '../store/workspaceStore';
+/**
+ * PROJECT: MONAD
+ * AUTHOR: Kyrylo Yatsenko
+ * YEAR: 2026
+ * * COPYRIGHT NOTICE:
+ * © 2026 Kyrylo Yatsenko. All rights reserved.
+ * 
+ * This work represents a proprietary methodology for Human-Machine Interaction (HMI).
+ * All source code, logic structures, and User Experience (UX) frameworks
+ * contained herein are the sole intellectual property of Kyrylo Yatsenko.
+ * 
+ * ATTRIBUTION REQUIREMENT:
+ * Any use of this program, or any portion thereof (including code snippets and
+ * interaction patterns), may not be used, redistributed, or adapted
+ * without explicit, visible credit to Kyrylo Yatsenko as the original author.
+ */
+
+import { PaneType, ChatRole } from '@/types/constants'
 
 // Types mimicking the backend response
 type BackendResponse = {
@@ -18,21 +35,9 @@ export const mockExecute = async (
     await delay(600); // Simulate network latency
 
     switch (verb) {
-        case 'load':
-            // Logic moved to frontend, but if called via backend fallback:
-            return {
-                type: 'data',
-                title: `Data: ${action || 'Untitled'}`,
-                content: [
-                    { id: 1, name: 'Alpha', value: 100 },
-                    { id: 2, name: 'Beta', value: 200 },
-                    { id: 3, name: 'Gamma', value: 150 },
-                ]
-            };
-
         case 'plot':
             return {
-                type: 'visual',
+                type: PaneType.VISUAL,
                 title: `Plot: ${action || 'Analysis'}`,
                 content: { chartType: 'bar', data: [100, 200, 150], note: 'Mock visualization' }
             };
@@ -40,28 +45,28 @@ export const mockExecute = async (
         case 'ask':
         case 'chat':
             return {
-                type: 'chat',
+                type: PaneType.CHAT,
                 title: 'Chat Assistant',
-                content: [{ role: 'assistant', content: `I processed your request: "${action}"\n\nIs there anything else I can help you with regarding **${sourceId || 'this context'}**?` }]
+                content: [{ role: ChatRole.ASSISTANT, content: `I processed your request: "${action}"\n\nIs there anything else I can help you with regarding **${sourceId || 'this context'}**?` }]
             };
 
         case 'diff':
             return {
-                type: 'code',
+                type: PaneType.CODE,
                 title: `Diff: ${sourceId} vs ...`,
                 content: `--- ${sourceId}\n+++ ${targetId || 'Comparison'}\n@@ -1,3 +1,3 @@\n- Old Value\n+ New Value\n Unchanged line`
             };
 
         case 'run':
             return {
-                type: 'code',
+                type: PaneType.CODE,
                 title: 'Execution Output',
                 content: `> Executing python script...\n> [DETAILS] Processing data from ${sourceId}\n> Done.\n\nResult: 42`
             };
 
         case 'tab':
             return {
-                type: 'data',
+                type: PaneType.DATA,
                 title: 'Extracted Table',
                 content: [
                     { Row: 1, ColA: 'Data 1', ColB: 'Data 2' },
@@ -69,11 +74,18 @@ export const mockExecute = async (
                 ]
             };
 
+        case 'summarize':
+            return {
+                type: PaneType.CHAT,
+                title: `Summary: ${sourceId || 'Context'}`,
+                content: [{ role: ChatRole.ASSISTANT, content: `**Summary of ${sourceId || 'context'}**:\n\nBased on the analysis, the key indicators suggest a positive trend with 15% growth in efficiency. Risk factors remain low, but monitoring of ${targetId || 'external variables'} is recommended.\n\n*   **Key Point 1**: Optimization successful.\n*   **Key Point 2**: Latency reduced by 25%.\n*   **Action Item**: Proceed with Phase 2 deployment.` }]
+            };
+
         default:
             return {
-                type: 'chat',
-                title: 'System Alert',
-                content: [{ role: 'system', content: `Unknown command: ${verb}` }]
+                type: PaneType.CHAT,
+                title: 'Default',
+                content: [{ role: ChatRole.SYSTEM, content: `Unknown command: ${verb}` }]
             };
     }
 };
