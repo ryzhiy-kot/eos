@@ -69,6 +69,7 @@ class ExecutionRequest(BaseModel):
     action: Optional[str] = None
     context_artifacts: Optional[Dict[str, Artifact]] = None
     referenced_artifact_ids: Optional[List[str]] = []
+    stream: bool = False
 
 
 class ExecutionResult(BaseModel):
