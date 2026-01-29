@@ -14,6 +14,7 @@
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.db.session import get_db
@@ -60,6 +61,12 @@ async def update_session(
 async def execute_interaction(
     req: ExecutionRequest, db: AsyncSession = Depends(get_db)
 ):
+    if req.stream and req.type == "chat":
+        return StreamingResponse(
+            ExecutionService.execute_stream(db, req),
+            media_type="text/event-stream"
+        )
+
     result = await ExecutionService.execute(db, req)
     if not result.get("success"):
         raise HTTPException(
