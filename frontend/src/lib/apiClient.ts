@@ -155,10 +155,21 @@ class ApiClient {
     }
 
     // Auth
-    async login(username: string, password?: string): Promise<any> {
+    async login(username: string, password: string): Promise<any> {
+        const cleanUsername = username?.trim();
+        const cleanPassword = password?.trim();
+
+        if (!cleanUsername) {
+            throw new Error('Username is required.');
+        }
+
+        if (!cleanPassword) {
+            throw new Error('Password is required.');
+        }
+
         return this.request('/api/v1/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
         });
     }
 
