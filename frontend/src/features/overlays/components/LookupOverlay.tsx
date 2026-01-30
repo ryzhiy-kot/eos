@@ -125,7 +125,7 @@ export default function LookupOverlay<T>({
                 <div className={clsx("flex-1 w-full mx-auto overflow-hidden flex flex-col min-h-0", contentWidth)}>
                     <div className={clsx(
                         "flex-1 overflow-y-auto pb-4 scrollbar-thin scrollbar-thumb-terminal-700 scrollbar-track-transparent",
-                        gridCols > 1 ? "grid gap-4" : "space-y-2"
+                        gridCols > 1 ? "grid gap-4 p-2" : "space-y-2"
                     )} style={{
                         gridTemplateColumns: gridCols > 1 ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined
                     }}>
