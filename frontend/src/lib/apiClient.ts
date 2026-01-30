@@ -155,10 +155,17 @@ class ApiClient {
     }
 
     // Auth
-    async login(username: string): Promise<any> {
+    async login(username: string, password?: string): Promise<any> {
         return this.request('/api/v1/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({ username, password }),
+        });
+    }
+
+    async logout(sessionToken: string): Promise<any> {
+        return this.request('/api/v1/auth/logout', {
+            method: 'POST',
+            body: JSON.stringify({ session_token: sessionToken }),
         });
     }
 

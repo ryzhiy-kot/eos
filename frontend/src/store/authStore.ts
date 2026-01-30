@@ -21,6 +21,8 @@ import { persist } from 'zustand/middleware';
 interface AuthState {
     isAuthenticated: boolean;
     user: string | null;
+    session_token: string | null;
+    session_expires_at: string | null;
     active_workspace_id: string | null;
     error: string | null;
     isLoading: boolean;
@@ -32,9 +34,11 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             isAuthenticated: false,
             user: null,
+            session_token: null,
+            session_expires_at: null,
             active_workspace_id: null,
             error: null,
             isLoading: false,
@@ -46,7 +50,7 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const { apiClient } = await import('../lib/apiClient');
                     const { workspaceActions } = await import('./workspaceStore');
-                    const user = await apiClient.login(username);
+                    const user = await apiClient.login(username, password);
 
                     if (user.memberships && user.memberships.length > 0) {
                         // Priority: active_workspace_id if valid, else first membership
@@ -57,6 +61,8 @@ export const useAuthStore = create<AuthState>()(
                     set({
                         isAuthenticated: true,
                         user: user.user_id,
+                        session_token: user.session_token || null,
+                        session_expires_at: user.session_expires_at || null,
                         active_workspace_id: user.active_workspace_id || null,
                         isLoading: false,
                         error: null
@@ -71,7 +77,24 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            logout: () => set({ isAuthenticated: false, user: null, active_workspace_id: null }),
+            logout: async () => {
+                const { session_token } = get();
+                if (session_token) {
+                    try {
+                        const { apiClient } = await import('../lib/apiClient');
+                        await apiClient.logout(session_token);
+                    } catch (e) {
+                        console.error('Logout failed:', e);
+                    }
+                }
+                set({
+                    isAuthenticated: false,
+                    user: null,
+                    session_token: null,
+                    session_expires_at: null,
+                    active_workspace_id: null
+                });
+            },
             setHasHydrated: () => set({ isHydrated: true })
         }),
         {
@@ -79,6 +102,8 @@ export const useAuthStore = create<AuthState>()(
             partialize: (state) => ({
                 isAuthenticated: state.isAuthenticated,
                 user: state.user,
+                session_token: state.session_token,
+                session_expires_at: state.session_expires_at,
                 active_workspace_id: state.active_workspace_id
             }),
             onRehydrateStorage: () => (state) => {
