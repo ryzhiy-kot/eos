@@ -18,6 +18,7 @@
 import { useAuthStore } from './store/authStore';
 import AppShell from './components/layout/AppShell';
 import LoginForm from './components/auth/LoginForm';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 function App() {
     const { isAuthenticated, isHydrated } = useAuthStore();
@@ -25,7 +26,9 @@ function App() {
     if (!isHydrated) return null;
 
     return (
-        isAuthenticated ? <AppShell /> : <LoginForm />
+        <ErrorBoundary>
+            {isAuthenticated ? <AppShell /> : <LoginForm />}
+        </ErrorBoundary>
     );
 }
 

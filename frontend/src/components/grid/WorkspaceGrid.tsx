@@ -19,6 +19,8 @@ import React, { useEffect } from 'react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import PaneFrame from '@/components/panes/PaneFrame';
 import { commandBus, COMMAND_NAMES } from '@/lib/commandBus';
+import ErrorBoundary from '../common/ErrorBoundary';
+import PaneErrorFallback from '../panes/PaneErrorFallback';
 
 const WorkspaceGrid: React.FC = () => {
     const { panes, activeLayout } = useWorkspaceStore();
@@ -90,7 +92,16 @@ const WorkspaceGrid: React.FC = () => {
                 if (!pane) return null;
                 return (
                     <div key={paneId} className={`${getItemSpan(index, activeLayout.length)} overflow-hidden`}>
-                        <PaneFrame pane={pane} />
+                        <ErrorBoundary
+                            fallback={({ error, reset }) => (
+                                <PaneErrorFallback
+                                    error={error}
+                                    reset={reset}
+                                />
+                            )}
+                        >
+                            <PaneFrame pane={pane} />
+                        </ErrorBoundary>
                     </div>
                 );
             })}
