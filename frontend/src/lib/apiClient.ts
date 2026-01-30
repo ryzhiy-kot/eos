@@ -102,6 +102,34 @@ class ApiClient {
         });
     }
 
+    async executeStream(request: {
+        type: ExecutionType;
+        session_id: string;
+        command_name?: string;
+        args?: string[];
+        action?: string;
+        context_artifacts?: Record<string, any>;
+        referenced_artifact_ids?: string[];
+        stream?: boolean;
+    }): Promise<Response> {
+        const url = `${this.baseUrl}/api/v1/sessions/execute`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(request),
+        });
+
+        if (!response.ok) {
+            throw {
+                message: `API Error: ${response.statusText}`,
+                status: response.status,
+            };
+        }
+        return response;
+    }
+
     // Session Management
     async listSessions(workspaceId: string): Promise<any[]> {
         return this.request(`/api/v1/sessions/workspace/${workspaceId}`);

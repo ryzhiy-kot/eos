@@ -179,28 +179,81 @@ export const useCommandTerminal = () => {
 
                 try {
                     const sessionId = `SESSION_${chatPane.id}`;
-                    const response = await apiClient.execute({
+
+                    // Optimistic update for streaming
+                    const emptyAssistantMsg = {
+                        role: ChatRole.ASSISTANT,
+                        content: '',
+                        created_at: new Date().toISOString(),
+                        artifacts: []
+                    };
+                    let currentMessages = [...updatedMessages, emptyAssistantMsg];
+                    workspaceActions.updateArtifactPayload(artifactId, { messages: currentMessages });
+
+                    const response = await apiClient.executeStream({
                         type: 'chat',
                         session_id: sessionId,
                         action: rawInput,
                         context_artifacts: contextArtifacts,
-                        referenced_artifact_ids: referencedArtifactIds
+                        referenced_artifact_ids: referencedArtifactIds,
+                        stream: true
                     });
 
-                    if (response.success && response.result.output_message) {
-                        const assistantMsg = response.result.output_message;
+                    let accumulatedText = '';
+                    let buffer = '';
+                    const reader = response.body?.getReader();
+                    const decoder = new TextDecoder();
 
-                        // Register any full artifacts returned in artifacts
-                        if (assistantMsg.artifacts) {
-                            assistantMsg.artifacts.forEach((art: any) => {
-                                workspaceActions.addArtifact(art);
-                            });
+                    if (reader) {
+                        try {
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+
+                                const chunk = decoder.decode(value, { stream: true });
+                                buffer += chunk;
+                                const lines = buffer.split('\n');
+                                buffer = lines.pop() || '';
+
+                                for (const line of lines) {
+                                    if (line.trim() === '') continue;
+                                    if (line.startsWith('data: ')) {
+                                        try {
+                                            const data = JSON.parse(line.substring(6));
+
+                                            if (data.type === 'text_delta') {
+                                                accumulatedText += data.content;
+                                                currentMessages = [...currentMessages];
+                                                currentMessages[currentMessages.length - 1] = {
+                                                    ...currentMessages[currentMessages.length - 1],
+                                                    content: accumulatedText
+                                                };
+                                                workspaceActions.updateArtifactPayload(artifactId, { messages: currentMessages });
+                                            } else if (data.type === 'final_message') {
+                                                const finalMsg = data.message;
+                                                currentMessages = [...currentMessages];
+                                                currentMessages[currentMessages.length - 1] = finalMsg;
+                                                workspaceActions.updateArtifactPayload(artifactId, { messages: currentMessages });
+
+                                                if (finalMsg.artifacts) {
+                                                    finalMsg.artifacts.forEach((art: any) => {
+                                                        workspaceActions.addArtifact(art);
+                                                    });
+                                                }
+                                            }
+                                        } catch (e) {
+                                            console.error('Error parsing SSE', e);
+                                        }
+                                    }
+                                }
+                            }
+                        } finally {
+                            reader.releaseLock();
                         }
-
-                        workspaceActions.updateArtifactPayload(artifactId, { messages: [...updatedMessages, assistantMsg] });
-                        const sessions = await apiClient.listSessions('default_workspace');
-                        workspaceActions.setChatSessions(sessions);
                     }
+
+                    const sessions = await apiClient.listSessions('default_workspace');
+                    workspaceActions.setChatSessions(sessions);
                 } catch (error) {
                     console.error('Chat error:', error);
                     workspaceActions.addNotification('Failed to get chat response', 'error');
