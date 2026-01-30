@@ -38,12 +38,22 @@ async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
     return user
 
 
+from app.services.auth.protocol import AuthServiceProtocol
+from app.services.auth.dependency import get_auth_service
+
 @router.post("/login", response_model=UserSchema, tags=["auth"])
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    req: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+    auth_service: AuthServiceProtocol = Depends(get_auth_service),
+):
     from app.services.user_service import UserService
 
     # Authenticate (or auto-register)
-    user = await UserService.authenticate_user(db, req.username)
+    user = await auth_service.authenticate(db, req.username, req.password)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
     if not user.enabled:
         raise HTTPException(status_code=403, detail="User account disabled")

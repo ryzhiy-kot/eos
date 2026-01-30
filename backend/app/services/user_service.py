@@ -47,6 +47,7 @@ class UserService:
 
     @staticmethod
     async def authenticate_user(db: AsyncSession, username: str) -> Optional[User]:
+        # DEPRECATED: Use app.services.auth.local.LocalAuthService or similar instead
         # Simple auth logic compatible with current implementation
         user = await UserService.get_by_user_id(db, username)
 

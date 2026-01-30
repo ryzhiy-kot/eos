@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URL: str = "sqlite+aiosqlite:///./monad.db"
     SQLALCHEMY_ECHO: bool = False
 
+    # Authentication
+    AUTH_PROVIDER: str = "local"
+
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"
     )
