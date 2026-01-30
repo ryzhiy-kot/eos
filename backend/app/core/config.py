@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     # Authentication
     AUTH_PROVIDER: str = "local"
+    AUTH_SERVICE_URL: str = "http://localhost:8001/auth/login"
+    AUTH_API_KEY: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"
