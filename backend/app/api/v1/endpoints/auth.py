@@ -31,7 +31,8 @@ async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
     if not user:
         user = await UserService.create_user(db, req.user_id)
         await db.commit()
-        await db.refresh(user)
+        # Refresh with memberships loaded
+        user = await UserService.get_by_user_id(db, req.user_id)
 
     # Ensure workspace and active ID
     user = await UserService.ensure_personal_workspace(db, user)

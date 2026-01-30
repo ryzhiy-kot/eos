@@ -27,8 +27,11 @@ class MockLLMProvider(LLMProvider):
             " Could you clarify which part of the artifact you're most interested in?",
         ]
 
+        # Always yield at least one chunk
+        yield TextDeltaEvent(content=phrases[0])
+
         # Simulate thinking or incremental generation
-        for chunk in phrases:
+        for chunk in phrases[1:]:
             if random.random() > 0.5: # specific selection
                 yield TextDeltaEvent(content=chunk)
 
