@@ -13,16 +13,38 @@
 # interaction patterns), may not be used, redistributed, or adapted
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.models.user import User, WorkspaceMember
 from app.models.workspace import Workspace
+from app.schemas.user import UserBase
 from typing import Optional
 import uuid
 
+logger = logging.getLogger(__name__)
+
 
 class UserService:
+    @staticmethod
+    async def sync_user(db: AsyncSession, user_data: UserBase) -> User:
+        user = await UserService.get_by_user_id(db, user_data.user_id)
+        if not user:
+            # Create new user
+            user = await UserService.create_user(db, user_data.user_id, user_data.profile)
+            await db.commit()
+            # Refresh to get ID
+            user = await UserService.get_by_user_id(db, user_data.user_id)
+        else:
+            # Update profile and enabled status
+            if user_data.profile:
+                user.profile = user_data.profile
+            user.enabled = user_data.enabled
+            await db.commit()
+
+        return user
+
     @staticmethod
     async def get_by_user_id(db: AsyncSession, user_id: str) -> Optional[User]:
         stmt = (
@@ -134,7 +156,7 @@ class UserService:
             )
             db.add(admin_user)
             await db.flush()
-            print("✓ Created default 'admin' user")
+            logger.info("✓ Created default 'admin' user")
 
         # Check if default workspace exists
         stmt = select(Workspace).where(Workspace.id == "default_workspace")
@@ -150,7 +172,7 @@ class UserService:
             )
             db.add(default_ws)
             await db.flush()
-            print("✓ Created default workspace")
+            logger.info("✓ Created default workspace")
 
             # Link admin to default workspace
             # Check if link already exists to be safe
@@ -164,6 +186,6 @@ class UserService:
                     workspace_id=default_ws.id, user_id=admin_user.id, role="OWNER"
                 )
                 db.add(member)
-                print("✓ Linked admin to default workspace")
+                logger.info("✓ Linked admin to default workspace")
 
         await db.commit()

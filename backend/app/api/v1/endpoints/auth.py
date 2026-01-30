@@ -51,13 +51,16 @@ async def login(
     from app.services.user_service import UserService
 
     # Authenticate (or auto-register)
-    user = await auth_service.authenticate(db, req.username, req.password)
+    auth_user = await auth_service.authenticate(db, req.username, req.password)
 
-    if not user:
+    if not auth_user:
         raise HTTPException(status_code=401, detail="Authentication failed")
 
-    if not user.enabled:
+    if not auth_user.enabled:
         raise HTTPException(status_code=403, detail="User account disabled")
+
+    # Sync to local DB
+    user = await UserService.sync_user(db, auth_user)
 
     # Ensure workspace
     user = await UserService.ensure_personal_workspace(db, user)
