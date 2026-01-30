@@ -19,11 +19,14 @@ from contextlib import asynccontextmanager
 
 from app.api.v1.api import api_router
 from app.core.config import get_settings
+from app.core.logging import setup_logging
 from app.db.session import engine
 from app.db.base_class import Base
 import app.models  # Ensure all models are registered
 
 settings = get_settings()
+
+setup_logging()
 
 
 @asynccontextmanager

@@ -13,6 +13,7 @@
 # interaction patterns), may not be used, redistributed, or adapted
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -21,6 +22,8 @@ from app.models.workspace import Workspace
 from app.schemas.user import UserBase
 from typing import Optional
 import uuid
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -153,7 +156,7 @@ class UserService:
             )
             db.add(admin_user)
             await db.flush()
-            print("✓ Created default 'admin' user")
+            logger.info("✓ Created default 'admin' user")
 
         # Check if default workspace exists
         stmt = select(Workspace).where(Workspace.id == "default_workspace")
@@ -169,7 +172,7 @@ class UserService:
             )
             db.add(default_ws)
             await db.flush()
-            print("✓ Created default workspace")
+            logger.info("✓ Created default workspace")
 
             # Link admin to default workspace
             # Check if link already exists to be safe
@@ -183,6 +186,6 @@ class UserService:
                     workspace_id=default_ws.id, user_id=admin_user.id, role="OWNER"
                 )
                 db.add(member)
-                print("✓ Linked admin to default workspace")
+                logger.info("✓ Linked admin to default workspace")
 
         await db.commit()

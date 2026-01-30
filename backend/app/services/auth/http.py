@@ -1,9 +1,12 @@
+import logging
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 from app.schemas.user import UserBase
 from app.services.auth.protocol import AuthServiceProtocol
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 class HttpAuthService(AuthServiceProtocol):
     def __init__(self):
@@ -34,11 +37,11 @@ class HttpAuthService(AuthServiceProtocol):
                     # We expect the remote to return a user object compatible with UserBase
                     return UserBase.model_validate(data)
                 elif response.status_code == 401:
+                    logger.info(f"Authentication failed for user: {username}")
                     return None
                 else:
-                    # Log error?
-                    print(f"Auth Service Error: {response.status_code} - {response.text}")
+                    logger.error(f"Auth Service Error: {response.status_code} - {response.text}")
                     return None
         except Exception as e:
-            print(f"Auth Service Exception: {e}")
+            logger.error(f"Auth Service Exception: {e}")
             return None
