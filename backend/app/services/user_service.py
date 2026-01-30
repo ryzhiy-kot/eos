@@ -18,11 +18,30 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.models.user import User, WorkspaceMember
 from app.models.workspace import Workspace
+from app.schemas.user import UserBase
 from typing import Optional
 import uuid
 
 
 class UserService:
+    @staticmethod
+    async def sync_user(db: AsyncSession, user_data: UserBase) -> User:
+        user = await UserService.get_by_user_id(db, user_data.user_id)
+        if not user:
+            # Create new user
+            user = await UserService.create_user(db, user_data.user_id, user_data.profile)
+            await db.commit()
+            # Refresh to get ID
+            user = await UserService.get_by_user_id(db, user_data.user_id)
+        else:
+            # Update profile and enabled status
+            if user_data.profile:
+                user.profile = user_data.profile
+            user.enabled = user_data.enabled
+            await db.commit()
+
+        return user
+
     @staticmethod
     async def get_by_user_id(db: AsyncSession, user_id: str) -> Optional[User]:
         stmt = (
