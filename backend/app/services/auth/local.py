@@ -1,13 +1,19 @@
-from typing import Optional
+import secrets
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Tuple, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.user import User as UserSchema, UserBase
 from app.services.user_service import UserService
 from app.services.auth.protocol import AuthServiceProtocol
 
+# In-memory session store for local development
+# In production, this should be in Redis or DB
+_LOCAL_SESSIONS: Dict[str, datetime] = {}
+
 class LocalAuthService(AuthServiceProtocol):
     async def authenticate(
         self, db: AsyncSession, username: str, password: Optional[str] = None
-    ) -> Optional[UserBase]:
+    ) -> Optional[Tuple[UserBase, str, datetime]]:
         # Simple auth logic compatible with current implementation
         user = await UserService.get_by_user_id(db, username)
 
@@ -28,5 +34,15 @@ class LocalAuthService(AuthServiceProtocol):
             user = await UserService.get_by_user_id(db, username)
 
         if user:
-            return UserSchema.model_validate(user)
+            # Generate Session
+            token = secrets.token_urlsafe(32)
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+            _LOCAL_SESSIONS[token] = expires_at
+
+            return UserSchema.model_validate(user), token, expires_at
+
         return None
+
+    async def logout(self, session_token: str) -> None:
+        if session_token in _LOCAL_SESSIONS:
+            del _LOCAL_SESSIONS[session_token]

@@ -5,16 +5,22 @@ from app.main import app
 from app.services.auth.protocol import AuthServiceProtocol
 from app.services.auth.dependency import get_auth_service
 from app.models.user import User
-from typing import Optional
+from app.schemas.user import UserBase
+from typing import Optional, Tuple
+from datetime import datetime
 
 # Mock Auth Service
 class MockAuthService(AuthServiceProtocol):
     async def authenticate(
         self, db: AsyncSession, username: str, password: Optional[str] = None
-    ) -> Optional[User]:
+    ) -> Optional[Tuple[UserBase, str, datetime]]:
         if username == "mock_user":
-            return User(id=999, user_id="mock_user", enabled=True, profile={"name": "Mock User"}, memberships=[])
+            user = UserBase(user_id="mock_user", enabled=True, profile={"name": "Mock User"})
+            return user, "mock_token", datetime.now()
         return None
+
+    async def logout(self, session_token: str) -> None:
+        pass
 
 @pytest.mark.asyncio
 async def test_auth_dependency_injection(client: AsyncClient):

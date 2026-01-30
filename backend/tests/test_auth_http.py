@@ -3,6 +3,9 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from app.services.auth.http import HttpAuthService
 from app.schemas.user import UserBase
 
+from datetime import datetime
+from app.schemas.user import UserBase
+
 @pytest.mark.asyncio
 async def test_http_auth_success():
     with patch("httpx.AsyncClient") as mock_client_cls:
@@ -12,9 +15,13 @@ async def test_http_auth_success():
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "user_id": "test_user",
-            "profile": {"name": "Test User"},
-            "enabled": True
+            "user": {
+                "user_id": "test_user",
+                "profile": {"name": "Test User"},
+                "enabled": True
+            },
+            "session_token": "mock_token",
+            "session_expires_at": datetime.now().isoformat()
         }
         mock_client.post.return_value = mock_response
 
@@ -22,9 +29,11 @@ async def test_http_auth_success():
         result = await service.authenticate(None, "test_user", "password")
 
         assert result is not None
-        assert isinstance(result, UserBase)
-        assert result.user_id == "test_user"
-        assert result.profile["name"] == "Test User"
+        user, token, expires = result
+        assert isinstance(user, UserBase)
+        assert user.user_id == "test_user"
+        assert user.profile["name"] == "Test User"
+        assert token == "mock_token"
 
 @pytest.mark.asyncio
 async def test_http_auth_failure():

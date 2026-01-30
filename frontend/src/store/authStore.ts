@@ -17,11 +17,13 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { apiClient } from '../lib/apiClient';
 
 interface AuthState {
     isAuthenticated: boolean;
     user: string | null;
     active_workspace_id: string | null;
+    sessionToken: string | null;
     error: string | null;
     isLoading: boolean;
     isHydrated: boolean;
@@ -32,10 +34,11 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             isAuthenticated: false,
             user: null,
             active_workspace_id: null,
+            sessionToken: null,
             error: null,
             isLoading: false,
             isHydrated: false,
@@ -44,20 +47,14 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
 
                 try {
-                    const { apiClient } = await import('../lib/apiClient');
-                    const { workspaceActions } = await import('./workspaceStore');
-                    const user = await apiClient.login(username);
-
-                    if (user.memberships && user.memberships.length > 0) {
-                        // Priority: active_workspace_id if valid, else first membership
-                        const targetWs = user.active_workspace_id || user.memberships[0].workspace_id;
-                        workspaceActions.setWorkspaceId(targetWs);
-                    }
+                    // Assuming login returns LoggedInUser which has session_token
+                    const data = await apiClient.login(username, password);
 
                     set({
                         isAuthenticated: true,
-                        user: user.user_id,
-                        active_workspace_id: user.active_workspace_id || null,
+                        user: data.user_id,
+                        active_workspace_id: data.active_workspace_id || null,
+                        sessionToken: data.session_token,
                         isLoading: false,
                         error: null
                     });
@@ -71,7 +68,17 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            logout: () => set({ isAuthenticated: false, user: null, active_workspace_id: null }),
+            logout: async () => {
+                const token = get().sessionToken;
+                if (token) {
+                    try {
+                        await apiClient.logout(token);
+                    } catch (e) {
+                        console.error("Logout failed", e);
+                    }
+                }
+                set({ isAuthenticated: false, user: null, active_workspace_id: null, sessionToken: null });
+            },
             setHasHydrated: () => set({ isHydrated: true })
         }),
         {
@@ -79,7 +86,8 @@ export const useAuthStore = create<AuthState>()(
             partialize: (state) => ({
                 isAuthenticated: state.isAuthenticated,
                 user: state.user,
-                active_workspace_id: state.active_workspace_id
+                active_workspace_id: state.active_workspace_id,
+                sessionToken: state.sessionToken
             }),
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated();

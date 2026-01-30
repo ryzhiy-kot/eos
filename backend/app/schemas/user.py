@@ -15,23 +15,30 @@
 
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, Dict, List
+from datetime import datetime
 
 
 class UserBase(BaseModel):
     user_id: str
     profile: Dict[str, Any] = {}
     enabled: bool = True
-    active_workspace_id: Optional[str] = None
 
 
 class UserCreate(UserBase):
-    pass
+    active_workspace_id: Optional[str] = None
 
 
 class User(UserBase):
     id: int
+    active_workspace_id: Optional[str] = None
     memberships: List["WorkspaceMember"] = []
     model_config = ConfigDict(from_attributes=True)
+
+
+class LoggedInUser(User):
+    session_token: str
+    session_expires_at: datetime
+    active_workspace_id: Optional[str] = None  # Ensure it's here for the response
 
 
 class WorkspaceMemberBase(BaseModel):

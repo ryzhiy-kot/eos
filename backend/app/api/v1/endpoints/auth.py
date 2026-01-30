@@ -13,8 +13,9 @@
 # interaction patterns), may not be used, redistributed, or adapted
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
-from app.schemas.user import UpdateActiveWorkspaceRequest
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict
+from app.schemas.user import UpdateActiveWorkspaceRequest, LoggedInUser
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.user import AuthSyncRequest, User as UserSchema
@@ -42,7 +43,7 @@ async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
 from app.services.auth.protocol import AuthServiceProtocol
 from app.services.auth.dependency import get_auth_service
 
-@router.post("/login", response_model=UserSchema, tags=["auth"])
+@router.post("/login", response_model=LoggedInUser, tags=["auth"])
 async def login(
     req: LoginRequest,
     db: AsyncSession = Depends(get_db),
@@ -51,10 +52,12 @@ async def login(
     from app.services.user_service import UserService
 
     # Authenticate (or auto-register)
-    auth_user = await auth_service.authenticate(db, req.username, req.password)
+    result = await auth_service.authenticate(db, req.username, req.password)
 
-    if not auth_user:
+    if not result:
         raise HTTPException(status_code=401, detail="Authentication failed")
+
+    auth_user, session_token, expires_at = result
 
     if not auth_user.enabled:
         raise HTTPException(status_code=403, detail="User account disabled")
@@ -65,7 +68,20 @@ async def login(
     # Ensure workspace
     user = await UserService.ensure_personal_workspace(db, user)
 
-    return user
+    # Construct response
+    return LoggedInUser(
+        **UserSchema.model_validate(user).model_dump(),
+        session_token=session_token,
+        session_expires_at=expires_at
+    )
+
+@router.post("/logout", tags=["auth"])
+async def logout(
+    session_token: str = Body(..., embed=True),
+    auth_service: AuthServiceProtocol = Depends(get_auth_service),
+):
+    await auth_service.logout(session_token)
+    return {"message": "Logged out successfully"}
 
 
 @router.post("/update-active-workspace", response_model=UserSchema, tags=["auth"])
