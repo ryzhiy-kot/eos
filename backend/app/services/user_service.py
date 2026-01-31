@@ -22,6 +22,7 @@ from app.models.workspace import Workspace
 from app.schemas.user import UserBase
 from typing import Optional
 import uuid
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -107,14 +108,51 @@ class UserService:
 
         # Logic to create workspace
         ws_id = str(uuid.uuid4())
+
+        # Prepare initial session
+        pane_id = "P1"
+        session_id = str(uuid.uuid4())
+        artifact_id = str(uuid.uuid4())
+
+        initial_state = {
+            "panes": {
+                pane_id: {
+                    "id": pane_id,
+                    "type": "chat",
+                    "artifactId": artifact_id,
+                    "title": "Chat",
+                    "isSticky": False,
+                    "lineage": {
+                        "parentIds": [],
+                        "command": "init",
+                        "timestamp": f"{time.time()}",
+                    },
+                }
+            },
+            "artifacts": {
+                artifact_id: {
+                    "id": artifact_id,
+                    "type": "chat",
+                    "payload": {
+                        "messages": []
+                    },
+                    "session_id": session_id,
+                    "mutations": [],
+                    "metadata": {"name": "Chat"}
+                }
+            },
+            "activeLayout": [pane_id],
+            "archive": [],
+            "focusedPaneId": pane_id
+        }
+
         workspace = Workspace(
             id=ws_id,
             name=f"{user.user_id}'s Workspace",
-            state={"panes": {}, "artifacts": {}, "activeLayout": [], "archive": []},
+            state=initial_state,
             is_archived=False,
         )
         db.add(workspace)
-
         await db.flush()
 
         member = WorkspaceMember(
@@ -124,6 +162,39 @@ class UserService:
 
         # Set active workspace id
         user.active_workspace_id = workspace.id
+
+        # Create session in DB
+        from app.services.session_service import SessionService
+        await SessionService.create_session(
+            db,
+            session_id=session_id,
+            name="Chat",
+            workspace_id=ws_id,
+        )
+
+        # Create artifact in DB
+        from app.models.artifact import Artifact, MutationRecord
+        db_artifact = Artifact(
+            id=artifact_id,
+            type="chat",
+            artifact_metadata={"name": "Chat"},
+            session_id=session_id,
+            storage_backend="db",
+            payload={"messages": []}
+        )
+        db.add(db_artifact)
+
+        mutation = MutationRecord(
+            artifact_id=artifact_id,
+            version_id="v1",
+            parent_id=None,
+            origin={"type": "manual_edit", "sessionId": session_id},
+            change_summary="Initial creation",
+            payload={"messages": []},
+            status="committed",
+        )
+        db_artifact.mutations.append(mutation)
+        db.add(mutation)
 
         await db.commit()
 
@@ -169,7 +240,6 @@ class UserService:
             # Create default chat session ID and Artifact ID
             default_session_id = "default_session"
             default_artifact_id = f"A_{default_session_id}"
-            import time
 
             default_ws = Workspace(
                 id="default_workspace",
@@ -194,16 +264,16 @@ class UserService:
                             "id": default_artifact_id,
                             "type": "chat",
                             "payload": {
-                                "messages": [
-                                    {"role": "system", "content": "Welcome to EoS."}
-                                ]
+                                "messages": []
                             },
                             "session_id": default_session_id,
                             "mutations": [],
+                            "metadata": {"name": "General"}
                         }
                     },
                     "activeLayout": [default_session_id],
                     "archive": [],
+                    "focusedPaneId": default_session_id
                 },
                 is_archived=False,
             )
@@ -234,6 +304,31 @@ class UserService:
                 name="General",
                 workspace_id=default_ws.id,
             )
-            logger.info("✓ Created default chat session")
+
+            # Create the Artifact record for default workspace
+            from app.models.artifact import Artifact, MutationRecord
+            db_artifact = Artifact(
+                id=default_artifact_id,
+                type="chat",
+                artifact_metadata={"name": "General"},
+                session_id=default_session_id,
+                storage_backend="db",
+                payload={"messages": []}
+            )
+            db.add(db_artifact)
+
+            mutation = MutationRecord(
+                artifact_id=default_artifact_id,
+                version_id="v1",
+                parent_id=None,
+                origin={"type": "manual_edit", "sessionId": default_session_id},
+                change_summary="Initial creation",
+                payload={"messages": []},
+                status="committed",
+            )
+            db_artifact.mutations.append(mutation)
+            db.add(mutation)
+
+            logger.info("✓ Created default chat session and artifact")
 
         await db.commit()

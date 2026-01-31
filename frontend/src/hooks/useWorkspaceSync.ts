@@ -47,6 +47,7 @@ export const useWorkspaceSync = () => {
         useWorkspaceStore(state => state.panes),
         useWorkspaceStore(state => state.activeLayout),
         useWorkspaceStore(state => state.density),
+        useWorkspaceStore(state => state.focusedPaneId),
         isAuthenticated,
         isInitializing
     ]);
