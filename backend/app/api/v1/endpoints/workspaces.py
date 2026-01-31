@@ -24,12 +24,17 @@ from app.schemas.workspace import (
     DeleteWorkspaceResponse,
 )
 from app.services.workspace_service import WorkspaceService
+from app.api import deps
+from app.schemas.user import User
 
 router = APIRouter()
 
 
 @router.get("/", response_model=List[Workspace], tags=["workspaces"])
-async def list_workspaces(db: AsyncSession = Depends(get_db)):
+async def list_workspaces(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
     return await WorkspaceService.get_workspaces(db)
 
 
@@ -40,13 +45,19 @@ async def list_workspaces(db: AsyncSession = Depends(get_db)):
     tags=["workspaces"],
 )
 async def create_workspace(
-    workspace_in: WorkspaceCreate, db: AsyncSession = Depends(get_db)
+    workspace_in: WorkspaceCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
 ):
     return await WorkspaceService.create_workspace(db, workspace_in)
 
 
 @router.get("/{id}", response_model=Workspace, tags=["workspaces"])
-async def get_workspace(id: str, db: AsyncSession = Depends(get_db)):
+async def get_workspace(
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
     db_obj = await WorkspaceService.get_workspace(db, id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -55,7 +66,10 @@ async def get_workspace(id: str, db: AsyncSession = Depends(get_db)):
 
 @router.patch("/{id}", response_model=Workspace, tags=["workspaces"])
 async def update_workspace(
-    id: str, workspace_in: WorkspaceUpdate, db: AsyncSession = Depends(get_db)
+    id: str,
+    workspace_in: WorkspaceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
 ):
     db_obj = await WorkspaceService.update_workspace(db, id, workspace_in)
     if not db_obj:
@@ -64,7 +78,11 @@ async def update_workspace(
 
 
 @router.delete("/{id}", response_model=DeleteWorkspaceResponse, tags=["workspaces"])
-async def delete_workspace(id: str, db: AsyncSession = Depends(get_db)):
+async def delete_workspace(
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
     success = await WorkspaceService.delete_workspace(db, id)
     if not success:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -76,6 +94,7 @@ async def archive_pane(
     id: str,
     pane_data: dict,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
 ):
     # For now, we don't have user_id in the request, could be added later
     success = await WorkspaceService.archive_pane(db, id, pane_data)

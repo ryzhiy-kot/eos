@@ -12,12 +12,16 @@ async def test_http_auth_success():
 
         mock_response = MagicMock()
         mock_response.status_code = 200
+        # Mock standard OAuth2 response + user info
         mock_response.json.return_value = {
-            "user_id": "test_user",
-            "profile": {"name": "Test User"},
-            "enabled": True,
-            "session_token": "token123",
-            "session_expires_at": "2026-01-01T00:00:00"
+            "access_token": "token123",
+            "token_type": "bearer",
+            "expires_in": 3600,
+            "user": {
+                "user_id": "test_user",
+                "profile": {"name": "Test User"},
+                "enabled": True
+            }
         }
         mock_client.post.return_value = mock_response
 

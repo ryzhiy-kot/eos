@@ -1,13 +1,13 @@
-from typing import Optional, Dict
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.user import User as UserSchema
 from app.services.user_service import UserService
 from app.services.auth.protocol import AuthServiceProtocol, AuthResult
-import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from app.core import security
+from app.core.config import get_settings
 
-# In-memory session store
-SESSIONS: Dict[str, datetime] = {}
+settings = get_settings()
 
 class LocalAuthService(AuthServiceProtocol):
     async def authenticate(
@@ -33,9 +33,11 @@ class LocalAuthService(AuthServiceProtocol):
             user = await UserService.get_by_user_id(db, username)
 
         if user:
-            token = secrets.token_urlsafe(32)
-            expires_at = datetime.utcnow() + timedelta(hours=24)
-            SESSIONS[token] = expires_at
+            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            token = security.create_access_token(
+                data={"sub": user.user_id}, expires_delta=access_token_expires
+            )
+            expires_at = datetime.now(timezone.utc) + access_token_expires
 
             return AuthResult(
                 user=UserSchema.model_validate(user),
@@ -46,5 +48,5 @@ class LocalAuthService(AuthServiceProtocol):
         return AuthResult(error="Authentication failed")
 
     async def logout(self, session_token: str) -> None:
-        if session_token in SESSIONS:
-            del SESSIONS[session_token]
+        # JWTs are stateless, no server-side invalidation in this simple implementation
+        pass

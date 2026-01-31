@@ -68,3 +68,15 @@ async def client(db_engine):
 async def db_session(db_engine):
     async with TestingSessionLocal() as session:
         yield session
+
+@pytest.fixture
+async def authenticated_client(client: AsyncClient):
+    # Log in to get token - Use Form Data
+    response = await client.post(
+        "/api/v1/auth/login",
+        data={"username": "test_user", "password": "password"}
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    client.headers["Authorization"] = f"Bearer {token}"
+    return client

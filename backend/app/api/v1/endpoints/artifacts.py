@@ -18,12 +18,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.artifact import Artifact as ArtifactSchema
 from app.services.artifact_service import ArtifactService
+from app.api import deps
+from app.schemas.user import User
 
 router = APIRouter()
 
 
 @router.get("/{id}", response_model=ArtifactSchema, tags=["artifacts"])
-async def get_artifact(id: str, db: AsyncSession = Depends(get_db)):
+async def get_artifact(
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
     db_obj = await ArtifactService.get_artifact(db, id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Artifact not found")
@@ -32,6 +38,8 @@ async def get_artifact(id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=ArtifactSchema, tags=["artifacts"])
 async def create_artifact(
-    artifact_in: ArtifactSchema, db: AsyncSession = Depends(get_db)
+    artifact_in: ArtifactSchema,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(deps.get_current_user),
 ):
     return await ArtifactService.create_or_update_artifact(db, artifact_in)

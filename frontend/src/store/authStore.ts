@@ -50,7 +50,15 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const { apiClient } = await import('../lib/apiClient');
                     const { workspaceActions } = await import('./workspaceStore');
-                    const user = await apiClient.login(username, password);
+                    const authResponse = await apiClient.login(username, password);
+
+                    // Handle standard OAuth2 response or older format compatibility
+                    const accessToken = authResponse.access_token || authResponse.session_token;
+                    const user = authResponse.user || (authResponse.user_id ? authResponse : null);
+
+                    if (!accessToken || !user) {
+                         throw new Error("Invalid response from server");
+                    }
 
                     if (user.memberships && user.memberships.length > 0) {
                         // Priority: active_workspace_id if valid, else first membership
@@ -61,8 +69,8 @@ export const useAuthStore = create<AuthState>()(
                     set({
                         isAuthenticated: true,
                         user: user.user_id,
-                        session_token: user.session_token || null,
-                        session_expires_at: user.session_expires_at || null,
+                        session_token: accessToken,
+                        session_expires_at: authResponse.session_expires_at || null,
                         active_workspace_id: user.active_workspace_id || null,
                         isLoading: false,
                         error: null
