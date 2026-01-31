@@ -4,12 +4,12 @@ from app.services.llm_providers import MockLLMProvider
 import json
 
 @pytest.mark.asyncio
-async def test_execute_chat_integration(client):
+async def test_execute_chat_integration(authenticated_client):
     with patch("app.services.execution_service.get_llm_provider") as mock_get_provider:
         mock_provider = MockLLMProvider()
         mock_get_provider.return_value = mock_provider
 
-        response = await client.post(
+        response = await authenticated_client.post(
             "/api/v1/sessions/execute",
             json={
                 "type": "chat",
@@ -24,12 +24,12 @@ async def test_execute_chat_integration(client):
         assert data["result"]["output_message"]["content"] is not None
 
 @pytest.mark.asyncio
-async def test_execute_chat_streaming(client):
+async def test_execute_chat_streaming(authenticated_client):
     with patch("app.services.execution_service.get_llm_provider") as mock_get_provider:
         mock_provider = MockLLMProvider()
         mock_get_provider.return_value = mock_provider
 
-        async with client.stream(
+        async with authenticated_client.stream(
             "POST",
             "/api/v1/sessions/execute",
             json={

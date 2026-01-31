@@ -14,9 +14,11 @@
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
 import asyncio
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import StreamingResponse
 import json
+from app.api import deps
+from app.schemas.user import User
 
 router = APIRouter()
 
@@ -35,5 +37,8 @@ async def event_generator(request: Request):
 
 
 @router.get("/stream", tags=["events"])
-async def stream_events(request: Request):
+async def stream_events(
+    request: Request,
+    current_user: User = Depends(deps.get_current_user),
+):
     return StreamingResponse(event_generator(request), media_type="text/event-stream")

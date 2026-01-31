@@ -41,12 +41,19 @@ class ApiClient {
     ): Promise<T> {
         const url = `${this.baseUrl}${endpoint}`;
 
+        // Dynamically import store to avoid circular dependency
+        const { useAuthStore } = await import('../store/authStore');
+        const token = useAuthStore.getState().session_token;
+
+        const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            ...options.headers,
+        };
+
         const config: RequestInit = {
             ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers,
-            },
+            headers,
         };
 
         try {
@@ -113,11 +120,18 @@ class ApiClient {
         stream?: boolean;
     }): Promise<Response> {
         const url = `${this.baseUrl}/api/v1/sessions/execute`;
+
+        const { useAuthStore } = await import('../store/authStore');
+        const token = useAuthStore.getState().session_token;
+
+        const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        };
+
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify(request),
         });
 
@@ -167,10 +181,38 @@ class ApiClient {
             throw new Error('Password is required.');
         }
 
-        return this.request('/api/v1/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
-        });
+        const formData = new FormData();
+        formData.append('username', cleanUsername);
+        formData.append('password', cleanPassword);
+
+        // Note: request() adds JSON header by default which conflicts with FormData
+        // We bypass this.request here to handle FormData correctly
+        const url = `${this.baseUrl}/api/v1/auth/login`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                 const error: ApiError = {
+                    message: `Login Failed: ${response.statusText}`,
+                    status: response.status,
+                };
+                throw error;
+            }
+
+            return await response.json();
+        } catch (error) {
+             if (error instanceof TypeError) {
+                throw {
+                    message: `Network Error: Unable to connect to ${this.baseUrl}. Please check if the server is running.`,
+                    status: 0,
+                } as ApiError;
+            }
+            throw error;
+        }
     }
 
     async logout(sessionToken: string): Promise<any> {

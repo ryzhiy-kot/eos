@@ -13,13 +13,14 @@
 # interaction patterns), may not be used, redistributed, or adapted
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
-from app.schemas.user import UpdateActiveWorkspaceRequest, LoggedInUser
+from app.schemas.user import UpdateActiveWorkspaceRequest
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.user import AuthSyncRequest, User as UserSchema
-from app.schemas.user import LoginRequest
 from pydantic import BaseModel
+from typing import Optional
 from datetime import datetime
 
 router = APIRouter()
@@ -28,6 +29,11 @@ router = APIRouter()
 class LogoutRequest(BaseModel):
     session_token: str
 
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: Optional[UserSchema] = None
+    session_expires_at: Optional[datetime] = None
 
 @router.post("/sync", response_model=UserSchema, tags=["auth"])
 async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
@@ -47,18 +53,19 @@ async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
 
 from app.services.auth.protocol import AuthServiceProtocol
 from app.services.auth.dependency import get_auth_service
+from app.api import deps
 
 
-@router.post("/login", response_model=LoggedInUser, tags=["auth"])
+@router.post("/login", response_model=TokenResponse, tags=["auth"])
 async def login(
-    req: LoginRequest,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
     auth_service: AuthServiceProtocol = Depends(get_auth_service),
 ):
     from app.services.user_service import UserService
 
     # Authenticate (or auto-register)
-    result = await auth_service.authenticate(db, req.username, req.password)
+    result = await auth_service.authenticate(db, form_data.username, form_data.password)
 
     if result.error or not result.user:
         raise HTTPException(
@@ -76,10 +83,11 @@ async def login(
 
     user_schema = UserSchema.model_validate(user)
 
-    return LoggedInUser(
-        **user_schema.model_dump(),
-        session_token=result.session_token or "",
-        session_expires_at=result.session_expires_at or datetime.utcnow(),
+    return TokenResponse(
+        access_token=result.session_token,
+        token_type="bearer",
+        user=user_schema,
+        session_expires_at=result.session_expires_at
     )
 
 
@@ -87,6 +95,7 @@ async def login(
 async def logout(
     req: LogoutRequest,
     auth_service: AuthServiceProtocol = Depends(get_auth_service),
+    current_user: UserSchema = Depends(deps.get_current_user),
 ):
     await auth_service.logout(req.session_token)
     return {"message": "Logged out successfully"}
@@ -94,9 +103,15 @@ async def logout(
 
 @router.post("/update-active-workspace", response_model=UserSchema, tags=["auth"])
 async def update_active_workspace(
-    req: UpdateActiveWorkspaceRequest, db: AsyncSession = Depends(get_db)
+    req: UpdateActiveWorkspaceRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserSchema = Depends(deps.get_current_user),
 ):
     from app.services.user_service import UserService
+
+    # Verify that the user being updated matches the authenticated user
+    if req.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Cannot update another user's workspace")
 
     user = await UserService.update_active_workspace(db, req.user_id, req.workspace_id)
     if not user:

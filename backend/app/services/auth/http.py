@@ -5,7 +5,7 @@ import httpx
 from app.schemas.user import UserBase
 from app.services.auth.protocol import AuthServiceProtocol, AuthResult
 from app.core.config import get_settings
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -22,30 +22,58 @@ class HttpAuthService(AuthServiceProtocol):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        payload = {"username": username, "password": password}
+        # Send as Form Data (OAuth2 standard for password grant)
+        data_payload = {"username": username, "password": password}
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.url,
-                    json=payload,
+                    data=data_payload,
                     headers=headers,
                     timeout=10.0
                 )
 
                 if response.status_code == 200:
                     data = response.json()
-                    # Expect compatible UserBase data
-                    user = UserBase.model_validate(data)
 
-                    token = data.get("session_token")
-                    expires_at = data.get("session_expires_at")
+                    # Expect access_token in response
+                    token = data.get("access_token")
+                    token_type = data.get("token_type") # e.g. "bearer"
 
-                    if expires_at and isinstance(expires_at, str):
-                        try:
-                            expires_at = datetime.fromisoformat(expires_at)
-                        except ValueError:
-                            expires_at = None
+                    # Try to get user from nested 'user' key first
+                    user_data = data.get("user")
+
+                    user = None
+                    if user_data and isinstance(user_data, dict):
+                         # If user_id is missing, inject it from login args
+                         if "user_id" not in user_data:
+                             user_data["user_id"] = username
+                         try:
+                             user = UserBase.model_validate(user_data)
+                         except Exception as e:
+                             logger.warning(f"Failed to validate user from 'user' field: {e}")
+
+                    # If no user found or validation failed, try constructing from root if it looks like a user
+                    if not user:
+                         # Check if root has user_id
+                         if "user_id" in data:
+                             try:
+                                 user = UserBase.model_validate(data)
+                             except Exception as e:
+                                 logger.warning(f"Failed to validate user from root: {e}")
+
+                    # Fallback: Create minimal user
+                    if not user:
+                        user = UserBase(user_id=username, name=username)
+
+
+                    # Calculate expiry
+                    expires_in = data.get("expires_in")
+                    expires_at = None
+                    if expires_in:
+                         expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
 
                     return AuthResult(
                         user=user,

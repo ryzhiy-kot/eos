@@ -33,23 +33,22 @@ async def test_auth_sync(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_workspace_lifecycle(client: AsyncClient):
-    # Ensure user exists
-    await client.post("/api/v1/auth/sync", json={"user_id": "test_user"})
+async def test_workspace_lifecycle(authenticated_client: AsyncClient):
+    # Ensure user exists is handled by authenticated_client fixture
 
     # 1. Create workspace
     workspace_data = {
         "name": "Research Session",
         "state": {"panes": [{"id": "P1", "type": "chat"}], "visibleIds": ["P1"]},
     }
-    response = await client.post("/api/v1/workspaces/", json=workspace_data)
+    response = await authenticated_client.post("/api/v1/workspaces/", json=workspace_data)
     assert response.status_code == 201
     ws = response.json()
     assert ws["name"] == "Research Session"
     ws_id = ws["id"]
 
     # 2. List workspaces
-    response = await client.get("/api/v1/workspaces/")
+    response = await authenticated_client.get("/api/v1/workspaces/")
     assert response.status_code == 200
     workspaces = response.json()
     assert len(workspaces) >= 1
@@ -57,17 +56,17 @@ async def test_workspace_lifecycle(client: AsyncClient):
 
     # 3. Update workspace
     update_data = {"name": "Updated Session"}
-    response = await client.patch(f"/api/v1/workspaces/{ws_id}", json=update_data)
+    response = await authenticated_client.patch(f"/api/v1/workspaces/{ws_id}", json=update_data)
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Session"
 
     # 4. Soft delete (Archive)
-    response = await client.delete(f"/api/v1/workspaces/{ws_id}")
+    response = await authenticated_client.delete(f"/api/v1/workspaces/{ws_id}")
     assert response.status_code == 200
     assert response.json()["status"] == "archived"
 
     # 5. Verify it's gone from list
-    response = await client.get("/api/v1/workspaces/")
+    response = await authenticated_client.get("/api/v1/workspaces/")
     assert response.status_code == 200
     workspaces = response.json()
     assert not any(w["id"] == ws_id for w in workspaces)

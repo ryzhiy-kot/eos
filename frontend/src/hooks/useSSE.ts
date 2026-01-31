@@ -17,6 +17,7 @@
 
 import { ConnectionStatus } from '@/types/constants';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useAuthStore } from '@/store/authStore';
 
 
 interface SSEMessage {
@@ -39,6 +40,7 @@ export function useSSE({
     reconnectInterval = 1000,
     maxReconnectAttempts = 10,
 }: UseSSEOptions = {}) {
+    const sessionToken = useAuthStore(state => state.session_token);
     const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
     const [lastHeartbeat, setLastHeartbeat] = useState<number | null>(null);
     const eventSourceRef = useRef<EventSource | null>(null);
@@ -72,7 +74,14 @@ export function useSSE({
         console.log(`Attempting to connect to SSE (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})...`);
 
         try {
-            const eventSource = new EventSource(url);
+            // Append token if available
+            let finalUrl = url;
+            if (sessionToken) {
+                const separator = url.includes('?') ? '&' : '?';
+                finalUrl = `${url}${separator}token=${encodeURIComponent(sessionToken)}`;
+            }
+
+            const eventSource = new EventSource(finalUrl);
             eventSourceRef.current = eventSource;
 
             eventSource.onopen = () => {

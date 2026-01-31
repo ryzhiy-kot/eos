@@ -5,6 +5,7 @@ from app.main import app
 from app.services.auth.protocol import AuthServiceProtocol, AuthResult
 from app.services.auth.dependency import get_auth_service
 from app.models.user import User
+from app.schemas.user import User as UserSchema
 from typing import Optional
 
 
@@ -21,8 +22,13 @@ class MockAuthService(AuthServiceProtocol):
                 profile={"name": "Mock User"},
                 memberships=[],
             )
-            return AuthResult(user=user)
+            # Ensure user is Pydantic model
+            user_schema = UserSchema.model_validate(user)
+            return AuthResult(user=user_schema, session_token="mock_token_123")
         return AuthResult(error="Authentication failed")
+
+    async def logout(self, session_token: str) -> None:
+        pass
 
 
 @pytest.mark.asyncio
@@ -34,13 +40,21 @@ async def test_auth_dependency_injection(client: AsyncClient):
 
     try:
         # Test valid login with mock service
-        # If I return None, I should get 401 (as I just added). This proves my Mock service was called and returned None.
-        # Because the default LocalAuthService would have auto-registered "unknown_user" and returned 200.
+        # Using Form Data
         response = await client.post(
-            "/api/v1/auth/login", json={"username": "unknown_user"}
+            "/api/v1/auth/login",
+            data={"username": "unknown_user", "password": "any"}
         )
         assert response.status_code == 401
         assert response.json()["detail"] == "Authentication failed"
+
+        # Test success
+        response = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "mock_user", "password": "any"}
+        )
+        assert response.status_code == 200
+        assert response.json()["access_token"] == "mock_token_123"
 
     finally:
         app.dependency_overrides = original_overrides
@@ -51,7 +65,10 @@ async def test_default_auth_service(client: AsyncClient):
     # Test with default service (LocalAuthService)
     # This relies on auto-registration
     username = "test_auto_reg_user_di"
-    response = await client.post("/api/v1/auth/login", json={"username": username})
+    response = await client.post(
+        "/api/v1/auth/login",
+        data={"username": username, "password": "password"}
+    )
     assert response.status_code == 200
     data = response.json()
-    assert data["user_id"] == username
+    assert data["user"]["user_id"] == username
