@@ -16,6 +16,7 @@
  */
 
 import { create } from 'zustand';
+import { MAX_HISTORY_LENGTH } from '../config';
 import { CommandEntry } from '@/lib/commandRegistry';
 import {
     PaneType,
@@ -298,6 +299,9 @@ export const workspaceActions = {
         if (pushToHistory) {
             if (!newHistory[artifactId]) newHistory[artifactId] = [];
             newHistory[artifactId].push(currentArtifact.payload);
+            if (newHistory[artifactId].length > MAX_HISTORY_LENGTH) {
+                newHistory[artifactId].shift();
+            }
             newFuture[artifactId] = [];
         }
 
@@ -399,6 +403,9 @@ export const workspaceActions = {
         const newFuture = { ...state.future };
         if (!newFuture[artifactId]) newFuture[artifactId] = [];
         newFuture[artifactId].push(current);
+        if (newFuture[artifactId].length > MAX_HISTORY_LENGTH) {
+            newFuture[artifactId].shift();
+        }
 
         return {
             artifacts: { ...state.artifacts, [artifactId]: { ...artifact, payload: previous } },
@@ -421,6 +428,9 @@ export const workspaceActions = {
         const newHistory = { ...state.history };
         if (!newHistory[artifactId]) newHistory[artifactId] = [];
         newHistory[artifactId].push(current);
+        if (newHistory[artifactId].length > MAX_HISTORY_LENGTH) {
+            newHistory[artifactId].shift();
+        }
 
         return {
             artifacts: { ...state.artifacts, [artifactId]: { ...artifact, payload: next } },
