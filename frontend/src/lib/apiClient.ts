@@ -154,6 +154,13 @@ class ApiClient {
         });
     }
 
+    async updateArtifact(id: string, updates: any): Promise<any> {
+        return this.request(`/api/v1/artifacts/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates),
+        });
+    }
+
     // Auth
     async login(username: string, password: string): Promise<any> {
         const cleanUsername = username?.trim();

@@ -41,10 +41,30 @@ class MutationRecord(BaseModel):
 
 
 # Artifact Structured Payloads
+class ArtifactCreate(BaseModel):
+    id: Optional[str] = None
+    type: str
+    name: str
+    payload: Optional[Any] = None
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, validation_alias="artifact_metadata"
+    )
+    session_id: Optional[str] = None
+
+
+class ArtifactUpdate(BaseModel):
+    name: Optional[str] = None
+    payload: Optional[Any] = None
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, validation_alias="artifact_metadata"
+    )
+
+
 class Artifact(BaseModel):
     id: str
     type: str  # chat, visual, code, doc, data
-    payload: Any
+    name: str
+    payload: Optional[Any] = None
     metadata: Optional[Dict[str, Any]] = Field(
         default=None, validation_alias="artifact_metadata"
     )

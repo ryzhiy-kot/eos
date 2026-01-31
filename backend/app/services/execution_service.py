@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 from typing import Dict, Any, Tuple, List
 import random
 import json
+import uuid
 from app.models.artifact import Artifact, MutationRecord
 from app.schemas.chat import ExecutionRequest
 from app.services.session_service import SessionService
@@ -94,11 +95,15 @@ class ExecutionService:
             except json.JSONDecodeError:
                 payload = {"raw_content": payload_str}
 
+            metadata = data["metadata"] or {}
+            if "name" not in metadata:
+                metadata["name"] = f"Generated {data['type'].capitalize()}"
+
             new_art = Artifact(
                 id=art_id,
                 type=data["type"],
                 payload=payload,
-                artifact_metadata=data["metadata"],
+                artifact_metadata=metadata,
                 session_id=session_id,
             )
             new_artifact_models.append(new_art)
@@ -192,9 +197,6 @@ class ExecutionService:
         )
 
         # Serialize the final message properly
-        # We need to be careful with datetime serialization if we dump the model
-        # Using jsonable_encoder or just returning minimal info might be safer,
-        # but let's try manual dict construction for safety
         final_msg_dict = {
             "id": assistant_msg.id,
             "session_id": assistant_msg.session_id,
@@ -211,7 +213,7 @@ class ExecutionService:
                     "metadata": a.artifact_metadata,
                     "session_id": a.session_id,
                     "created_at": a.created_at.isoformat() if a.created_at else None,
-                    "mutations": [],  # Simplified for now
+                    "mutations": [],
                 }
                 for a in new_artifact_models
             ],
@@ -296,35 +298,38 @@ class ExecutionService:
         # Mock generation logic
         if cmd == "plot":
             new_art = Artifact(
-                id=f"A_PLOT_{random.randint(1000, 9999)}",
+                id=str(uuid.uuid4()),
                 type="visual",
                 payload={
                     "format": "svg",
                     "url": f"data:image/svg+xml,<svg>Mock plot</svg>",
                     "alt": "Plot",
                 },
+                artifact_metadata={"name": "Plot Result"},
                 session_id=db_session.id,
             )
             new_artifact_models.append(new_art)
         elif cmd == "run":
             new_art = Artifact(
-                id=f"A_CODE_{random.randint(1000, 9999)}",
+                id=str(uuid.uuid4()),
                 type="code",
                 payload={
                     "language": "python",
                     "source": f"Executed code: {req.action[:50] if req.action else ''}...",
                 },
+                artifact_metadata={"name": "Code Execution"},
                 session_id=db_session.id,
             )
             new_artifact_models.append(new_art)
         elif cmd == "optimize":
             new_art = Artifact(
-                id=f"A_OPT_{random.randint(1000, 9999)}",
+                id=str(uuid.uuid4()),
                 type="code",
                 payload={
                     "language": "python",
                     "source": "# Optimized Code\nprint('Hello Optimized World')",
                 },
+                artifact_metadata={"name": "Optimized Code"},
                 session_id=db_session.id,
             )
             new_artifact_models.append(new_art)

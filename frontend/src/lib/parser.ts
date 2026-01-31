@@ -65,8 +65,8 @@ export const parseCommand = (input: string, activePaneId: string | null): Parsed
         if (/^@?P\d+$/.test(tokens[1])) {
             sourceId = tokens[1].startsWith('@') ? tokens[1].substring(1).toUpperCase() : tokens[1].toUpperCase();
             actionStartIdx = 2;
-        } else if (/^@?A_\w+$/.test(tokens[1])) {
-            // Direct Artifact ID reference
+        } else if (/^@?(?:A_\w+|[0-9a-fA-F\-]{36})$/.test(tokens[1])) {
+            // Direct Artifact ID reference (legacy A_ or UUID)
             sourceId = tokens[1].startsWith('@') ? tokens[1].substring(1) : tokens[1];
             actionStartIdx = 2;
         }

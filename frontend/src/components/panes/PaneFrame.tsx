@@ -27,8 +27,10 @@ interface PaneFrameProps {
 }
 
 const PaneFrame: React.FC<PaneFrameProps> = ({ pane }) => {
-    const { focusedPaneId } = useWorkspaceStore();
+    const { focusedPaneId, artifacts } = useWorkspaceStore();
     const isFocused = focusedPaneId === pane.id;
+    const artifact = artifacts[pane.artifactId];
+    const title = artifact?.metadata?.name || 'Untitled';
 
     const handleFocus = () => {
         if (!isFocused) {
@@ -68,7 +70,7 @@ const PaneFrame: React.FC<PaneFrameProps> = ({ pane }) => {
                         [{pane.id}]
                     </span>
                     <span className="font-bold text-slate-700 dark:text-slate-200">
-                        [{pane.type.charAt(0).toUpperCase() + pane.type.slice(1)}: {pane.title}]
+                        [{pane.type.charAt(0).toUpperCase() + pane.type.slice(1)}: {title}]
                     </span>
                 </div>
 

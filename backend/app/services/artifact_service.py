@@ -17,10 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
-from typing import Optional
+from typing import Optional, Union
 import random
+import uuid
 from app.models.artifact import Artifact, MutationRecord
-from app.schemas.artifact import Artifact as ArtifactSchema
+from app.schemas.artifact import ArtifactCreate, ArtifactUpdate
 
 
 from app.core.config import get_settings
@@ -53,7 +54,9 @@ class ArtifactService:
 
     @staticmethod
     async def _update_artifact_logic(
-        db: AsyncSession, existing: Artifact, artifact_in: ArtifactSchema
+        db: AsyncSession,
+        existing: Artifact,
+        artifact_in: Union[ArtifactCreate, ArtifactUpdate],
     ) -> Artifact:
         new_version_id = "v1"
         parent_id = None
@@ -61,7 +64,7 @@ class ArtifactService:
         # Resolve versioning
         mut_stmt = (
             select(MutationRecord)
-            .where(MutationRecord.artifact_id == artifact_in.id)
+            .where(MutationRecord.artifact_id == existing.id)
             .order_by(MutationRecord.timestamp.desc())
         )
         mut_result = await db.execute(mut_stmt)
@@ -75,66 +78,99 @@ class ArtifactService:
             except (ValueError, AttributeError):
                 new_version_id = f"v{random.randint(2, 999)}"
 
-        # Handle external storage
-        store = get_artifact_store()
-        storage_key = await store.save(artifact_in.id, artifact_in.payload)
+        # Prepare metadata
+        metadata = existing.artifact_metadata or {}
+        if artifact_in.metadata:
+            metadata.update(artifact_in.metadata)
+        if artifact_in.name:
+            metadata["name"] = artifact_in.name
+
+        # Handle payload and storage
+        payload = existing.payload
+        if artifact_in.payload is not None:
+            payload = artifact_in.payload
+
+        # Only update storage if payload changed
         settings = get_settings()
+        storage_key = existing.storage_key
+        if artifact_in.payload is not None:
+            store = get_artifact_store()
+            storage_key = await store.save(existing.id, payload)
+            existing.storage_backend = settings.ARTIFACT_STORAGE_BACKEND
+            existing.storage_key = storage_key
+            if settings.ARTIFACT_STORAGE_BACKEND == "db":
+                existing.payload = payload
+            else:
+                existing.payload = None  # Offloaded
 
         # Update handle
-        existing.type = artifact_in.type
-        existing.artifact_metadata = artifact_in.metadata or {}
-        existing.storage_backend = settings.ARTIFACT_STORAGE_BACKEND
-        existing.storage_key = storage_key
+        if hasattr(artifact_in, "type") and artifact_in.type:
+             existing.type = artifact_in.type
 
-        if settings.ARTIFACT_STORAGE_BACKEND == "db":
-            existing.payload = artifact_in.payload
-        else:
-            existing.payload = None  # Offloaded
+        existing.artifact_metadata = metadata
 
-        if artifact_in.session_id:
+        if hasattr(artifact_in, "session_id") and artifact_in.session_id:
             existing.session_id = artifact_in.session_id
 
-        mutation = MutationRecord(
-            artifact_id=artifact_in.id,
-            version_id=new_version_id,
-            parent_id=parent_id,
-            origin={"type": "manual_edit", "sessionId": artifact_in.session_id},
-            change_summary="Update via manual edit or sync",
-            payload=artifact_in.payload,
-            status="committed",
-        )
-        existing.mutations.append(mutation)
-        db.add(mutation)
+        # Create mutation only if payload changed or it's a significant update
+        # For now, we assume any update via this method creates a mutation if payload provided
+        # If only metadata changed, we might skip mutation or create a metadata-only mutation?
+        # The existing logic seemed to always create a mutation.
+
+        if artifact_in.payload is not None:
+            mutation = MutationRecord(
+                artifact_id=existing.id,
+                version_id=new_version_id,
+                parent_id=parent_id,
+                origin={
+                    "type": "manual_edit",
+                    "sessionId": existing.session_id,
+                },
+                change_summary="Update via manual edit or sync",
+                payload=payload,
+                status="committed",
+            )
+            existing.mutations.append(mutation)
+            db.add(mutation)
+
+        db.add(existing)
         await db.commit()
         await db.refresh(existing, ["mutations"])
 
         # Ensure payload is visible on return
-        if existing.payload is None and artifact_in.payload is not None:
-            existing.payload = artifact_in.payload
+        if existing.payload is None and payload is not None:
+            existing.payload = payload
 
         return existing
 
     @staticmethod
     async def create_or_update_artifact(
-        db: AsyncSession, artifact_in: ArtifactSchema
+        db: AsyncSession, artifact_in: ArtifactCreate
     ) -> Artifact:
-        existing = await ArtifactService.get_artifact(db, artifact_in.id)
+        if artifact_in.id:
+            existing = await ArtifactService.get_artifact(db, artifact_in.id)
+            if existing:
+                return await ArtifactService._update_artifact_logic(
+                    db, existing, artifact_in
+                )
 
-        if existing:
-            return await ArtifactService._update_artifact_logic(
-                db, existing, artifact_in
-            )
+        # Generate ID if missing
+        new_id = artifact_in.id or str(uuid.uuid4())
+
+        # Prepare metadata
+        metadata = artifact_in.metadata or {}
+        metadata["name"] = artifact_in.name
 
         # Handle external storage
         store = get_artifact_store()
-        storage_key = await store.save(artifact_in.id, artifact_in.payload)
+        storage_key = await store.save(new_id, artifact_in.payload)
         settings = get_settings()
 
         try:
             artifact_obj = Artifact(
-                id=artifact_in.id,
+                id=new_id,
                 type=artifact_in.type,
-                artifact_metadata=artifact_in.metadata or {},
+                artifact_metadata=metadata,
                 session_id=artifact_in.session_id or "default_session",
                 storage_backend=settings.ARTIFACT_STORAGE_BACKEND,
                 storage_key=storage_key,
@@ -145,7 +181,7 @@ class ArtifactService:
             db.add(artifact_obj)
 
             mutation = MutationRecord(
-                artifact_id=artifact_in.id,
+                artifact_id=new_id,
                 version_id="v1",
                 parent_id=None,
                 origin={"type": "manual_edit", "sessionId": artifact_in.session_id},
@@ -167,12 +203,19 @@ class ArtifactService:
         except IntegrityError:
             await db.rollback()
             # Race condition: artifact created by another process/request
-            existing = await ArtifactService.get_artifact(db, artifact_in.id)
-            if existing:
-                return await ArtifactService._update_artifact_logic(
-                    db, existing, artifact_in
-                )
+            if artifact_in.id:
+                existing = await ArtifactService.get_artifact(db, artifact_in.id)
+                if existing:
+                    return await ArtifactService._update_artifact_logic(
+                        db, existing, artifact_in
+                    )
             raise
+
+    @staticmethod
+    async def update_artifact(
+        db: AsyncSession, existing: Artifact, artifact_in: ArtifactUpdate
+    ) -> Artifact:
+        return await ArtifactService._update_artifact_logic(db, existing, artifact_in)
 
     @staticmethod
     async def create_adhoc_mutation(
