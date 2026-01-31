@@ -87,7 +87,8 @@ export const useRegisterCommands = (onReady?: () => void) => {
         const pane = useWorkspaceStore.getState().panes[sourceId];
         if (!pane) return false;
 
-        const confirmed = window.confirm(`Are you sure you want to PERMANENTLY archive pane ${sourceId} (${pane.title})? It will be removed from local state and saved to audit logs.`);
+        // Note: pane.title is removed, so we use ID or fetch artifact name if needed
+        const confirmed = window.confirm(`Are you sure you want to PERMANENTLY archive pane ${sourceId}? It will be removed from local state and saved to audit logs.`);
         if (confirmed) {
             try {
                 const { apiClient } = await import('../lib/apiClient');
@@ -178,19 +179,34 @@ export const useRegisterCommands = (onReady?: () => void) => {
     useCommandHandler(COMMAND_NAMES.HELP, handleHelp);
     useCommandHandler(COMMAND_NAMES.QUESTION, () => handleHelp({}));
 
-    useCommandHandler(COMMAND_NAMES.RENAME, (payload) => {
+    useCommandHandler(COMMAND_NAMES.RENAME, async (payload) => {
         const potentialId = payload.args[0]?.toUpperCase();
         const panes = useWorkspaceStore.getState().panes;
+        let paneId: string | null = null;
+        let newName: string = "";
+
         if (potentialId && panes[potentialId] && payload.args.length > 1) {
-            const newTitle = payload.args.slice(1).join(' ');
-            workspaceActions.renamePane(potentialId, newTitle);
-            return true;
+            paneId = potentialId;
+            newName = payload.args.slice(1).join(' ');
+        } else {
+             const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
+             if (sourceId && payload.args.length > 0) {
+                 paneId = sourceId;
+                 newName = payload.args.join(' ');
+             }
         }
-        const sourceId = payload.context.sourceId || payload.context.focusedPaneId;
-        if (sourceId && payload.args.length > 0) {
-            const newTitle = payload.args.join(' ');
-            workspaceActions.renamePane(sourceId, newTitle);
-            return true;
+
+        if (paneId && newName) {
+            const artifactId = panes[paneId].artifactId;
+            try {
+                const { apiClient } = await import('../lib/apiClient');
+                await apiClient.updateArtifact(artifactId, { name: newName });
+                workspaceActions.renameArtifact(artifactId, newName);
+                return true;
+            } catch (e) {
+                workspaceActions.addNotification(`Rename failed: ${e}`, 'error');
+                return false;
+            }
         }
         return false;
     });
@@ -225,32 +241,32 @@ export const useRegisterCommands = (onReady?: () => void) => {
         return false;
     });
 
-    useCommandHandler(COMMAND_NAMES.INIT, () => {
+    useCommandHandler(COMMAND_NAMES.INIT, async () => {
         if (activeLayout.length === 0) {
-            const artifactId = `A_INIT_${Date.now()}`;
-            const initArtifact = {
-                id: artifactId,
+            const initArtifactPayload = {
                 type: 'chat' as const,
+                name: 'System Initialized',
                 payload: { messages: [{ role: 'system', content: 'Welcome to eos. System ready.' }] },
-                session_id: 'SESSION_INIT',
-                mutations: []
+                session_id: 'SESSION_INIT'
             };
 
-            // Persist
-            import('../lib/apiClient').then(({ apiClient }) => {
-                apiClient.createArtifact(initArtifact).catch(e => console.error('Failed to persist INIT artifact:', e));
-            });
+            try {
+                const { apiClient } = await import('../lib/apiClient');
+                const created = await apiClient.createArtifact(initArtifactPayload);
 
-            workspaceActions.addArtifact(initArtifact);
-            workspaceActions.addPane({
-                id: 'P1',
-                artifactId: artifactId,
-                type: 'chat',
-                title: 'System Initialized',
-                isSticky: true,
-                lineage: { parentIds: [], command: 'init', timestamp: new Date().toISOString() }
-            });
-            return true;
+                workspaceActions.addArtifact(created);
+                workspaceActions.addPane({
+                    id: 'P1',
+                    artifactId: created.id,
+                    type: 'chat',
+                    isSticky: true,
+                    lineage: { parentIds: [], command: 'init', timestamp: new Date().toISOString() }
+                });
+                return true;
+            } catch (e) {
+                console.error('Failed to init:', e);
+                return false;
+            }
         }
         return false;
     });
@@ -261,28 +277,31 @@ export const useRegisterCommands = (onReady?: () => void) => {
         const state = useWorkspaceStore.getState();
         const paneId = targetId || workspaceActions.allocateNextPaneId();
         const sessionId = `SESSION_${paneId}`;
-        const artifactId = `A_CHAT_${Date.now()}`;
 
-        const newArtifact = {
-            id: artifactId,
+        const newArtifactPayload = {
             type: 'chat' as const,
+            name: `Chat: ${initialMessage.substring(0, 20)}`,
             payload: { messages: [{ role: 'user', content: initialMessage }] },
-            session_id: sessionId,
-            mutations: []
+            session_id: sessionId
         };
 
+        let createdArtifact;
         try {
             const { apiClient } = await import('../lib/apiClient');
-            await apiClient.createArtifact(newArtifact);
-        } catch (e) { console.error('Failed to persist CHAT artifact:', e); }
+            createdArtifact = await apiClient.createArtifact(newArtifactPayload);
+        } catch (e) {
+            console.error('Failed to persist CHAT artifact:', e);
+            workspaceActions.addNotification('Failed to create chat artifact', 'error');
+            return false;
+        }
 
-        workspaceActions.addArtifact(newArtifact);
+        const artifactId = createdArtifact.id;
+        workspaceActions.addArtifact(createdArtifact);
 
         workspaceActions.addPane({
             id: paneId,
             artifactId: artifactId,
             type: 'chat',
-            title: `Chat: ${initialMessage.substring(0, 20)}...`,
             isSticky: false,
             lineage: {
                 parentIds: payload.context.sourceId ? [payload.context.sourceId] : [],
@@ -346,8 +365,10 @@ export const useRegisterCommands = (onReady?: () => void) => {
         try {
             switch (artifact.type) {
                 case 'chat':
+                    // Need name from artifact metadata
+                    const name = artifact.metadata?.name || 'Chat';
                     clipboardContent = JSON.stringify({
-                        chat_name: pane.title,
+                        chat_name: name,
                         history: artifact.payload.messages
                     }, null, 2);
                     formatLabel = 'JSON';
@@ -442,7 +463,6 @@ export const useRegisterCommands = (onReady?: () => void) => {
                             id: newPaneId,
                             artifactId: art.id,
                             type: art.type,
-                            title: `${commandName.charAt(0).toUpperCase() + commandName.slice(1)}: ${sourceId}`,
                             isSticky: false,
                             lineage: {
                                 parentIds: [sourceId],
@@ -564,7 +584,6 @@ export const useRegisterCommands = (onReady?: () => void) => {
                 id: paneId,
                 artifactId: artifact.id,
                 type: artifact.type,
-                title: artifact.metadata?.filename || artifact.id,
                 isSticky: true,
                 lineage: {
                     parentIds: payload.context.sourceId ? [payload.context.sourceId] : [],

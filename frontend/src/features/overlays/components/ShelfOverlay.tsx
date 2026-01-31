@@ -26,7 +26,7 @@ import { Pane } from '@/store/workspaceStore';
 import { PaneType, OverlayType } from '@/types/constants';
 
 const ShelfOverlay: React.FC = () => {
-    const { archive, panes, activeOverlay, focusedPaneId } = useWorkspaceStore();
+    const { archive, panes, artifacts, activeOverlay, focusedPaneId } = useWorkspaceStore();
     const isOpen = activeOverlay === OverlayType.SHELF;
 
     const handleSelect = (pane: Pane) => {
@@ -40,13 +40,18 @@ const ShelfOverlay: React.FC = () => {
     const filterItem = (id: string, query: string) => {
         const pane = panes[id];
         if (!pane) return false;
+        const artifact = artifacts[pane.artifactId];
+        const title = artifact?.metadata?.name || 'Untitled';
         const q = query.toLowerCase();
-        return pane.title.toLowerCase().includes(q) || pane.id.toLowerCase().includes(q);
+        return title.toLowerCase().includes(q) || pane.id.toLowerCase().includes(q);
     };
 
     const renderItem = (id: string, isSelected: boolean) => {
         const pane = panes[id];
         if (!pane) return null;
+        const artifact = artifacts[pane.artifactId];
+        const title = artifact?.metadata?.name || 'Untitled';
+
         return (
             <div
                 className={clsx(
@@ -69,7 +74,7 @@ const ShelfOverlay: React.FC = () => {
                     <span className={clsx(
                         "text-xs truncate max-w-[150px]",
                         isSelected ? "text-white" : "text-neutral-500"
-                    )}>{pane.title}</span>
+                    )}>{title}</span>
                 </div>
                 <div className={clsx(
                     "flex-1 overflow-hidden relative transition-opacity bg-neutral-950/50",

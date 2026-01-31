@@ -42,6 +42,10 @@ class Artifact(Base):
         lazy="selectin",
     )
 
+    @property
+    def name(self):
+        return (self.artifact_metadata or {}).get("name", "Untitled")
+
 
 class MutationRecord(Base):
     __tablename__ = "mutation_records"

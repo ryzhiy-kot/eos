@@ -38,7 +38,7 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
         return (
             <div className="p-4 flex flex-col items-center justify-center h-full text-neutral-600 font-mono text-xs gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                LOADING: {pane.title}
+                LOADING: {pane.id}
             </div>
         );
     }
@@ -47,6 +47,7 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
     const currentMutation = artifact.mutations?.find(m => m.version_id === activeVersionId);
     const displayPayload = currentMutation ? currentMutation.payload : artifact.payload;
     const isGhost = currentMutation?.status === MutationStatus.GHOST;
+    const title = artifact.metadata?.name || 'Untitled';
 
     const renderVersionToolbar = () => {
         if (!isGhost) return null;
@@ -92,7 +93,7 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
                 }
                 return <MarkdownRenderer content={String(displayPayload.value)} />;
             case PaneType.VISUAL:
-                return <VisualRenderer src={displayPayload.url} title={pane.title} />;
+                return <VisualRenderer src={displayPayload.url} title={title} />;
             default:
                 return (
                     <div className="p-4 flex items-center justify-center h-full text-neutral-600 font-mono text-xs">

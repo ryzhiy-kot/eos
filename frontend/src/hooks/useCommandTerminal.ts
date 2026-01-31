@@ -82,7 +82,7 @@ export const useCommandTerminal = () => {
 
             // Resolve all @ references in the rawInput
             // Matches @P1, @A_XYZ
-            const resourceRefs = rawInput.match(/@(P\d+|A_\w+)/gi) || [];
+            const resourceRefs = rawInput.match(/@(P\d+|[A-Z0-9a-z_\-]+)/gi) || [];
             const contextArtifacts: Record<string, any> = {};
             const referencedArtifactIds: string[] = [];
             const optimisticArtifacts: any[] = [];
@@ -94,8 +94,12 @@ export const useCommandTerminal = () => {
                 if (id.startsWith('P')) {
                     const p = state.panes[id];
                     if (p) artifactId = p.artifactId;
-                } else if (id.startsWith('A_')) {
-                    artifactId = id;
+                } else {
+                    // Try to match artifact ID directly (UUID or A_...)
+                    // Case sensitive match from store keys
+                    if (state.artifacts[ref.substring(1)]) {
+                        artifactId = ref.substring(1);
+                    }
                 }
 
                 if (artifactId) {
@@ -133,26 +137,27 @@ export const useCommandTerminal = () => {
                 }
 
                 if (!chatPane) {
-                    const artifactId = `A_CHAT_${Date.now()}`;
                     const paneId = workspaceActions.allocateNextPaneId();
-
-                    const newArtifact = {
-                        id: artifactId,
+                    const artifactPayload = {
                         type: PaneType.CHAT,
+                        name: `Chat ${paneId}`,
                         payload: { messages: [] },
                         session_id: `SESSION_${paneId}`,
-                        mutations: []
                     };
 
-                    try { await apiClient.createArtifact(newArtifact); }
-                    catch (e) { console.error('Failed to persist auto-chat artifact:', e); }
+                    let created;
+                    try { created = await apiClient.createArtifact(artifactPayload); }
+                    catch (e) {
+                        console.error('Failed to persist auto-chat artifact:', e);
+                        workspaceActions.addNotification('Failed to create chat artifact', 'error');
+                        return;
+                    }
 
-                    workspaceActions.addArtifact(newArtifact);
+                    workspaceActions.addArtifact(created);
                     const newPane = {
                         id: paneId,
-                        artifactId: artifactId,
+                        artifactId: created.id,
                         type: PaneType.CHAT,
-                        title: `Chat ${paneId}`,
                         isSticky: false,
                         lineage: {
                             parentIds: [],
@@ -326,56 +331,57 @@ export const useCommandTerminal = () => {
             }
 
             if (targetId === 'ATTACH') {
-                const artifactId = `A_FILE_${Date.now()}`;
-                const newArtifact = {
-                    id: artifactId,
+                const newArtifactPayload = {
                     type,
+                    name: file.name,
                     payload,
                     session_id: 'default_session',
-                    mutations: [],
                     metadata: { filename: file.name }
                 };
 
                 // Persist new artifact first
-                try { await apiClient.createArtifact(newArtifact); }
-                catch (e) { console.error('Failed to persist attached artifact:', e); }
+                let created;
+                try { created = await apiClient.createArtifact(newArtifactPayload); }
+                catch (e) { console.error('Failed to persist attached artifact:', e); return; }
 
-                workspaceActions.addArtifact(newArtifact);
+                workspaceActions.addArtifact(created);
 
                 // Replace @file in the input with @A_ID
-                setInput(prev => prev.replace(/@file\s?/, `@${artifactId} `));
+                setInput(prev => prev.replace(/@file\s?/, `@${created.id} `));
             } else if (targetId && state.panes[targetId]) {
                 const artifactId = state.panes[targetId].artifactId;
-                const updatedArtifact = { ...state.artifacts[artifactId], payload };
+                const updatedArtifact = {
+                    ...state.artifacts[artifactId],
+                    payload,
+                    metadata: { ...state.artifacts[artifactId].metadata, name: file.name }
+                };
                 workspaceActions.updateArtifactPayload(artifactId, payload, true);
-                workspaceActions.renamePane(targetId, file.name);
+                workspaceActions.renameArtifact(artifactId, file.name);
                 workspaceActions.focusPane(targetId);
 
                 // Persist update
-                try { await apiClient.createArtifact(updatedArtifact); }
+                try { await apiClient.createArtifact(updatedArtifact); } // createArtifact updates if exists
                 catch (e) { console.error('Failed to persist artifact update:', e); }
             } else {
-                const artifactId = `A_FILE_${Date.now()}`;
                 const paneId = workspaceActions.allocateNextPaneId();
-                const newArtifact = {
-                    id: artifactId,
+                const newArtifactPayload = {
                     type,
+                    name: file.name,
                     payload,
                     session_id: 'default_session',
-                    mutations: [],
                     metadata: { filename: file.name }
                 };
 
                 // Persist new artifact first
-                try { await apiClient.createArtifact(newArtifact); }
-                catch (e) { console.error('Failed to persist new artifact:', e); }
+                let created;
+                try { created = await apiClient.createArtifact(newArtifactPayload); }
+                catch (e) { console.error('Failed to persist new artifact:', e); return; }
 
-                workspaceActions.addArtifact(newArtifact);
+                workspaceActions.addArtifact(created);
                 workspaceActions.addPane({
                     id: paneId,
-                    artifactId: artifactId,
+                    artifactId: created.id,
                     type,
-                    title: file.name,
                     isSticky: true,
                     lineage: { parentIds: [], command: `/load ${file.name}`, timestamp: new Date().toISOString() }
                 });

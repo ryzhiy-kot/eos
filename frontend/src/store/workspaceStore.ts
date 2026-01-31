@@ -80,7 +80,6 @@ export interface Pane {
     id: string;
     artifactId: string;
     type: PaneType;
-    title: string;
     isSticky: boolean;
     lineage?: PaneLineage;
 }
@@ -317,12 +316,19 @@ export const workspaceActions = {
         };
     }),
 
-    renamePane: (id: string, title: string) => useWorkspaceStore.setState((state) => ({
-        panes: {
-            ...state.panes,
-            [id]: { ...state.panes[id], title }
-        }
-    })),
+    renameArtifact: (artifactId: string, name: string) => useWorkspaceStore.setState((state) => {
+        const artifact = state.artifacts[artifactId];
+        if (!artifact) return {};
+        return {
+            artifacts: {
+                ...state.artifacts,
+                [artifactId]: {
+                    ...artifact,
+                    metadata: { ...(artifact.metadata || {}), name }
+                }
+            }
+        };
+    }),
 
     closePane: (id: string) => useWorkspaceStore.setState((state) => {
         const newLayout = state.activeLayout.filter(pid => pid !== id);

@@ -2,6 +2,7 @@ import os
 import random
 import json
 import httpx
+import uuid
 from typing import AsyncGenerator
 from app.core.llm_protocol import (
     LLMProvider,
@@ -38,11 +39,11 @@ class MockLLMProvider(LLMProvider):
         # Mock artifact generation
         # Let's say we generate a plot sometimes
         if random.random() > 0.7:
-             art_id = f"A_PLOT_{random.randint(1000, 9999)}"
+             art_id = str(uuid.uuid4())
              yield ArtifactStartEvent(
                  artifact_id=art_id,
                  artifact_type="visual",
-                 artifact_metadata={"alt": "Plot"}
+                 artifact_metadata={"alt": "Plot", "name": "Generated Plot"}
              )
 
              payload = {
