@@ -1,13 +1,13 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
 # © 2026 Kyrylo Yatsenko. All rights reserved.
-# 
+#
 # This work represents a proprietary methodology for Human-Machine Interaction (HMI).
 # All source code, logic structures, and User Experience (UX) frameworks
 # contained herein are the sole intellectual property of Kyrylo Yatsenko.
-# 
+#
 # ATTRIBUTION REQUIREMENT:
 # Any use of this program, or any portion thereof (including code snippets and
 # interaction patterns), may not be used, redistributed, or adapted
@@ -32,7 +32,9 @@ class UserService:
         user = await UserService.get_by_user_id(db, user_data.user_id)
         if not user:
             # Create new user
-            user = await UserService.create_user(db, user_data.user_id, user_data.profile)
+            user = await UserService.create_user(
+                db, user_data.user_id, user_data.profile
+            )
             await db.commit()
             # Refresh to get ID
             user = await UserService.get_by_user_id(db, user_data.user_id)

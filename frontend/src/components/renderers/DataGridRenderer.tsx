@@ -1,5 +1,22 @@
+/**
+ * PROJECT: EoS
+ * AUTHOR: Kyrylo Yatsenko
+ * YEAR: 2026
+ * * COPYRIGHT NOTICE:
+ * © 2026 Kyrylo Yatsenko. All rights reserved.
+ * 
+ * This work represents a proprietary methodology for Human-Machine Interaction (HMI).
+ * All source code, logic structures, and User Experience (UX) frameworks
+ * contained herein are the sole intellectual property of Kyrylo Yatsenko.
+ * 
+ * ATTRIBUTION REQUIREMENT:
+ * Any use of this program, or any portion thereof (including code snippets and
+ * interaction patterns), may not be used, redistributed, or adapted
+ * without explicit, visible credit to Kyrylo Yatsenko as the original author.
+ */
+
 import React from 'react';
-import { List, ListChildComponentProps } from 'react-window';
+import { List, RowComponentProps } from 'react-window';
 import { AutoSizer } from 'react-virtualized-auto-sizer';
 
 interface DataGridRendererProps {
@@ -7,23 +24,14 @@ interface DataGridRendererProps {
 }
 
 // Row component defined outside to avoid re-creation
-// It receives data and headers via rowProps passed from List
-const Row = ({ index, style, data, headers }: any) => {
+const Row = ({ index, style, ariaAttributes, data, headers }: RowComponentProps<{ data: any[], headers: string[] }>) => {
     const row = data[index];
-    // Ensure styles are applied correctly, react-window passes height/width/top/left
-    // We add min-width to ensure the row is at least as wide as the content (for horizontal scrolling)
-    // The parent container (List) has overflow-x-auto, but the row divs need to be wide enough.
-    // Actually, react-window FixedSizeList usually sets width: 100%.
-    // To enable horizontal scroll, the inner container of List usually needs to grow.
-    // But since we want to scroll the List container, the row items just need to be wide enough.
-    // If we use FixedSizeList, width is passed in style.
-
-    // Calculate total width based on columns
     const minWidth = headers.length * 150;
 
     return (
         <div
-            style={{ ...style, width: Math.max(style.width, minWidth) }}
+            {...ariaAttributes}
+            style={{ ...style, width: typeof style.width === 'number' ? Math.max(style.width, minWidth) : minWidth }}
             className="flex items-center hover:bg-white/5 transition-colors border-b border-neutral-800 text-neutral-400"
         >
             {headers.map((header: string) => (
@@ -68,7 +76,7 @@ const DataGridRenderer: React.FC<DataGridRendererProps> = ({ data }) => {
         if (node) {
             // Use addEventListener instead of onscroll property to avoid overwriting existing listeners if any
             const handleScroll = (e: Event) => {
-                 if (headerRef.current) {
+                if (headerRef.current) {
                     headerRef.current.scrollLeft = (e.target as HTMLElement).scrollLeft;
                 }
             };
@@ -79,7 +87,7 @@ const DataGridRenderer: React.FC<DataGridRendererProps> = ({ data }) => {
             // But to be safe, setting onscroll directly is actually cleaner for this use case if we own the scroll behavior.
 
             node.onscroll = (e: any) => {
-                 if (headerRef.current) {
+                if (headerRef.current) {
                     headerRef.current.scrollLeft = e.target.scrollLeft;
                 }
             };
@@ -105,30 +113,22 @@ const DataGridRenderer: React.FC<DataGridRendererProps> = ({ data }) => {
 
             {/* Body */}
             <div className="flex-1">
-                 <AutoSizer>
-                    {({ height, width }: any) => {
+                <AutoSizer
+                    renderProp={({ height, width }: any) => {
                         if (!height || !width) return null;
                         return (
-                        <List
-                            height={height}
-                            width={width}
-                            itemCount={data.length}
-                            itemSize={40}
-                            outerRef={outerRefCallback}
-                            className="overflow-y-auto overflow-x-auto"
-                        >
-                             {({ index, style }: any) => (
-                                <Row
-                                    index={index}
-                                    style={style}
-                                    data={data}
-                                    headers={headers}
-                                />
-                            )}
-                        </List>
+                            <List
+                                style={{ height, width }}
+                                rowCount={data.length}
+                                rowHeight={40}
+                                listRef={outerRefCallback as any}
+                                className="overflow-y-auto overflow-x-auto"
+                                rowComponent={Row}
+                                rowProps={{ data, headers }}
+                            />
                         );
                     }}
-                </AutoSizer>
+                />
             </div>
         </div>
     );

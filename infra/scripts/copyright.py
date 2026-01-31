@@ -1,4 +1,4 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
@@ -17,7 +17,7 @@ import os
 
 # --- CONFIGURATION ---
 AUTHOR = "Kyrylo Yatsenko"
-PROJECT_NAME = "MONAD"
+PROJECT_NAME = "EoS"
 YEAR = "2026"
 
 # Folders and files to strictly ignore

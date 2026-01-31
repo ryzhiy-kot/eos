@@ -1,5 +1,5 @@
 /**
- * PROJECT: MONAD
+ * PROJECT: EoS
  * AUTHOR: Kyrylo Yatsenko
  * YEAR: 2026
  * * COPYRIGHT NOTICE:
@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthState>()(
             setHasHydrated: () => set({ isHydrated: true })
         }),
         {
-            name: 'monad-auth-storage',
+            name: 'eos-auth-storage',
             partialize: (state) => ({
                 isAuthenticated: state.isAuthenticated,
                 user: state.user,

@@ -1,4 +1,4 @@
-[[monad]]
+[[eos]]
 <!DOCTYPE html>
 
 <html class="dark" lang="en"><head>

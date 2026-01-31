@@ -1,13 +1,13 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
 # © 2026 Kyrylo Yatsenko. All rights reserved.
-# 
+#
 # This work represents a proprietary methodology for Human-Machine Interaction (HMI).
 # All source code, logic structures, and User Experience (UX) frameworks
 # contained herein are the sole intellectual property of Kyrylo Yatsenko.
-# 
+#
 # ATTRIBUTION REQUIREMENT:
 # Any use of this program, or any portion thereof (including code snippets and
 # interaction patterns), may not be used, redistributed, or adapted
@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 router = APIRouter()
+
 
 class LogoutRequest(BaseModel):
     session_token: str
@@ -47,6 +48,7 @@ async def sync_auth(req: AuthSyncRequest, db: AsyncSession = Depends(get_db)):
 from app.services.auth.protocol import AuthServiceProtocol
 from app.services.auth.dependency import get_auth_service
 
+
 @router.post("/login", response_model=LoggedInUser, tags=["auth"])
 async def login(
     req: LoginRequest,
@@ -59,7 +61,9 @@ async def login(
     result = await auth_service.authenticate(db, req.username, req.password)
 
     if result.error or not result.user:
-        raise HTTPException(status_code=401, detail=result.error or "Authentication failed")
+        raise HTTPException(
+            status_code=401, detail=result.error or "Authentication failed"
+        )
 
     if not result.user.enabled:
         raise HTTPException(status_code=403, detail="User account disabled")
@@ -75,7 +79,7 @@ async def login(
     return LoggedInUser(
         **user_schema.model_dump(),
         session_token=result.session_token or "",
-        session_expires_at=result.session_expires_at or datetime.utcnow()
+        session_expires_at=result.session_expires_at or datetime.utcnow(),
     )
 
 

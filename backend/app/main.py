@@ -1,4 +1,4 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
@@ -72,4 +72,4 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    return {"message": "Monad Backend API is running."}
+    return {"message": "EoS Backend API is running."}

@@ -1,5 +1,5 @@
 /**
- * PROJECT: MONAD
+ * PROJECT: EoS
  * AUTHOR: Kyrylo Yatsenko
  * YEAR: 2026
  * * COPYRIGHT NOTICE:
@@ -38,7 +38,7 @@ const LoginForm: React.FC = () => {
             <div className="w-full max-w-md bg-terminal-900 border border-terminal-700 shadow-glow relative z-10 p-8 flex flex-col gap-6 animate-scale-in">
                 {/* Header */}
                 <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-mono font-bold text-white tracking-wildest uppercase">monad<span className="text-accent-main">_OS</span></h1>
+                    <h1 className="text-3xl font-mono font-bold text-white tracking-wildest uppercase">eos<span className="text-accent-main">_OS</span></h1>
                     <div className="text-xs font-mono text-terminal-700 uppercase tracking-widest">Secure Access Terminal</div>
                 </div>
 
