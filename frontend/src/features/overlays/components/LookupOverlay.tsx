@@ -54,6 +54,7 @@ export default function LookupOverlay<T>({
     const [search, setSearch] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
+    const selectedItemRef = useRef<HTMLDivElement>(null);
 
     const filteredItems = items.filter(item => filterItem(item, search));
 
@@ -75,16 +76,41 @@ export default function LookupOverlay<T>({
         }
     }, [isOpen]);
 
+    // Scroll selected item into view
+    useEffect(() => {
+        if (selectedItemRef.current) {
+            selectedItemRef.current.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+            });
+        }
+    }, [selectedIndex, filteredItems]);
+
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         const len = filteredItems.length;
         if (len === 0) return;
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setSelectedIndex(prev => (prev + gridCols < len ? prev + gridCols : prev % gridCols));
+            // In grid mode, ArrowDown adds gridCols, wrapping if needed but typically moving down.
+            // If it's a grid, we want proper 2D navigation or simple linear wrapping.
+            // The previous logic was: prev + gridCols < len ? prev + gridCols : prev % gridCols
+            // This jumps from last row back to first row in the same column.
+
+            // Linear list fallback if gridCols=1
+            if (gridCols === 1) {
+                setSelectedIndex(prev => (prev + 1) % len);
+            } else {
+                 setSelectedIndex(prev => (prev + gridCols < len ? prev + gridCols : prev % gridCols));
+            }
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setSelectedIndex(prev => (prev - gridCols >= 0 ? prev - gridCols : (Math.floor((len - 1) / gridCols) * gridCols) + (prev % gridCols)));
+            if (gridCols === 1) {
+                 setSelectedIndex(prev => (prev - 1 + len) % len);
+            } else {
+                setSelectedIndex(prev => (prev - gridCols >= 0 ? prev - gridCols : (Math.floor((len - 1) / gridCols) * gridCols) + (prev % gridCols)));
+            }
         } else if (e.key === 'ArrowRight' && gridCols > 1) {
             e.preventDefault();
             setSelectedIndex(prev => (prev + 1) % len);
@@ -132,6 +158,7 @@ export default function LookupOverlay<T>({
                         {filteredItems.map((item, index) => (
                             <div
                                 key={index}
+                                ref={index === selectedIndex ? selectedItemRef : null}
                                 onClick={() => onSelect(item)}
                                 className="cursor-pointer"
                             >
