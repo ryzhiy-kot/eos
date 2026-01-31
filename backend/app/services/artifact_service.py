@@ -23,6 +23,10 @@ from app.models.artifact import Artifact, MutationRecord
 from app.schemas.artifact import Artifact as ArtifactSchema
 
 
+from app.core.config import get_settings
+from app.core.artifact.factory import get_artifact_store
+
+
 class ArtifactService:
     @staticmethod
     async def get_artifact(db: AsyncSession, artifact_id: str) -> Optional[Artifact]:
@@ -32,7 +36,20 @@ class ArtifactService:
             .options(selectinload(Artifact.mutations))
         )
         result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        artifact = result.scalar_one_or_none()
+
+        if artifact and artifact.storage_backend != "db" and artifact.storage_key:
+            store = get_artifact_store()
+            try:
+                content = await store.load(artifact.id, artifact.storage_key)
+                # Rehydrate payload for the consumer
+                artifact.payload = content
+            except Exception as e:
+                # Log error but return artifact with missing payload or handle gracefully
+                # For now we assume consistency
+                pass
+
+        return artifact
 
     @staticmethod
     async def _update_artifact_logic(
@@ -58,10 +75,22 @@ class ArtifactService:
             except (ValueError, AttributeError):
                 new_version_id = f"v{random.randint(2, 999)}"
 
+        # Handle external storage
+        store = get_artifact_store()
+        storage_key = await store.save(artifact_in.id, artifact_in.payload)
+        settings = get_settings()
+
         # Update handle
         existing.type = artifact_in.type
-        existing.payload = artifact_in.payload
         existing.artifact_metadata = artifact_in.metadata or {}
+        existing.storage_backend = settings.ARTIFACT_STORAGE_BACKEND
+        existing.storage_key = storage_key
+
+        if settings.ARTIFACT_STORAGE_BACKEND == "db":
+            existing.payload = artifact_in.payload
+        else:
+            existing.payload = None  # Offloaded
+
         if artifact_in.session_id:
             existing.session_id = artifact_in.session_id
 
@@ -78,6 +107,11 @@ class ArtifactService:
         db.add(mutation)
         await db.commit()
         await db.refresh(existing, ["mutations"])
+
+        # Ensure payload is visible on return
+        if existing.payload is None and artifact_in.payload is not None:
+            existing.payload = artifact_in.payload
+
         return existing
 
     @staticmethod
@@ -91,13 +125,22 @@ class ArtifactService:
                 db, existing, artifact_in
             )
 
+        # Handle external storage
+        store = get_artifact_store()
+        storage_key = await store.save(artifact_in.id, artifact_in.payload)
+        settings = get_settings()
+
         try:
             artifact_obj = Artifact(
                 id=artifact_in.id,
                 type=artifact_in.type,
-                payload=artifact_in.payload,
                 artifact_metadata=artifact_in.metadata or {},
                 session_id=artifact_in.session_id or "default_session",
+                storage_backend=settings.ARTIFACT_STORAGE_BACKEND,
+                storage_key=storage_key,
+                payload=artifact_in.payload
+                if settings.ARTIFACT_STORAGE_BACKEND == "db"
+                else None,
             )
             db.add(artifact_obj)
 
@@ -115,6 +158,11 @@ class ArtifactService:
 
             await db.commit()
             await db.refresh(artifact_obj, ["mutations"])
+
+            # Ensure payload is visible on return
+            if artifact_obj.payload is None and artifact_in.payload is not None:
+                artifact_obj.payload = artifact_in.payload
+
             return artifact_obj
         except IntegrityError:
             await db.rollback()

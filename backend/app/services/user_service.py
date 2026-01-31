@@ -166,10 +166,45 @@ class UserService:
         default_ws = result.scalar_one_or_none()
 
         if not default_ws:
+            # Create default chat session ID and Artifact ID
+            default_session_id = "default_session"
+            default_artifact_id = f"A_{default_session_id}"
+            import time
+
             default_ws = Workspace(
                 id="default_workspace",
                 name="Default Workspace",
-                state={"panes": {}, "artifacts": {}, "activeLayout": [], "archive": []},
+                state={
+                    "panes": {
+                        default_session_id: {
+                            "id": default_session_id,
+                            "type": "chat",
+                            "artifactId": default_artifact_id,
+                            "title": "General",
+                            "isSticky": True,
+                            "lineage": {
+                                "parentIds": [],
+                                "command": "init",
+                                "timestamp": f"{time.time()}",
+                            },
+                        }
+                    },
+                    "artifacts": {
+                        default_artifact_id: {
+                            "id": default_artifact_id,
+                            "type": "chat",
+                            "payload": {
+                                "messages": [
+                                    {"role": "system", "content": "Welcome to EoS."}
+                                ]
+                            },
+                            "session_id": default_session_id,
+                            "mutations": [],
+                        }
+                    },
+                    "activeLayout": [default_session_id],
+                    "archive": [],
+                },
                 is_archived=False,
             )
             db.add(default_ws)
@@ -189,5 +224,16 @@ class UserService:
                 )
                 db.add(member)
                 logger.info("✓ Linked admin to default workspace")
+
+            # Create the actual Session record
+            from app.services.session_service import SessionService
+
+            await SessionService.create_session(
+                db,
+                session_id=default_session_id,
+                name="General",
+                workspace_id=default_ws.id,
+            )
+            logger.info("✓ Created default chat session")
 
         await db.commit()

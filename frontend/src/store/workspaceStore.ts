@@ -538,8 +538,8 @@ export const workspaceActions = {
                     artifacts: ws.state.artifacts || {},
                     activeLayout: ws.state.activeLayout || [],
                     archive: ws.state.archive || [],
-                    isInitializing: false,
-                    nextPaneId: maxId + 1
+                    focusedPaneId: (ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null,
+                    isInitializing: false
                 });
             } else {
                 useWorkspaceStore.setState({ isInitializing: false, nextPaneId: 1 });

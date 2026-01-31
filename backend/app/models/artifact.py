@@ -24,7 +24,9 @@ class Artifact(Base):
 
     id = Column(String, primary_key=True)
     type = Column(String, nullable=False)  # chat, visual, code, doc, data
-    payload = Column(JSON, nullable=False)
+    storage_backend = Column(String, default="db", nullable=False)
+    storage_key = Column(String, nullable=True)
+    payload = Column(JSON, nullable=True)  # Nullable if stored externally
     artifact_metadata = Column(JSON, default=dict)
     session_id = Column(String, ForeignKey("chat_sessions.id"), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
