@@ -19,7 +19,7 @@ import React from 'react';
 import Header from './Header';
 import WorkspaceGrid from '../grid/WorkspaceGrid';
 import CommandTerminal from '../terminal/CommandTerminal';
-import { ShelfOverlay, HelpOverlay } from '@/features/overlays';
+import { ShelfOverlay, HelpOverlay, ArtifactPickerOverlay } from '@/features/overlays';
 import { useRegisterCommands } from '@/hooks/useRegisterCommands';
 import { useSSE } from '@/hooks/useSSE';
 import { useWorkspaceSync } from '@/hooks/useWorkspaceSync';
@@ -53,6 +53,7 @@ const AppShell: React.FC = () => {
         <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden font-mono relative">
             {activeOverlay === OverlayType.SHELF && <ShelfOverlay />}
             {activeOverlay === OverlayType.HELP && <HelpOverlay />}
+            {activeOverlay === OverlayType.ARTIFACT_PICKER && <ArtifactPickerOverlay />}
 
             <Header connectionStatus={connectionStatus} />
 

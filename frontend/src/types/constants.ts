@@ -55,7 +55,8 @@ export type ConnectionStatus = typeof ConnectionStatus[keyof typeof ConnectionSt
 export const OverlayType = {
     SHELF: 'shelf',
     HELP: 'help',
-    LOOKUP: 'lookup'
+    LOOKUP: 'lookup',
+    ARTIFACT_PICKER: 'artifact_picker'
 } as const;
 export type OverlayType = typeof OverlayType[keyof typeof OverlayType] | null;
 

@@ -535,6 +535,50 @@ export const useRegisterCommands = (onReady?: () => void) => {
         }
     });
 
+    useCommandHandler(COMMAND_NAMES.OPEN, (payload) => {
+        const artifactId = payload.args[0];
+
+        // If "close" is passed, close the overlay
+        if (artifactId === 'close') {
+             workspaceActions.toggleArtifactPicker(false);
+             return true;
+        }
+
+        // If no artifact ID (or "all"), toggle the picker
+        if (!artifactId || artifactId === 'all') {
+            const mode = artifactId === 'all' ? 'all' : 'session';
+            workspaceActions.toggleArtifactPicker(true, mode);
+            return true;
+        }
+
+        // Otherwise, open the specific artifact
+        const state = useWorkspaceStore.getState();
+        const artifact = state.artifacts[artifactId];
+
+        if (artifact) {
+             // Close overlay first if it was open
+             workspaceActions.toggleArtifactPicker(false);
+
+             const paneId = workspaceActions.allocateNextPaneId();
+             workspaceActions.addPane({
+                id: paneId,
+                artifactId: artifact.id,
+                type: artifact.type,
+                title: artifact.metadata?.filename || artifact.id,
+                isSticky: true,
+                lineage: {
+                    parentIds: payload.context.sourceId ? [payload.context.sourceId] : [],
+                    command: `/open ${artifactId}`,
+                    timestamp: new Date().toISOString()
+                }
+             });
+             return true;
+        } else {
+            workspaceActions.addNotification(`Artifact ${artifactId} not found`, 'error');
+            return false;
+        }
+    });
+
     // --- Command Metadata Registration ---
 
     useEffect(() => {
@@ -674,6 +718,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
             { name: COMMAND_NAMES.DIFF, description: 'Compare two panes or a pane and a file.', example: '/diff @P1,@P2 or /diff @P1,@file', category: 'data', shortcut: 'alt+d' },
             { name: COMMAND_NAMES.SUMMARIZE, description: 'Summarize pane content or an attached file.', example: '/summarize @P1 or /summarize @file', category: 'data', shortcut: 'alt+s' },
             { name: 'OPTIMIZE' as any, description: 'Preview an AI-driven optimization of a pane.', example: '/optimize @P1 "prompt"', category: 'data' as any, shortcut: 'alt+z' },
+            { name: COMMAND_NAMES.OPEN, description: 'Open an artifact in a new pane, or open the artifact picker.', example: '/open [all | ArtifactID]', category: 'utility', shortcut: 'alt+a' },
         ] as CommandEntry[]);
     }, []); // Static registry, run once
 };
