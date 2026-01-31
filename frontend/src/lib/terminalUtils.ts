@@ -15,14 +15,6 @@
  * without explicit, visible credit to Kyrylo Yatsenko as the original author.
  */
 
-export const generatePaneId = (panes: Record<string, any>) => {
-    const numbers = Object.keys(panes)
-        .map(id => parseInt(id.replace(/^P/, '')))
-        .filter(n => !isNaN(n));
-    const maxId = numbers.length > 0 ? Math.max(...numbers) : 0;
-    return `P${maxId + 1}`;
-};
-
 /**
  * Parses duration expressions like "20m", "50s", "20 minutes", etc.
  * Default unit is minutes if none provided.

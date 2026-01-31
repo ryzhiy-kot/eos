@@ -125,10 +125,12 @@ interface WorkspaceState {
     chatSessions: any[]; // Chat sessions from backend
     activeWorkspaceId: string | null;
     isInitializing: boolean;
+    nextPaneId: number;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>(() => ({
     panes: {},
+    nextPaneId: 1,
     artifacts: {},
     activeLayout: [],
     focusedPaneId: null,
@@ -169,6 +171,13 @@ export const workspaceActions = {
     triggerSubmitCommand: (command: string) =>
         useWorkspaceStore.setState({ commandSubmitRequest: { command, timestamp: Date.now() } }),
 
+    allocateNextPaneId: () => {
+        const state = useWorkspaceStore.getState();
+        const id = `P${state.nextPaneId}`;
+        useWorkspaceStore.setState({ nextPaneId: state.nextPaneId + 1 });
+        return id;
+    },
+
     addPane: (pane: Pane) => useWorkspaceStore.setState((state) => {
         // If already in active layout, just focus it and update content
         if (state.activeLayout.includes(pane.id)) {
@@ -176,6 +185,16 @@ export const workspaceActions = {
                 panes: { ...state.panes, [pane.id]: pane },
                 focusedPaneId: pane.id
             };
+        }
+
+        // Update counter if manually added pane ID is higher
+        let nextPaneId = state.nextPaneId;
+        const match = pane.id.match(/^P(\d+)$/);
+        if (match) {
+            const num = parseInt(match[1]);
+            if (num >= nextPaneId) {
+                nextPaneId = num + 1;
+            }
         }
 
         let newLayout = [...state.activeLayout];
@@ -202,6 +221,7 @@ export const workspaceActions = {
             activeLayout: newLayout,
             archive: newArchive,
             focusedPaneId: pane.id,
+            nextPaneId,
         };
     }),
 
@@ -485,15 +505,24 @@ export const workspaceActions = {
             const ws = await apiClient.getWorkspace(targetId);
             if (ws && ws.state) {
                 // Merge persisted state
+                const panes = ws.state.panes || {};
+
+                // Calculate nextPaneId from loaded panes
+                const numbers = Object.keys(panes)
+                    .map(id => parseInt(id.replace(/^P/, '')))
+                    .filter(n => !isNaN(n));
+                const maxId = numbers.length > 0 ? Math.max(...numbers) : 0;
+
                 useWorkspaceStore.setState({
-                    panes: ws.state.panes || {},
+                    panes,
                     artifacts: ws.state.artifacts || {},
                     activeLayout: ws.state.activeLayout || [],
                     archive: ws.state.archive || [],
-                    isInitializing: false
+                    isInitializing: false,
+                    nextPaneId: maxId + 1
                 });
             } else {
-                useWorkspaceStore.setState({ isInitializing: false });
+                useWorkspaceStore.setState({ isInitializing: false, nextPaneId: 1 });
             }
         } catch (e) {
             console.error('Failed to initialize workspace:', e);
