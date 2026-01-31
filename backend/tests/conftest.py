@@ -62,3 +62,9 @@ async def client(db_engine):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+
+
+@pytest.fixture
+async def db_session(db_engine):
+    async with TestingSessionLocal() as session:
+        yield session

@@ -26,13 +26,19 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173"]
 
     # Database
-    SQLALCHEMY_DATABASE_URL: str = "sqlite+aiosqlite:///./monad.db"
+    SQLALCHEMY_DATABASE_URL: str = "sqlite+aiosqlite:///./eos.db"
     SQLALCHEMY_ECHO: bool = False
 
     # Authentication
     AUTH_PROVIDER: str = "local"
     AUTH_SERVICE_URL: str = "http://localhost:8001/auth/login"
     AUTH_API_KEY: Optional[str] = None
+
+    # Artifact Storage
+    ARTIFACT_STORAGE_BACKEND: str = "db"  # db, file, gcs, http
+    ARTIFACT_STORAGE_PATH: str = "./artifacts"
+    ARTIFACT_GCS_BUCKET: Optional[str] = None
+    ARTIFACT_HTTP_URL: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"
