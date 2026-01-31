@@ -1,5 +1,5 @@
 /**
- * PROJECT: MONAD
+ * PROJECT: EoS
  * AUTHOR: Kyrylo Yatsenko
  * YEAR: 2026
  * * COPYRIGHT NOTICE:

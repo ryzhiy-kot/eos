@@ -1,4 +1,4 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
@@ -18,7 +18,7 @@ import os
 
 
 def migrate():
-    db_path = "monad.db"
+    db_path = "eos.db"
     if not os.path.exists(db_path):
         print(f"Database {db_path} not found. Skipping migration.")
         return
@@ -45,7 +45,24 @@ def migrate():
                 "! Could not find last_workspace_id to rename, and active_workspace_id doesn't exist."
             )
 
-        # 2. Create archived_panes table
+        # 2. Update artifacts table
+        print("Ensuring artifacts table has storage columns...")
+        cursor.execute("PRAGMA table_info(artifacts)")
+        artifact_cols = [col[1] for col in cursor.fetchall()]
+
+        if "storage_backend" not in artifact_cols:
+            print("Adding storage_backend column to artifacts table...")
+            cursor.execute(
+                "ALTER TABLE artifacts ADD COLUMN storage_backend TEXT DEFAULT 'db' NOT NULL"
+            )
+            print("✓ storage_backend column added.")
+
+        if "storage_key" not in artifact_cols:
+            print("Adding storage_key column to artifacts table...")
+            cursor.execute("ALTER TABLE artifacts ADD COLUMN storage_key TEXT")
+            print("✓ storage_key column added.")
+
+        # 3. Create archived_panes table
         print("Ensuring archived_panes table exists...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS archived_panes (

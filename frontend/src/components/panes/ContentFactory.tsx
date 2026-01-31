@@ -1,5 +1,5 @@
 /**
- * PROJECT: MONAD
+ * PROJECT: EoS
  * AUTHOR: Kyrylo Yatsenko
  * YEAR: 2026
  * * COPYRIGHT NOTICE:
@@ -38,7 +38,7 @@ const ContentFactory: React.FC<ContentFactoryProps> = ({ pane }) => {
         return (
             <div className="p-4 flex flex-col items-center justify-center h-full text-neutral-600 font-mono text-xs gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                LOADING ARTIFACT: {pane.artifactId}
+                LOADING: {pane.title}
             </div>
         );
     }

@@ -1,4 +1,4 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
@@ -19,7 +19,7 @@ from typing import List, Optional
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Monad API"
+    PROJECT_NAME: str = "EoS API"
     API_V1_STR: str = "/api/v1"
 
     # CORS

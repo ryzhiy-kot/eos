@@ -1,4 +1,4 @@
-# PROJECT: MONAD
+# PROJECT: EoS
 # AUTHOR: Kyrylo Yatsenko
 # YEAR: 2026
 # * COPYRIGHT NOTICE:
@@ -28,4 +28,4 @@ async def test_health_check(client: AsyncClient):
 async def test_root(client: AsyncClient):
     response = await client.get("/")
     assert response.status_code == 200
-    assert "Monad Backend API is running" in response.json()["message"]
+    assert "EoS Backend API is running" in response.json()["message"]

@@ -5,23 +5,23 @@ import DataGridRenderer from './DataGridRenderer';
 
 // Mock AutoSizer
 vi.mock('react-virtualized-auto-sizer', () => ({
-    AutoSizer: ({ children }: any) => children({ height: 600, width: 800 }),
+    AutoSizer: ({ renderProp }: any) => renderProp({ height: 600, width: 800 }),
 }));
 
 // Mock react-window List
 vi.mock('react-window', () => ({
-    List: ({ itemCount, itemSize, children, style, outerRef, ...props }: any) => {
-        // Render only a subset based on height/itemSize (simulation of virtualization)
+    List: ({ rowCount, rowHeight, rowComponent: RowComponent, rowProps, style, listRef, ...props }: any) => {
         const height = style?.height || 600;
-        const visibleCount = Math.ceil(height / itemSize);
+        const visibleCount = Math.ceil(height / rowHeight);
         const items = [];
-        // Just render the first few items
-        for (let i = 0; i < Math.min(itemCount, visibleCount); i++) {
+        for (let i = 0; i < Math.min(rowCount, visibleCount); i++) {
             items.push(
                 <React.Fragment key={i}>
-                    {children({
+                    {RowComponent({
                         index: i,
-                        style: { height: itemSize, width: '100%', top: i * itemSize },
+                        style: { height: rowHeight, width: '100%', top: i * rowHeight },
+                        ariaAttributes: { "aria-posinset": i + 1, "aria-setsize": rowCount, role: "listitem" },
+                        ...rowProps
                     })}
                 </React.Fragment>
             );

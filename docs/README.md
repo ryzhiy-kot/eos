@@ -1,6 +1,6 @@
 # Project Documentation
 
-This directory contains all documentation and artifacts related to the monad project.
+This directory contains all documentation and artifacts related to the eos project.
 
 ## Directory Structure
 

@@ -1,5 +1,5 @@
 /**
- * PROJECT: MONAD
+ * PROJECT: EoS
  * AUTHOR: Kyrylo Yatsenko
  * YEAR: 2026
  * * COPYRIGHT NOTICE:
@@ -17,7 +17,7 @@
 
 import { ExecutionType } from '@/types/constants';
 
-// API Client for monad Backend Communication
+// API Client for eos Backend Communication
 
 const API_BASE_URL = typeof window !== 'undefined'
     ? (window.location.hostname === 'localhost' ? 'http://localhost:8000' : window.location.origin)

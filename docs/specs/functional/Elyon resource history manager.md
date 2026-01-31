@@ -1,5 +1,5 @@
 ---
-project: "[[monad]]"
+project: "[[eos]]"
 type: Spec
 ---
 
