@@ -18,7 +18,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useWorkspaceStore, workspaceActions } from '@/store/workspaceStore';
 import { parseCommand } from '@/lib/parser';
-import { generatePaneId } from '@/lib/terminalUtils';
 import { COMMAND_NAMES, commandBus, CommandName } from '@/lib/commandBus';
 import { useCommandHandler } from '@/hooks/useCommandHandler';
 import { apiClient } from '@/lib/apiClient';
@@ -134,7 +133,7 @@ export const useCommandTerminal = () => {
 
                 if (!chatPane) {
                     const artifactId = `A_CHAT_${Date.now()}`;
-                    const paneId = generatePaneId(state.panes);
+                    const paneId = workspaceActions.allocateNextPaneId();
 
                     const newArtifact = {
                         id: artifactId,
@@ -356,7 +355,7 @@ export const useCommandTerminal = () => {
                 catch (e) { console.error('Failed to persist artifact update:', e); }
             } else {
                 const artifactId = `A_FILE_${Date.now()}`;
-                const paneId = generatePaneId(state.panes);
+                const paneId = workspaceActions.allocateNextPaneId();
                 const newArtifact = {
                     id: artifactId,
                     type,

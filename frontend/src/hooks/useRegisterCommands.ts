@@ -19,7 +19,7 @@ import { useEffect } from 'react';
 import { useWorkspaceStore, workspaceActions } from '@/store/workspaceStore';
 import { useAuthStore } from '@/store/authStore';
 import { CommandEntry } from '@/lib/commandRegistry';
-import { parseDurationExpression, generatePaneId } from '@/lib/terminalUtils';
+import { parseDurationExpression } from '@/lib/terminalUtils';
 import { COMMAND_NAMES } from '@/lib/commandBus';
 import { useCommandHandler } from '@/hooks/useCommandHandler';
 import { extractPaneId } from '@/lib/parser';
@@ -259,7 +259,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
         const initialMessage = payload.action || 'Hello';
         const targetId = payload.targetId && /^P\d+$/.test(payload.targetId) ? payload.targetId : undefined;
         const state = useWorkspaceStore.getState();
-        const paneId = targetId || generatePaneId(state.panes);
+        const paneId = targetId || workspaceActions.allocateNextPaneId();
         const sessionId = `SESSION_${paneId}`;
         const artifactId = `A_CHAT_${Date.now()}`;
 
@@ -437,7 +437,7 @@ export const useRegisterCommands = (onReady?: () => void) => {
                 if (response.result.new_artifacts) {
                     response.result.new_artifacts.forEach((art: any) => {
                         workspaceActions.addArtifact(art);
-                        const newPaneId = generatePaneId(useWorkspaceStore.getState().panes);
+                        const newPaneId = workspaceActions.allocateNextPaneId();
                         workspaceActions.addPane({
                             id: newPaneId,
                             artifactId: art.id,
