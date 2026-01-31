@@ -127,6 +127,7 @@ interface WorkspaceState {
     activeWorkspaceId: string | null;
     isInitializing: boolean;
     nextPaneId: number;
+    artifactPickerMode: 'session' | 'all';
 }
 
 export const useWorkspaceStore = create<WorkspaceState>(() => ({
@@ -158,6 +159,7 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
     chatSessions: [],
     activeWorkspaceId: null,
     isInitializing: false,
+    artifactPickerMode: 'session',
 }));
 
 /**
@@ -384,6 +386,14 @@ export const workspaceActions = {
         const nextOpen = isOpen !== undefined ? isOpen : state.activeOverlay !== 'help';
         return {
             activeOverlay: nextOpen ? 'help' : null
+        };
+    }),
+
+    toggleArtifactPicker: (isOpen?: boolean, mode: 'session' | 'all' = 'session') => useWorkspaceStore.setState((state) => {
+        const nextOpen = isOpen !== undefined ? isOpen : state.activeOverlay !== 'artifact_picker';
+        return {
+            activeOverlay: nextOpen ? 'artifact_picker' : null,
+            artifactPickerMode: mode
         };
     }),
 

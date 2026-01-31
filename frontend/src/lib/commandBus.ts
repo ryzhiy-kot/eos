@@ -45,6 +45,7 @@ export const COMMAND_NAMES = {
     CLIP: 'clip',
     OPTIMIZE: 'optimize',
     ARCHIVE: 'archive',
+    OPEN: 'open',
 } as const;
 
 export type CommandName = typeof COMMAND_NAMES[keyof typeof COMMAND_NAMES];

@@ -18,6 +18,9 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatRole } from '@/types/constants';
+import { commandBus, COMMAND_NAMES } from '@/lib/commandBus';
+import { ExternalLink } from 'lucide-react';
+import { useWorkspaceStore } from '@/store/workspaceStore';
 
 interface ChatRendererProps {
     messages: any[];
@@ -25,6 +28,16 @@ interface ChatRendererProps {
 }
 
 const ChatRenderer: React.FC<ChatRendererProps> = ({ messages, contextDescription }) => {
+    const { focusedPaneId } = useWorkspaceStore();
+
+    const handleArtifactClick = (artifactId: string) => {
+        commandBus.dispatch({
+            name: COMMAND_NAMES.OPEN,
+            args: [artifactId],
+            context: { focusedPaneId }
+        });
+    };
+
     return (
         <div className="flex-1 overflow-y-auto p-3 space-y-3 text-sm">
             <div className="text-[10px] text-neutral-500 border-l border-neutral-800 pl-2 italic uppercase tracking-tight">
@@ -42,11 +55,23 @@ const ChatRenderer: React.FC<ChatRendererProps> = ({ messages, contextDescriptio
                             <div className="flex-1 text-neutral-300 prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p]:mb-1 [&>pre]:my-2 [&>ul]:my-1 [&>ol]:my-1">
                                 <ReactMarkdown>{msg.content}</ReactMarkdown>
                                 {msg.artifacts && msg.artifacts.length > 0 && (
-                                    <div className="mt-1 flex flex-wrap gap-1.5">
+                                    <div className="mt-2 flex flex-wrap gap-2">
                                         {msg.artifacts.map((art: any) => (
-                                            <span key={art.id} className="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-neutral-900 text-neutral-500 border border-neutral-800 uppercase">
-                                                📎 {art.id}
-                                            </span>
+                                            <button
+                                                key={art.id}
+                                                onClick={() => handleArtifactClick(art.id)}
+                                                className="group flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-md bg-neutral-900 border border-neutral-800 hover:border-blue-500/50 hover:bg-blue-900/10 transition-all text-left max-w-full"
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold font-mono text-neutral-400 group-hover:text-blue-300 transition-colors uppercase">
+                                                        {art.type}
+                                                    </span>
+                                                    <span className="text-[9px] text-neutral-600 truncate max-w-[120px]">
+                                                        {art.metadata?.filename || art.id}
+                                                    </span>
+                                                </div>
+                                                <ExternalLink size={12} className="text-neutral-600 group-hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all -ml-1 group-hover:ml-0" />
+                                            </button>
                                         ))}
                                     </div>
                                 )}
