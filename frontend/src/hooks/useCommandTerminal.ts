@@ -22,6 +22,7 @@ import { COMMAND_NAMES, commandBus, CommandName } from '@/lib/commandBus';
 import { useCommandHandler } from '@/hooks/useCommandHandler';
 import { apiClient } from '@/lib/apiClient';
 import { ChatRole, PaneType } from '@/types/constants'
+import { readFileTextChunked } from '@/lib/fileUtils';
 
 export const useCommandTerminal = () => {
     const [input, setInput] = useState('');
@@ -306,7 +307,7 @@ export const useCommandTerminal = () => {
                 type = PaneType.DOC;
                 payload = { format: 'pdf', value: URL.createObjectURL(file), is_url: true };
             } else {
-                const text = await file.text();
+                const text = await readFileTextChunked(file);
                 if (file.type.includes('json') || file.name.endsWith('.json')) {
                     type = PaneType.DATA;
                     payload = { format: 'json', data: JSON.parse(text) };
