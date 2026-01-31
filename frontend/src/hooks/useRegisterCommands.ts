@@ -245,8 +245,8 @@ export const useRegisterCommands = (onReady?: () => void) => {
         if (activeLayout.length === 0) {
             const initArtifactPayload = {
                 type: 'chat' as const,
-                name: 'System Initialized',
-                payload: { messages: [{ role: 'system', content: 'Welcome to eos. System ready.' }] },
+                name: 'Chat',
+                payload: { messages: [] },
                 session_id: 'SESSION_INIT'
             };
 

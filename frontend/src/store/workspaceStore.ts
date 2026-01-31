@@ -544,7 +544,7 @@ export const workspaceActions = {
                     artifacts: ws.state.artifacts || {},
                     activeLayout: ws.state.activeLayout || [],
                     archive: ws.state.archive || [],
-                    focusedPaneId: (ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null,
+                    focusedPaneId: ws.state.focusedPaneId || ((ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null),
                     isInitializing: false
                 });
             } else {
@@ -566,7 +566,8 @@ export const workspaceActions = {
             panes: state.panes,
             artifacts: state.artifacts,
             activeLayout: state.activeLayout,
-            archive: state.archive
+            archive: state.archive,
+            focusedPaneId: state.focusedPaneId
         };
 
         try {

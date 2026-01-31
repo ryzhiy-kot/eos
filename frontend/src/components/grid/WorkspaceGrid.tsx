@@ -25,13 +25,6 @@ import PaneErrorFallback from '../panes/PaneErrorFallback';
 const WorkspaceGrid: React.FC = () => {
     const { panes, activeLayout } = useWorkspaceStore();
 
-    // Initial pane for testing/bootstrapping
-    useEffect(() => {
-        if (activeLayout.length === 0) {
-            commandBus.dispatch({ name: COMMAND_NAMES.INIT, args: [], context: { focusedPaneId: null } });
-        }
-    }, [activeLayout.length]);
-
     // Base 6 grid allows for perfect 2-item (3+3) and 3-item (2+2+2) rows
     const getContainerClass = (count: number) => {
         if (count <= 1) return 'grid-cols-1 grid-rows-1';
