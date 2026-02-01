@@ -22,20 +22,18 @@ import { useAuthStore } from '../store/authStore';
 export const useWorkspaceSync = () => {
     const isAuthenticated = useAuthStore(state => state.isAuthenticated);
     const activeWorkspaceId = useAuthStore(state => state.active_workspace_id);
-    const hasInitialized = useRef(false);
 
     // Initial Load
     useEffect(() => {
-        if (isAuthenticated && !hasInitialized.current) {
+        if (isAuthenticated) {
             workspaceActions.initializeWorkspace(activeWorkspaceId);
-            hasInitialized.current = true;
         }
     }, [isAuthenticated, activeWorkspaceId]);
 
     // Auto-save on change
     useEffect(() => {
-        // block any sync if not authenticated, or not initialized
-        if (!isAuthenticated || !hasInitialized.current) return;
+        // block any sync if not authenticated
+        if (!isAuthenticated) return;
 
         const timeout = setTimeout(() => {
             workspaceActions.syncWorkspace();

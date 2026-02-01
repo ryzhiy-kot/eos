@@ -522,7 +522,8 @@ export const workspaceActions = {
     // Workspace Sync
     initializeWorkspace: async (id: string | null = null) => {
         const targetId = id || 'default_workspace';
-        useWorkspaceStore.setState({ activeWorkspaceId: targetId });
+        // Reset ID to block sync during load
+        useWorkspaceStore.setState({ activeWorkspaceId: null });
 
         try {
             const { apiClient } = await import('../lib/apiClient');
@@ -542,10 +543,11 @@ export const workspaceActions = {
                     artifacts: ws.state.artifacts || {},
                     activeLayout: ws.state.activeLayout || [],
                     archive: ws.state.archive || [],
-                    focusedPaneId: ws.state.focusedPaneId || ((ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null)
+                    focusedPaneId: ws.state.focusedPaneId || ((ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null),
+                    activeWorkspaceId: targetId
                 });
             } else {
-                useWorkspaceStore.setState({ nextPaneId: 1 });
+                useWorkspaceStore.setState({ nextPaneId: 1, activeWorkspaceId: targetId });
             }
         } catch (e) {
             console.error('Failed to initialize workspace:', e);
