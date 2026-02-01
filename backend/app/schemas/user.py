@@ -15,7 +15,6 @@
 
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, Dict, List
-from datetime import datetime
 
 
 class UserBase(BaseModel):
@@ -35,11 +34,6 @@ class User(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class LoggedInUser(User):
-    session_token: str
-    session_expires_at: datetime
-
-
 class WorkspaceMemberBase(BaseModel):
     workspace_id: str
     user_id: int
@@ -50,15 +44,6 @@ class WorkspaceMember(WorkspaceMemberBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AuthSyncRequest(BaseModel):
-    user_id: str
-
-
 class UpdateActiveWorkspaceRequest(BaseModel):
     user_id: str
     workspace_id: str
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: Optional[str] = None

@@ -30,7 +30,7 @@ from app.core.artifact.factory import get_artifact_store
 
 class ArtifactService:
     @staticmethod
-    async def get_artifact(db: AsyncSession, artifact_id: str) -> Optional[Artifact]:
+    async def get_artifact(db: AsyncSession, artifact_id: str, token: Optional[str] = None) -> Optional[Artifact]:
         stmt = (
             select(Artifact)
             .where(Artifact.id == artifact_id)
@@ -42,7 +42,7 @@ class ArtifactService:
         if artifact and artifact.storage_backend != "db" and artifact.storage_key:
             store = get_artifact_store()
             try:
-                content = await store.load(artifact.id, artifact.storage_key)
+                content = await store.load(artifact.id, artifact.storage_key, token=token)
                 # Rehydrate payload for the consumer
                 artifact.payload = content
             except Exception as e:
@@ -57,6 +57,7 @@ class ArtifactService:
         db: AsyncSession,
         existing: Artifact,
         artifact_in: Union[ArtifactCreate, ArtifactUpdate],
+        token: Optional[str] = None
     ) -> Artifact:
         new_version_id = "v1"
         parent_id = None
@@ -95,7 +96,7 @@ class ArtifactService:
         storage_key = existing.storage_key
         if artifact_in.payload is not None:
             store = get_artifact_store()
-            storage_key = await store.save(existing.id, payload)
+            storage_key = await store.save(existing.id, payload, token=token)
             existing.storage_backend = settings.ARTIFACT_STORAGE_BACKEND
             existing.storage_key = storage_key
             if settings.ARTIFACT_STORAGE_BACKEND == "db":
@@ -112,11 +113,7 @@ class ArtifactService:
         if hasattr(artifact_in, "session_id") and artifact_in.session_id:
             existing.session_id = artifact_in.session_id
 
-        # Create mutation only if payload changed or it's a significant update
-        # For now, we assume any update via this method creates a mutation if payload provided
-        # If only metadata changed, we might skip mutation or create a metadata-only mutation?
-        # The existing logic seemed to always create a mutation.
-
+        # Create mutation
         if artifact_in.payload is not None:
             mutation = MutationRecord(
                 artifact_id=existing.id,
@@ -145,13 +142,13 @@ class ArtifactService:
 
     @staticmethod
     async def create_or_update_artifact(
-        db: AsyncSession, artifact_in: ArtifactCreate
+        db: AsyncSession, artifact_in: ArtifactCreate, token: Optional[str] = None
     ) -> Artifact:
         if artifact_in.id:
-            existing = await ArtifactService.get_artifact(db, artifact_in.id)
+            existing = await ArtifactService.get_artifact(db, artifact_in.id, token=token)
             if existing:
                 return await ArtifactService._update_artifact_logic(
-                    db, existing, artifact_in
+                    db, existing, artifact_in, token=token
                 )
 
         # Generate ID if missing
@@ -163,7 +160,7 @@ class ArtifactService:
 
         # Handle external storage
         store = get_artifact_store()
-        storage_key = await store.save(new_id, artifact_in.payload)
+        storage_key = await store.save(new_id, artifact_in.payload, token=token)
         settings = get_settings()
 
         try:
@@ -204,18 +201,18 @@ class ArtifactService:
             await db.rollback()
             # Race condition: artifact created by another process/request
             if artifact_in.id:
-                existing = await ArtifactService.get_artifact(db, artifact_in.id)
+                existing = await ArtifactService.get_artifact(db, artifact_in.id, token=token)
                 if existing:
                     return await ArtifactService._update_artifact_logic(
-                        db, existing, artifact_in
+                        db, existing, artifact_in, token=token
                     )
             raise
 
     @staticmethod
     async def update_artifact(
-        db: AsyncSession, existing: Artifact, artifact_in: ArtifactUpdate
+        db: AsyncSession, existing: Artifact, artifact_in: ArtifactUpdate, token: Optional[str] = None
     ) -> Artifact:
-        return await ArtifactService._update_artifact_logic(db, existing, artifact_in)
+        return await ArtifactService._update_artifact_logic(db, existing, artifact_in, token=token)
 
     @staticmethod
     async def create_adhoc_mutation(

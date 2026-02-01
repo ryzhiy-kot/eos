@@ -66,7 +66,8 @@ class HttpLLMProvider(LLMProvider):
         self.api_key = os.getenv("LLM_API_KEY", "")
 
     async def generate_stream(self, request: LLMRequest) -> AsyncGenerator[LLMEvent, None]:
-        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        token = self.api_key if self.api_key else request.api_key
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
         async with httpx.AsyncClient() as client:
             async with client.stream(
                 "POST",

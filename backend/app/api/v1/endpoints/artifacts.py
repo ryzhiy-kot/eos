@@ -22,13 +22,21 @@ from app.schemas.artifact import (
     ArtifactUpdate,
 )
 from app.services.artifact_service import ArtifactService
+from app.api.deps import get_current_user, oauth2_scheme
+from app.schemas.user import User
 
 router = APIRouter()
 
 
 @router.get("/{id}", response_model=ArtifactSchema, tags=["artifacts"])
-async def get_artifact(id: str, db: AsyncSession = Depends(get_db)):
-    db_obj = await ArtifactService.get_artifact(db, id)
+async def get_artifact(
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme)
+):
+    # Pass token if needed for retrieval from external store
+    db_obj = await ArtifactService.get_artifact(db, id, token=token)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return db_obj
@@ -36,16 +44,23 @@ async def get_artifact(id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=ArtifactSchema, tags=["artifacts"])
 async def create_artifact(
-    artifact_in: ArtifactCreate, db: AsyncSession = Depends(get_db)
+    artifact_in: ArtifactCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme)
 ):
-    return await ArtifactService.create_or_update_artifact(db, artifact_in)
+    return await ArtifactService.create_or_update_artifact(db, artifact_in, token=token)
 
 
 @router.patch("/{id}", response_model=ArtifactSchema, tags=["artifacts"])
 async def update_artifact(
-    id: str, artifact_in: ArtifactUpdate, db: AsyncSession = Depends(get_db)
+    id: str,
+    artifact_in: ArtifactUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme)
 ):
-    db_obj = await ArtifactService.get_artifact(db, id)
+    db_obj = await ArtifactService.get_artifact(db, id, token=token)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Artifact not found")
-    return await ArtifactService.update_artifact(db, db_obj, artifact_in)
+    return await ArtifactService.update_artifact(db, db_obj, artifact_in, token=token)

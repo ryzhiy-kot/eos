@@ -35,18 +35,39 @@ class ApiClient {
         this.baseUrl = baseUrl;
     }
 
+    private getToken(): string | null {
+        try {
+            if (typeof window === 'undefined') return null;
+            const raw = localStorage.getItem('eos-auth-storage');
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return parsed.state?.session_token || null;
+        } catch {
+            return null;
+        }
+    }
+
     private async request<T>(
         endpoint: string,
         options: RequestInit = {}
     ): Promise<T> {
         const url = `${this.baseUrl}${endpoint}`;
 
+        const headers: any = {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        };
+
+        if (!headers['Authorization']) {
+            const token = this.getToken();
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+        }
+
         const config: RequestInit = {
             ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers,
-            },
+            headers,
         };
 
         try {
@@ -113,11 +134,18 @@ class ApiClient {
         stream?: boolean;
     }): Promise<Response> {
         const url = `${this.baseUrl}/api/v1/sessions/execute`;
+
+        const token = this.getToken();
+        const headers: any = {
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify(request),
         });
 
@@ -174,10 +202,36 @@ class ApiClient {
             throw new Error('Password is required.');
         }
 
-        return this.request('/api/v1/auth/login', {
+        const formData = new FormData();
+        formData.append('username', cleanUsername);
+        formData.append('password', cleanPassword);
+
+        const response = await fetch(`${this.baseUrl}/api/v1/auth/login`, {
             method: 'POST',
-            body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
+            body: formData,
         });
+
+        if (!response.ok) {
+            let detail = response.statusText;
+            try {
+                const data = await response.json();
+                if (data.detail) detail = data.detail;
+            } catch {}
+             throw {
+                message: `Authentication Failed: ${detail}`,
+                status: response.status,
+            } as ApiError;
+        }
+
+        return await response.json();
+    }
+
+    async getProfile(token?: string): Promise<any> {
+        const headers: any = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        return this.request('/api/v1/auth/me', { headers });
     }
 
     async logout(sessionToken: string): Promise<any> {

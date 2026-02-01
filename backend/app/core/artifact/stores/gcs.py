@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Optional
 import logging
 from app.core.artifact.store import ArtifactStore
 from app.core.config import get_settings
@@ -21,7 +21,7 @@ class GCSArtifactStore(ArtifactStore):
             self.client = None
             self.bucket = None
 
-    async def save(self, artifact_id: str, content: Any) -> str:
+    async def save(self, artifact_id: str, content: Any, token: Optional[str] = None) -> str:
         if not self.bucket:
             raise RuntimeError("GCS client not initialized")
 
@@ -35,7 +35,7 @@ class GCSArtifactStore(ArtifactStore):
         blob.upload_from_string(json.dumps(content), content_type="application/json")
         return f"gs://{self.bucket_name}/{blob_name}"
 
-    async def load(self, artifact_id: str, storage_key: str) -> Any:
+    async def load(self, artifact_id: str, storage_key: str, token: Optional[str] = None) -> Any:
         if not self.bucket:
             raise RuntimeError("GCS client not initialized")
 
