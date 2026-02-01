@@ -241,36 +241,6 @@ export const useRegisterCommands = (onReady?: () => void) => {
         return false;
     });
 
-    useCommandHandler(COMMAND_NAMES.INIT, async () => {
-        if (activeLayout.length === 0) {
-            const initArtifactPayload = {
-                type: 'chat' as const,
-                name: 'Chat',
-                payload: { messages: [] },
-                session_id: 'SESSION_INIT'
-            };
-
-            try {
-                const { apiClient } = await import('../lib/apiClient');
-                const created = await apiClient.createArtifact(initArtifactPayload);
-
-                workspaceActions.addArtifact(created);
-                workspaceActions.addPane({
-                    id: 'P1',
-                    artifactId: created.id,
-                    type: 'chat',
-                    isSticky: true,
-                    lineage: { parentIds: [], command: 'init', timestamp: new Date().toISOString() }
-                });
-                return true;
-            } catch (e) {
-                console.error('Failed to init:', e);
-                return false;
-            }
-        }
-        return false;
-    });
-
     useCommandHandler(COMMAND_NAMES.CHAT, async (payload) => {
         const initialMessage = payload.action || 'Hello';
         const targetId = payload.targetId && /^P\d+$/.test(payload.targetId) ? payload.targetId : undefined;
