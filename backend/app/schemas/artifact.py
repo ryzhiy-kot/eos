@@ -68,7 +68,7 @@ class Artifact(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(
         default=None, validation_alias="artifact_metadata"
     )
-    session_id: str
+    session_id: Optional[str] = None
     created_at: Optional[datetime] = None
     mutations: List[MutationRecord] = []
 

@@ -171,7 +171,7 @@ class ArtifactService:
                 id=new_id,
                 type=artifact_in.type,
                 artifact_metadata=metadata,
-                session_id=artifact_in.session_id or "default_session",
+                session_id=artifact_in.session_id,
                 storage_backend=settings.ARTIFACT_STORAGE_BACKEND,
                 storage_key=storage_key,
                 payload=artifact_in.payload

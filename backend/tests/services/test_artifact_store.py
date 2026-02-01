@@ -87,6 +87,7 @@ async def test_service_integration_db(db_session):
         artifact_in = ArtifactSchema(
             id="test_db_integration",
             type="text",
+            name="Test DB Artifact",
             payload={"content": "stored_in_db"},
             session_id="session_1",
             metadata={},
@@ -122,6 +123,7 @@ async def test_service_integration_file(db_session, tmp_path):
         artifact_in = ArtifactSchema(
             id="test_file_integration",
             type="text",
+            name="Test File Artifact",
             payload={"content": "stored_in_file"},
             session_id="session_1",
             metadata={},

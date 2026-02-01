@@ -32,3 +32,4 @@ class Workspace(Base):
     )
 
     members = relationship("WorkspaceMember", back_populates="workspace")
+    artifacts = relationship("Artifact", back_populates="workspace", cascade="all, delete-orphan")

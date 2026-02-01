@@ -14,7 +14,7 @@
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Union
 from datetime import datetime
 from .base import BaseResponse
 from .artifact import Artifact
@@ -30,12 +30,12 @@ class ChatMessageCreate(ChatMessageBase):
 
 
 class ChatMessage(ChatMessageBase):
-    id: int
+    id: str
     session_id: str
-    created_at: datetime
+    created_at: Optional[datetime] = None
     artifacts: List[Artifact] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    # No from_attributes=True because it's no longer 1:1 with DB
 
 
 class ChatSessionBase(BaseModel):
@@ -54,11 +54,11 @@ class ChatSessionUpdate(BaseModel):
 
 class ChatSession(ChatSessionBase):
     id: str
-    is_active: bool
-    created_at: datetime
+    is_active: bool = True
+    created_at: Optional[datetime] = None
     messages: List[ChatMessage] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    # No from_attributes=True because it maps from Artifact
 
 
 class ExecutionRequest(BaseModel):

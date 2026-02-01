@@ -106,17 +106,17 @@ class WorkspaceService:
         """
         ws_id = str(uuid.uuid4())
 
-        # Prepare initial session
+        # Prepare initial session (Chat Artifact)
         pane_id = "P1"
         session_id = str(uuid.uuid4())
-        artifact_id = str(uuid.uuid4())
+        # We treat the session AS the artifact
 
         initial_state = {
             "panes": {
                 pane_id: {
                     "id": pane_id,
                     "type": "chat",
-                    "artifactId": artifact_id,
+                    "artifactId": session_id, # Point to session ID
                     "title": "Chat",
                     "isSticky": False,
                     "lineage": {
@@ -127,13 +127,11 @@ class WorkspaceService:
                 }
             },
             "artifacts": {
-                artifact_id: {
-                    "id": artifact_id,
+                session_id: {
+                    "id": session_id,
                     "type": "chat",
-                    "payload": {
-                        "messages": []
-                    },
-                    "session_id": session_id,
+                    "payload": [], # Chat payload is a list of messages
+                    "session_id": None, # Root chat has no parent session
                     "mutations": [],
                     "metadata": {"name": "Chat"}
                 }
@@ -157,7 +155,7 @@ class WorkspaceService:
         )
         db.add(member)
 
-        # Create session in DB
+        # Create session (Chat Artifact) in DB via Service
         from app.services.session_service import SessionService
         await SessionService.create_session(
             db,
@@ -165,30 +163,6 @@ class WorkspaceService:
             name="Chat",
             workspace_id=ws_id,
         )
-
-        # Create artifact in DB
-        from app.models.artifact import Artifact, MutationRecord
-        db_artifact = Artifact(
-            id=artifact_id,
-            type="chat",
-            artifact_metadata={"name": "Chat"},
-            session_id=session_id,
-            storage_backend="db",
-            payload={"messages": []}
-        )
-        db.add(db_artifact)
-
-        mutation = MutationRecord(
-            artifact_id=artifact_id,
-            version_id="v1",
-            parent_id=None,
-            origin={"type": "manual_edit", "sessionId": session_id},
-            change_summary="Initial creation",
-            payload={"messages": []},
-            status="committed",
-        )
-        db_artifact.mutations.append(mutation)
-        db.add(mutation)
 
         await db.commit()
         return ws_id
