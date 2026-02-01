@@ -14,9 +14,11 @@
 # without explicit, visible credit to Kyrylo Yatsenko as the original author.
 
 import asyncio
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 import json
+from app.services.auth.dependency import get_auth_service
+from app.db.session import AsyncSessionLocal
 
 router = APIRouter()
 
@@ -35,5 +37,22 @@ async def event_generator(request: Request):
 
 
 @router.get("/stream", tags=["events"])
-async def stream_events(request: Request):
+async def stream_events(
+    request: Request,
+    token: str = None,
+    auth_service = Depends(get_auth_service)
+):
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing authentication token")
+
+    async with AsyncSessionLocal() as db:
+        user = await auth_service.validate_token(token, db)
+        if not user:
+             raise HTTPException(status_code=401, detail="Invalid authentication token")
+
     return StreamingResponse(event_generator(request), media_type="text/event-stream")

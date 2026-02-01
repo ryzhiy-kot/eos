@@ -26,6 +26,8 @@ from app.schemas.chat import (
 )
 from app.services.session_service import SessionService
 from app.services.execution_service import ExecutionService
+from app.api.deps import get_current_user, oauth2_scheme
+from app.schemas.user import User
 
 router = APIRouter()
 
@@ -33,12 +35,20 @@ router = APIRouter()
 @router.get(
     "/workspace/{workspace_id}", response_model=List[ChatSession], tags=["sessions"]
 )
-async def list_sessions(workspace_id: str, db: AsyncSession = Depends(get_db)):
+async def list_sessions(
+    workspace_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     return await SessionService.get_sessions(db, workspace_id)
 
 
 @router.get("/{id}", response_model=ChatSession, tags=["sessions"])
-async def get_session(id: str, db: AsyncSession = Depends(get_db)):
+async def get_session(
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     db_obj = await SessionService.get_session(db, id)
     if not db_obj:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -47,7 +57,10 @@ async def get_session(id: str, db: AsyncSession = Depends(get_db)):
 
 @router.patch("/{id}", response_model=ChatSession, tags=["sessions"])
 async def update_session(
-    id: str, session_in: ChatSessionUpdate, db: AsyncSession = Depends(get_db)
+    id: str,
+    session_in: ChatSessionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     db_obj = await SessionService.update_session(
         db, id, name=session_in.name, is_active=session_in.is_active
@@ -59,14 +72,17 @@ async def update_session(
 
 @router.post("/execute", response_model=ExecutionResponse, tags=["sessions"])
 async def execute_interaction(
-    req: ExecutionRequest, db: AsyncSession = Depends(get_db)
+    req: ExecutionRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme)
 ):
     if req.stream and req.type == "chat":
         return StreamingResponse(
-            ExecutionService.execute_stream(db, req), media_type="text/event-stream"
+            ExecutionService.execute_stream(db, req, token=token), media_type="text/event-stream"
         )
 
-    result = await ExecutionService.execute(db, req)
+    result = await ExecutionService.execute(db, req, token=token)
     if not result.get("success"):
         raise HTTPException(
             status_code=400, detail=result.get("message", "Execution failed")

@@ -16,7 +16,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 import random
 import json
 import uuid
@@ -37,9 +37,9 @@ from app.services.llm_providers import get_llm_provider
 
 class ExecutionService:
     @staticmethod
-    async def execute(db: AsyncSession, req: ExecutionRequest) -> Dict:
+    async def execute(db: AsyncSession, req: ExecutionRequest, token: Optional[str] = None) -> Dict:
         if req.type == "chat":
-            return await ExecutionService._execute_chat(db, req)
+            return await ExecutionService._execute_chat(db, req, token)
         elif req.type == "command":
             return await ExecutionService._execute_command(db, req)
         return {"success": False, "message": "Unsupported execution type"}
@@ -130,7 +130,7 @@ class ExecutionService:
         return new_artifact_models
 
     @staticmethod
-    async def execute_stream(db: AsyncSession, req: ExecutionRequest):
+    async def execute_stream(db: AsyncSession, req: ExecutionRequest, token: Optional[str] = None):
         db_session, pydantic_artifacts = await ExecutionService._prepare_chat_context(
             db, req
         )
@@ -146,6 +146,7 @@ class ExecutionService:
             session_id=req.session_id,
             messages=llm_messages,
             context_artifacts=pydantic_artifacts,
+            api_key=token,
         )
 
         provider = get_llm_provider()
@@ -222,7 +223,7 @@ class ExecutionService:
         yield f"data: {json.dumps({'type': 'final_message', 'message': final_msg_dict})}\n\n"
 
     @staticmethod
-    async def _execute_chat(db: AsyncSession, req: ExecutionRequest) -> Dict:
+    async def _execute_chat(db: AsyncSession, req: ExecutionRequest, token: Optional[str] = None) -> Dict:
         db_session, pydantic_artifacts = await ExecutionService._prepare_chat_context(
             db, req
         )
@@ -238,6 +239,7 @@ class ExecutionService:
             session_id=req.session_id,
             messages=llm_messages,
             context_artifacts=pydantic_artifacts,
+            api_key=token,
         )
 
         provider = get_llm_provider()

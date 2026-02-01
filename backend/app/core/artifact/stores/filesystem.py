@@ -1,7 +1,7 @@
 import os
 import json
 import aiofiles
-from typing import Any
+from typing import Any, Optional
 from app.core.artifact.store import ArtifactStore
 from app.core.config import get_settings
 
@@ -13,13 +13,13 @@ class FilesystemArtifactStore(ArtifactStore):
         if not os.path.exists(self.base_path):
             os.makedirs(self.base_path, exist_ok=True)
 
-    async def save(self, artifact_id: str, content: Any) -> str:
+    async def save(self, artifact_id: str, content: Any, token: Optional[str] = None) -> str:
         file_path = os.path.join(self.base_path, f"{artifact_id}.json")
         async with aiofiles.open(file_path, mode="w", encoding="utf-8") as f:
             await f.write(json.dumps(content, ensure_ascii=False, indent=2))
         return file_path
 
-    async def load(self, artifact_id: str, storage_key: str) -> Any:
+    async def load(self, artifact_id: str, storage_key: str, token: Optional[str] = None) -> Any:
         # storage_key here is the file path
         if not os.path.exists(storage_key):
             # Fallback: check if it's relative or in base path

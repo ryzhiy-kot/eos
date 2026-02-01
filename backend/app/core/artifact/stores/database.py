@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 from app.core.artifact.store import ArtifactStore
 
 
@@ -17,12 +17,12 @@ class DatabaseArtifactStore(ArtifactStore):
     in a text column, but for now it's consistent with existing behavior.
     """
 
-    async def save(self, artifact_id: str, content: Any) -> str:
+    async def save(self, artifact_id: str, content: Any, token: Optional[str] = None) -> str:
         # In DB mode, the service saves the content directly to the model.
         # We return a sentinel or empty string.
         return "db"
 
-    async def load(self, artifact_id: str, storage_key: str) -> Any:
+    async def load(self, artifact_id: str, storage_key: str, token: Optional[str] = None) -> Any:
         # Service handles loading from the DB model directly for efficiency.
         # This might be used if we wanted to double-check, but usually
         # the storage_backend='db' check in service bypasses explicit load.

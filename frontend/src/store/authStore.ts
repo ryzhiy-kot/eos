@@ -50,7 +50,16 @@ export const useAuthStore = create<AuthState>()(
                 try {
                     const { apiClient } = await import('../lib/apiClient');
                     const { workspaceActions } = await import('./workspaceStore');
-                    const user = await apiClient.login(username, password);
+
+                    // 1. Get Token
+                    const tokenData = await apiClient.login(username, password);
+                    const accessToken = tokenData.access_token;
+
+                    // Set token immediately so getProfile can use it via localStorage
+                    set({ session_token: accessToken });
+
+                    // 2. Get User Profile
+                    const user = await apiClient.getProfile(accessToken);
 
                     if (user.memberships && user.memberships.length > 0) {
                         // Priority: active_workspace_id if valid, else first membership
@@ -61,8 +70,8 @@ export const useAuthStore = create<AuthState>()(
                     set({
                         isAuthenticated: true,
                         user: user.user_id,
-                        session_token: user.session_token || null,
-                        session_expires_at: user.session_expires_at || null,
+                        session_token: accessToken,
+                        session_expires_at: null, // JWT expiry is managed by token validity
                         active_workspace_id: user.active_workspace_id || null,
                         isLoading: false,
                         error: null
@@ -71,7 +80,10 @@ export const useAuthStore = create<AuthState>()(
                 } catch (err: any) {
                     set({
                         isLoading: false,
-                        error: err.message || 'ACCESS DENIED: Invalid credentials.'
+                        error: err.message || 'ACCESS DENIED: Invalid credentials.',
+                        isAuthenticated: false,
+                        session_token: null,
+                        user: null
                     });
                     return false;
                 }

@@ -12,6 +12,7 @@ class LLMRequest(BaseModel):
     session_id: str
     messages: List[LLMMessage]
     context_artifacts: List[Artifact] = []
+    api_key: Optional[str] = None
 
 class LLMEvent(BaseModel):
     type: str
