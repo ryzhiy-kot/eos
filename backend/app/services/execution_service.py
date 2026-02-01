@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import Dict, Any, Tuple, List
-import random
 import json
 import uuid
 from app.models.artifact import Artifact, MutationRecord
@@ -48,14 +47,15 @@ class ExecutionService:
     async def _prepare_chat_context(
         db: AsyncSession, req: ExecutionRequest
     ) -> Tuple[Any, List[ArtifactSchema]]:
-        # Resolve or create session
+        # Resolve or create session (returns Schema)
         db_session = await SessionService.get_session(db, req.session_id)
         if not db_session:
             db_session = await SessionService.create_session(
                 db, req.session_id, f"Chat {req.session_id[:8]}"
             )
 
-        # Resolve existing artifacts
+        # Resolve existing artifacts (ORM objects -> Schemas)
+        # Note: artifacts referenced in request might be ORM objects we need to load
         artifacts = []
         if req.referenced_artifact_ids:
             art_stmt = (
@@ -72,7 +72,7 @@ class ExecutionService:
             req.session_id,
             "user",
             req.action or "",
-            artifacts=artifacts,
+            artifacts=artifacts, # Pass ORM objects, SessionService handles them
         )
 
         # Convert artifacts to Pydantic models for the LLM Protocol
@@ -84,6 +84,7 @@ class ExecutionService:
     async def _process_generated_artifacts(
         db: AsyncSession,
         session_id: str,
+        workspace_id: str,
         new_artifacts_map: Dict,
         req: ExecutionRequest,
     ) -> List[Artifact]:
@@ -105,6 +106,7 @@ class ExecutionService:
                 payload=payload,
                 artifact_metadata=metadata,
                 session_id=session_id,
+                workspace_id=workspace_id,
             )
             new_artifact_models.append(new_art)
 
@@ -189,7 +191,7 @@ class ExecutionService:
 
         # Process generated artifacts and save to DB
         new_artifact_models = await ExecutionService._process_generated_artifacts(
-            db, db_session.id, new_artifacts_map, req
+            db, db_session.id, db_session.workspace_id, new_artifacts_map, req
         )
 
         assistant_msg = await SessionService.save_message(
@@ -265,7 +267,7 @@ class ExecutionService:
 
         # Process generated artifacts
         new_artifact_models = await ExecutionService._process_generated_artifacts(
-            db, db_session.id, new_artifacts_map, req
+            db, db_session.id, db_session.workspace_id, new_artifacts_map, req
         )
 
         assistant_msg = await SessionService.save_message(
@@ -307,6 +309,7 @@ class ExecutionService:
                 },
                 artifact_metadata={"name": "Plot Result"},
                 session_id=db_session.id,
+                workspace_id=db_session.workspace_id,
             )
             new_artifact_models.append(new_art)
         elif cmd == "run":
@@ -319,6 +322,7 @@ class ExecutionService:
                 },
                 artifact_metadata={"name": "Code Execution"},
                 session_id=db_session.id,
+                workspace_id=db_session.workspace_id,
             )
             new_artifact_models.append(new_art)
         elif cmd == "optimize":
@@ -331,6 +335,7 @@ class ExecutionService:
                 },
                 artifact_metadata={"name": "Optimized Code"},
                 session_id=db_session.id,
+                workspace_id=db_session.workspace_id,
             )
             new_artifact_models.append(new_art)
         # ... other commands (diff, summarize) can be added similarly

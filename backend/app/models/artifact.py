@@ -28,13 +28,19 @@ class Artifact(Base):
     storage_key = Column(String, nullable=True)
     payload = Column(JSON, nullable=True)  # Nullable if stored externally
     artifact_metadata = Column(JSON, default=dict)
-    session_id = Column(String, ForeignKey("chat_sessions.id"), nullable=False)
+
+    # Workspace ownership
+    workspace_id = Column(String, ForeignKey("workspaces.id"), nullable=True)
+
+    # Parent session (Chat Artifact) - Self-referential
+    session_id = Column(String, ForeignKey("artifacts.id"), nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
-    session = relationship("ChatSession", back_populates="artifacts")
-    messages = relationship(
-        "ChatMessage", secondary="message_artifacts", back_populates="artifacts"
-    )
+    # Relationships
+    workspace = relationship("Workspace", back_populates="artifacts")
+    session = relationship("Artifact", remote_side=[id], backref="child_artifacts")
+
     mutations = relationship(
         "MutationRecord",
         back_populates="artifact",
