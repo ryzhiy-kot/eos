@@ -124,7 +124,6 @@ interface WorkspaceState {
     commandSubmitRequest: { command: string; timestamp: number } | null;
     chatSessions: any[]; // Chat sessions from backend
     activeWorkspaceId: string | null;
-    isInitializing: boolean;
     nextPaneId: number;
     artifactPickerMode: 'session' | 'all';
 }
@@ -157,7 +156,6 @@ export const useWorkspaceStore = create<WorkspaceState>(() => ({
     commandSubmitRequest: null,
     chatSessions: [],
     activeWorkspaceId: null,
-    isInitializing: false,
     artifactPickerMode: 'session',
 }));
 
@@ -524,7 +522,7 @@ export const workspaceActions = {
     // Workspace Sync
     initializeWorkspace: async (id: string | null = null) => {
         const targetId = id || 'default_workspace';
-        useWorkspaceStore.setState({ isInitializing: true, activeWorkspaceId: targetId });
+        useWorkspaceStore.setState({ activeWorkspaceId: targetId });
 
         try {
             const { apiClient } = await import('../lib/apiClient');
@@ -544,16 +542,14 @@ export const workspaceActions = {
                     artifacts: ws.state.artifacts || {},
                     activeLayout: ws.state.activeLayout || [],
                     archive: ws.state.archive || [],
-                    focusedPaneId: ws.state.focusedPaneId || ((ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null),
-                    isInitializing: false
+                    focusedPaneId: ws.state.focusedPaneId || ((ws.state.activeLayout && ws.state.activeLayout.length > 0) ? ws.state.activeLayout[0] : null)
                 });
             } else {
-                useWorkspaceStore.setState({ isInitializing: false, nextPaneId: 1 });
+                useWorkspaceStore.setState({ nextPaneId: 1 });
             }
         } catch (e) {
             console.error('Failed to initialize workspace:', e);
             workspaceActions.addNotification('Failed to load workspace state.', 'error');
-            useWorkspaceStore.setState({ isInitializing: false });
         }
     },
 
