@@ -128,7 +128,7 @@ class UserService:
     @staticmethod
     async def initialize_defaults(db: AsyncSession):
         """
-        Initializes default data (admin user, default workspace).
+        Initializes default data (admin user).
         This should be called on application startup.
         """
         # Check if admin user exists
@@ -143,6 +143,3 @@ class UserService:
             db.add(admin_user)
             await db.flush()
             logger.info("✓ Created default 'admin' user")
-
-        # Delegate default workspace creation to WorkspaceService
-        await WorkspaceService.ensure_default_workspace(db, admin_user.id)
