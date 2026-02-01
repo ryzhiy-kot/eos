@@ -40,7 +40,6 @@ export const COMMAND_NAMES = {
     REMOVE_PANE: 'rm',
     REMOVE_CLOCK: 'rmclock',
     REMOVE_TIMER: 'rmtimer',
-    INIT: 'init',
     CHAT: 'chat',
     CLIP: 'clip',
     OPTIMIZE: 'optimize',
