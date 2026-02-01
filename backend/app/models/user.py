@@ -27,7 +27,7 @@ class User(Base):
     enabled = Column(Boolean, default=True)
     active_workspace_id = Column(String, nullable=True)
 
-    memberships = relationship("WorkspaceMember", back_populates="user")
+    memberships = relationship("WorkspaceMember", back_populates="user", lazy="selectin")
 
 
 class WorkspaceMember(Base):

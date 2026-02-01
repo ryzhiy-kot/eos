@@ -1,45 +1,48 @@
 import pytest
-from sqlalchemy import select
 from app.services.user_service import UserService
 from app.models.workspace import Workspace
 from app.models.chat import ChatSession
-
+from app.models.user import User
 
 @pytest.mark.asyncio
-async def test_initialize_defaults_creates_session(db_session):
-    # Ensure clean slate for default objects if possible,
-    # but db_session fixture usually rolls back.
-    # However, initialize_defaults might have run or might check existence.
+async def test_ensure_personal_workspace_creates_session(db_session):
+    # Create a dummy user
+    user_id = "test_user_personal_ws"
+    user = await UserService.create_user(db_session, user_id)
+    await db_session.commit()
+    await db_session.refresh(user)
 
-    # Let's delete default workspace if exists to force creation logic
-    ws = await db_session.get(Workspace, "default_workspace")
-    if ws:
-        await db_session.delete(ws)
-        await db_session.commit()
+    # Trigger ensure_personal_workspace
+    updated_user = await UserService.ensure_personal_workspace(db_session, user)
 
-    # Run initialization
-    await UserService.initialize_defaults(db_session)
+    # Verify workspace created
+    assert updated_user.active_workspace_id is not None
+    workspace_id = updated_user.active_workspace_id
 
-    # Check default workspace state
-    ws = await db_session.get(Workspace, "default_workspace")
-    assert ws is not None
-    assert "default_session" in ws.state["panes"]
-    assert "default_session" in ws.state["activeLayout"]
+    workspace = await db_session.get(Workspace, workspace_id)
+    assert workspace is not None
+    assert workspace.name == f"{user_id}'s Workspace"
+
+    # Check session created in workspace state
+    panes = workspace.state["panes"]
+    assert len(panes) == 1
+    pane_id = list(panes.keys())[0]
 
     # Check session entity
-    session = await db_session.get(ChatSession, "default_session")
+    pane = panes[pane_id]
+    session_id = pane["id"] # The pane ID is used as key, but let's check artifact/session linkage
+    # Actually in our logic, pane_id="P1", but session_id is a UUID stored in artifact
+
+    artifact_id = pane["artifactId"]
+    artifact_data = workspace.state["artifacts"][artifact_id]
+    db_session_id = artifact_data["session_id"]
+
+    session = await db_session.get(ChatSession, db_session_id)
     assert session is not None
-    assert session.name == "General"
-    assert session.workspace_id == "default_workspace"
+    assert session.workspace_id == workspace_id
 
-    # Verify artifacts are present in state
-    assert "artifacts" in ws.state
-    panes = ws.state["panes"]
-    default_pane = panes["default_session"]
+    # Check artifact payload (should be empty messages)
+    assert artifact_data["payload"]["messages"] == []
 
-    assert "artifactId" in default_pane
-    assert "title" in default_pane
-
-    artifact_id = default_pane["artifactId"]
-    assert artifact_id in ws.state["artifacts"]
-    assert ws.state["artifacts"][artifact_id]["type"] == "chat"
+    # Check focusedPaneId
+    assert workspace.state["focusedPaneId"] == pane_id
