@@ -1,0 +1,12 @@
+node_modules/
+build/
+.svelte-kit/
+dist/
+__pycache__/
+*.pyc
+.env
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
