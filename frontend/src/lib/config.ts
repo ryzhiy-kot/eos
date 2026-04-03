@@ -1,3 +1,5 @@
+import { writable, get } from "svelte/store";
+
 export interface MockConfig {
   enabled: boolean;
   dataDelay: number;
@@ -9,8 +11,13 @@ export const mockConfig = writable<MockConfig>({
 });
 
 export function isMockEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem("mock_mode") === "true" || mockConfig.enabled;
+  if (typeof window === "undefined") return true;
+  const stored = localStorage.getItem("mock_mode");
+  if (stored === null) {
+    localStorage.setItem("mock_mode", "true");
+    return true;
+  }
+  return stored === "true" || get(mockConfig).enabled;
 }
 
 export function enableMockMode(enabled: boolean = true) {

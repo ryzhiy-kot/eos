@@ -53,5 +53,4 @@ export function mockLogin(username: string) {
     role: "trader",
     is_active: true,
   });
-  isAuthenticated.set(true);
 }
