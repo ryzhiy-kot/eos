@@ -15,6 +15,7 @@
   let isMinimized = $state(false);
   let position = $state({ x: 100 + (index % 4) * 50, y: 100 + Math.floor(index / 4) * 50 });
   let size = $state({ width: 400, height: 320 });
+  let zIndex = $state(10);
   let isDragging = $state(false);
   let dragStart = $state({ x: 0, y: 0 });
   let isResizing = $state(false);
@@ -36,6 +37,13 @@
     isDragging = true;
     dragStart = { x: e.clientX - position.x, y: e.clientY - position.y };
     e.stopPropagation();
+  }
+
+  function bringToFront() {
+    zIndex = 100;
+    setTimeout(() => {
+      zIndex = 10;
+    }, 0);
   }
 
   function handleMouseMove(e: MouseEvent) {
@@ -78,7 +86,8 @@
   class:minimized={isMinimized}
   class:dragging={isDragging}
   onmousedown={handleMouseDown}
-  style="left: {position.x}px; top: {position.y}px; width: {size.width}px; height: {size.height}px;"
+  onclick={bringToFront}
+  style="left: {position.x}px; top: {position.y}px; width: {size.width}px; height: {size.height}px; z-index: {zIndex};"
 >
   <div class="window-header" onmousedown={handleMouseDown}>
     <span class="window-title">
@@ -104,7 +113,7 @@
           low: d.low,
           close: d.close,
         }))}
-        <GenericChart data={chartData} chartType={spec.type as any} height={size.height - 60} />
+        <GenericChart data={chartData} chartType={spec.type as any} />
       {:else if artifact.type === "table" && artifact.columns && artifact.data}
         <div class="table-wrapper">
           <table class="data-table">
@@ -151,13 +160,14 @@
 <style>
   .artifact-window {
     position: absolute;
+    display: flex;
+    flex-direction: column;
     min-width: 200px;
     min-height: 150px;
     background: var(--bg-panel);
     border: 1px solid var(--border-primary);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    z-index: 10;
     overflow: hidden;
   }
 
@@ -183,6 +193,15 @@
 
   .artifact-window.minimized {
     min-width: 200px;
+    height: auto !important;
+  }
+
+  .artifact-window.minimized .window-content {
+    display: none;
+  }
+
+  .artifact-window.minimized .resize-handle {
+    display: none;
   }
 
   .window-header {
@@ -226,8 +245,9 @@
 
   .window-content {
     padding: 12px;
-    max-height: 400px;
     overflow: auto;
+    flex: 1;
+    min-height: 0;
   }
 
   .chart-container {

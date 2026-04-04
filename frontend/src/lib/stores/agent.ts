@@ -12,6 +12,7 @@ export interface Artifact {
   pdfData?: string;
   format?: string;
   created_at: string;
+  visible: boolean;
 }
 
 export interface Message {
@@ -55,6 +56,8 @@ export const isPanelExpanded = derived(
 export const currentMessages = derived(agentState, ($state) => $state.messages);
 
 export const currentArtifacts = derived(agentState, ($state) => $state.artifacts);
+
+export const visibleArtifacts = derived(agentState, ($state) => $state.artifacts.filter(a => a.visible));
 
 function addMessageToHistory(input: string) {
   agentState.update((state) => {
@@ -139,14 +142,14 @@ export function appendToLastMessage(extraContent: string) {
 export function addArtifact(artifact: Artifact) {
   agentState.update((state) => ({
     ...state,
-    artifacts: [...state.artifacts, artifact],
+    artifacts: [...state.artifacts, { ...artifact, visible: artifact.visible ?? true }],
   }));
 }
 
 export function updateArtifacts(artifacts: Artifact[]) {
   agentState.update((state) => ({
     ...state,
-    artifacts,
+    artifacts: artifacts.map((a) => ({ ...a, visible: a.visible ?? true })),
   }));
 }
 
@@ -154,6 +157,34 @@ export function removeArtifact(id: string) {
   agentState.update((state) => ({
     ...state,
     artifacts: state.artifacts.filter((a) => a.id !== id),
+  }));
+}
+
+export function hideArtifact(id: string) {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: state.artifacts.map((a) => (a.id === id ? { ...a, visible: false } : a)),
+  }));
+}
+
+export function showArtifact(id: string) {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: state.artifacts.map((a) => (a.id === id ? { ...a, visible: true } : a)),
+  }));
+}
+
+export function deleteArtifact(id: string) {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: state.artifacts.filter((a) => a.id !== id),
+  }));
+}
+
+export function clearAllArtifacts() {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: [],
   }));
 }
 

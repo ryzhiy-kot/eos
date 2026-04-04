@@ -121,6 +121,17 @@ frontend/
 4. **Error handling** - return meaningful errors, never crash silently
 5. **Pydantic models** for all request/response schemas
 6. **No hardcoded config** - use `app/config.py` settings
+7. **Relative imports** - always use relative imports within the app package
+
+```python
+# Good - relative imports within app package
+from ..services.agent_service import AgentService
+from ...config import settings
+
+# Bad - absolute imports
+from app.services.agent_service import AgentService
+from app.config import settings
+```
 
 ```python
 # Good

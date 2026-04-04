@@ -30,16 +30,15 @@
   let {
     data = [],
     chartType = "line",
-    height = 300,
     colors = {},
   }: {
     data: ChartDataPoint[];
     chartType?: "line" | "bar" | "candlestick" | "area";
-    height?: number;
     colors?: { line?: string; upColor?: string; downColor?: string };
   } = $props();
 
   let container: HTMLDivElement;
+  let chartWrapper: HTMLDivElement;
   let chart: IChartApi;
   let series: ISeriesApi<any>;
 
@@ -63,7 +62,7 @@
   }
 
   onMount(() => {
-    chart = createChart(container, {
+    chart = createChart(chartWrapper, {
       layout: {
         background: { type: ColorType.Solid, color: theme.chart.background },
         textColor: theme.chart.textColor,
@@ -83,7 +82,7 @@
         secondsVisible: false,
       },
       width: container.clientWidth,
-      height: height,
+      height: container.clientHeight,
     });
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -94,7 +93,7 @@
         });
       }
     });
-    resizeObserver.observe(container);
+    resizeObserver.observe(chartWrapper);
 
     return () => {
       resizeObserver.disconnect();
@@ -103,12 +102,11 @@
   });
 
   $effect(() => {
-    if (!chart) return;
-    if (container) {
-      chart.applyOptions({
-        width: container.clientWidth,
-        height: height || container.clientHeight,
-      });
+    if (!chart || !chartWrapper) return;
+    const h = chartWrapper.clientHeight;
+    const w = chartWrapper.clientWidth;
+    if (w > 0 && h > 0) {
+      chart.applyOptions({ width: w, height: h });
     }
   });
 
@@ -172,10 +170,23 @@
   });
 </script>
 
-<div bind:this={container} class="chart-container" style="height: {height}px;"></div>
+<div bind:this={container} class="chart-container">
+  <div bind:this={chartWrapper} class="chart-wrapper"></div>
+</div>
 
 <style>
   .chart-container {
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-wrapper {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     width: 100%;
   }
 </style>

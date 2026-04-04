@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { checkAuth } from "$lib/stores/auth";
   import { page } from "$app/stores";
-  import { agentState, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize } from "$lib/stores/agent";
+  import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact } from "$lib/stores/agent";
   import AgentTerminal from "$lib/components/agent/AgentTerminal.svelte";
   import ArtifactWindow from "$lib/components/agent/ArtifactWindow.svelte";
 
@@ -122,8 +122,8 @@
       </div>
       
       <div class="artifacts-layer">
-        {#each $agentState.artifacts as artifact, i (artifact.id)}
-          <ArtifactWindow {artifact} index={i} onClose={(id) => {}} />
+        {#each $visibleArtifacts as artifact, i (artifact.id)}
+          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} />
         {/each}
       </div>
     {/if}
