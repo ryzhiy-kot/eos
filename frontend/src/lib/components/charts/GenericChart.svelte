@@ -121,17 +121,18 @@
     switch (chartType) {
       case "bar":
         series = chart.addSeries(BarSeries, {
-          color: defaultColors.line,
-        });
+          upColor: defaultColors.upColor,
+          downColor: defaultColors.downColor,
+        } as any);
         series.setData(normalizedData as any);
         break;
 
       case "area":
         series = chart.addSeries(AreaSeries, {
           lineColor: defaultColors.line,
-          topColorColor: defaultColors.line + "40",
-          bottomColorColor: defaultColors.line + "10",
-        });
+          topColor: defaultColors.line + "40",
+          bottomColor: defaultColors.line + "10",
+        } as any);
         series.setData(normalizedData as any);
         break;
 

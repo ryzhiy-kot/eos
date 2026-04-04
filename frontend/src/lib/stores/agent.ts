@@ -29,6 +29,8 @@ export interface AgentState {
   isStreaming: boolean;
   panelExpanded: boolean;
   sessionId: string;
+  terminalPosition: { x: number; y: number };
+  terminalSize: { width: number; height: number };
 }
 
 const initialState: AgentState = {
@@ -39,6 +41,8 @@ const initialState: AgentState = {
   isStreaming: false,
   panelExpanded: true,
   sessionId: crypto.randomUUID(),
+  terminalPosition: { x: 20, y: 20 },
+  terminalSize: { width: 450, height: 400 },
 };
 
 export const agentState = writable<AgentState>(initialState);
@@ -176,6 +180,14 @@ export function clearConversation() {
     artifacts: [],
     sessionId: crypto.randomUUID(),
   }));
+}
+
+export function updateTerminalPosition(position: { x: number; y: number }) {
+  agentState.update((state) => ({ ...state, terminalPosition: position }));
+}
+
+export function updateTerminalSize(size: { width: number; height: number }) {
+  agentState.update((state) => ({ ...state, terminalSize: size }));
 }
 
 export function getHistory(): Array<{ role: string; content: string }> {

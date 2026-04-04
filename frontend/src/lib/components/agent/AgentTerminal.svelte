@@ -17,7 +17,6 @@
     type Artifact,
   } from "$lib/stores/agent";
   import { api } from "$lib/api/client";
-  import ArtifactWindow from "./ArtifactWindow.svelte";
 
   let inputValue = $state("");
   let inputRef: HTMLInputElement;
@@ -336,12 +335,6 @@ Artifact references in prompts:
           </div>
         </div>
       {/if}
-    </div>
-
-    <div class="artifacts-area">
-      {#each $agentState.artifacts as artifact, i}
-        <ArtifactWindow {artifact} index={i} onClose={removeArtifact} />
-      {/each}
     </div>
   </div>
 
