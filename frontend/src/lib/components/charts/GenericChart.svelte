@@ -103,6 +103,16 @@
   });
 
   $effect(() => {
+    if (!chart) return;
+    if (container) {
+      chart.applyOptions({
+        width: container.clientWidth,
+        height: height || container.clientHeight,
+      });
+    }
+  });
+
+  $effect(() => {
     if (!chart || !data.length) return;
 
     if (series) {
