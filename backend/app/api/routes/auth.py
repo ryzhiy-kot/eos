@@ -18,10 +18,14 @@ from app.services.auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
 
+# Fixed UUIDs for consistent user IDs across restarts
+TRADER_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
+ADMIN_USER_ID = "550e8400-e29b-41d4-a716-446655440001"
+
 # In-memory user store for mock mode (replace with DB in production)
 MOCK_USERS = {
     "admin": {
-        "id": str(uuid4()),
+        "id": ADMIN_USER_ID,
         "email": "admin@company.com",
         "display_name": "Admin User",
         "role": "admin",
@@ -29,7 +33,7 @@ MOCK_USERS = {
         "is_active": True,
     },
     "trader": {
-        "id": str(uuid4()),
+        "id": TRADER_USER_ID,
         "email": "trader@company.com",
         "display_name": "Jane Trader",
         "role": "trader",

@@ -96,6 +96,8 @@ class PnLAttributionResponse(BaseModel):
 class AgentChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
+    session_id: str | None = None
+    history: list[dict] | None = None
 
 
 class AgentChatResponse(BaseModel):

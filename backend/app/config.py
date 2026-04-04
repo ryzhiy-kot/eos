@@ -36,8 +36,18 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
+    # GROQ
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    # LLM Provider: "gemini" or "groq"
+    LLM_PROVIDER: str = "groq"
+
+    # Demo Mode (mock LLM responses when no API key available)
+    DEMO_MODE: bool = True
+
     # Financial API (mock mode)
-    MOCK_MODE: bool = True
+
     FINANCIAL_API_BASE_URL: str = "https://api.financial-data.internal"
     FINANCIAL_WS_URL: str = "wss://ws.financial-data.internal"
 

@@ -1,12 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { login, isLoading, authError, isAuthenticated, mockLogin } from "$lib/stores/auth";
-  import { mockConfig, enableMockMode } from "$lib/config";
+  import { login, isLoading, authError, isAuthenticated } from "$lib/stores/auth";
 
   let username = $state("trader");
   let password = $state("trader123");
-  let useMock = $state(true);
 
   onMount(() => {
     if ($isAuthenticated) {
@@ -17,13 +15,8 @@
   async function handleLogin(e: Event) {
     e.preventDefault();
     try {
-      if (useMock) {
-        mockLogin(username || "user");
-        goto("/");
-      } else {
-        await login(username, password);
-        goto("/");
-      }
+      await login(username, password);
+      goto("/");
     } catch {
       // error is in store
     }
@@ -66,12 +59,6 @@
           placeholder="Enter password"
           autocomplete="current-password"
         />
-      </div>
-      <div class="field checkbox-field">
-        <label>
-          <input type="checkbox" bind:checked={useMock} />
-          <span>Use Mock Data (Demo Mode)</span>
-        </label>
       </div>
       <button type="submit" class="btn btn-primary login-btn" disabled={$isLoading}>
         {$isLoading ? "Signing in..." : "Sign In"}

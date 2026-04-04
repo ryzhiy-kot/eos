@@ -130,7 +130,7 @@ class ApiClient {
   }
 
   // Agent
-  async *agentChat(message: string, conversationId?: string) {
+  async *agentChat(message: string, sessionId?: string, history?: Array<{role: string, content: string}>) {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
@@ -138,10 +138,14 @@ class ApiClient {
       headers["Authorization"] = `Bearer ${this.token}`;
     }
 
+    const body: Record<string, unknown> = { message };
+    if (sessionId) body.session_id = sessionId;
+    if (history) body.history = history;
+
     const response = await fetch(`${API_BASE}/agents/chat`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ message, conversation_id: conversationId }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

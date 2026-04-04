@@ -3,6 +3,8 @@
   import { onMount } from "svelte";
   import { checkAuth } from "$lib/stores/auth";
   import { page } from "$app/stores";
+  import { agentState, togglePanel } from "$lib/stores/agent";
+  import AgentTerminal from "$lib/components/agent/AgentTerminal.svelte";
 
   let { children } = $props();
 
@@ -31,19 +33,28 @@
           <a href="/market" class="nav-link" class:active={$page.url.pathname === "/market"}>Market</a>
           <a href="/risk" class="nav-link" class:active={$page.url.pathname === "/risk"}>Risk</a>
           <a href="/pnl" class="nav-link" class:active={$page.url.pathname === "/pnl"}>P&amp;L</a>
-          <a href="/agent" class="nav-link" class:active={$page.url.pathname === "/agent"}>AI Agent</a>
         </nav>
       </div>
       <div class="header-right">
+        <button class="terminal-toggle" onclick={togglePanel}>
+          <span class="terminal-icon">❯</span>
+          <span>Terminal</span>
+          <span class="toggle-arrow" class:expanded={$agentState.panelExpanded}>▼</span>
+        </button>
         <div class="live-indicator">
           <span class="live-dot"></span>
           <span>Live</span>
         </div>
       </div>
     </header>
-    <main class="main-content">
+    <main class="main-content" class:panel-open={$agentState.panelExpanded}>
       {@render children()}
     </main>
+    {#if $agentState.panelExpanded}
+      <div class="terminal-panel">
+        <AgentTerminal />
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -118,6 +129,39 @@
     background: rgba(59, 130, 246, 0.1);
   }
 
+  .terminal-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 4px;
+    padding: 5px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .terminal-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .terminal-icon {
+    color: var(--green);
+  }
+
+  .toggle-arrow {
+    font-size: 8px;
+    transition: transform 0.2s ease;
+  }
+
+  .toggle-arrow.expanded {
+    transform: rotate(180deg);
+  }
+
   .live-indicator {
     display: flex;
     align-items: center;
@@ -132,5 +176,15 @@
     overflow: auto;
     padding: 12px;
     background: var(--bg-primary);
+    transition: height 0.3s ease;
+  }
+
+  .main-content.panel-open {
+    height: 60vh;
+  }
+
+  .terminal-panel {
+    height: 40vh;
+    flex-shrink: 0;
   }
 </style>

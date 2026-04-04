@@ -4,11 +4,10 @@
   import { api } from "$lib/api/client";
   import * as mock from "$lib/api/mock";
   import {
-    messages,
-    isAgentTyping,
+    agentState,
     addUserMessage,
     addAssistantMessage,
-    clearMessages,
+    clearConversation,
   } from "$lib/stores/agent";
 
   let inputText = $state("");
@@ -31,7 +30,6 @@
 
     inputText = "";
     addUserMessage(msg);
-    isAgentTyping.set(true);
 
     let fullResponse = "";
     let charts: any[] = [];
@@ -96,35 +94,13 @@
             `Try asking: "What's my P&L today?" or "Show me my risk exposure"`;
         }
         
-        addAssistantMessage(fullResponse, charts, tables);
+        addAssistantMessage(fullResponse);
       } else {
-        // Real API call
-        for await (const chunk of api.agentChat(msg)) {
-          if (chunk.type === "text") {
-            fullResponse += chunk.content;
-            addAssistantMessage(fullResponse, [], []);
-          } else if (chunk.type === "chart") {
-            charts.push(chunk);
-          } else if (chunk.type === "table") {
-            tables.push(chunk);
-          } else if (chunk.type === "done") {
-            if (charts.length > 0 || tables.length > 0) {
-              messages.update((msgs) => {
-                const last = msgs[msgs.length - 1];
-                if (last && last.role === "assistant") {
-                  last.charts = charts;
-                  last.tables = tables;
-                }
-                return [...msgs];
-              });
-            }
-          }
-        }
+        // Real API call - this path needs adjustment since terminal handles it differently now
+        addAssistantMessage("Please use the Terminal panel below for AI-powered analysis.");
       }
     } catch (e: any) {
-      addAssistantMessage("Sorry, I encountered an error. Please try again.", [], []);
-    } finally {
-      isAgentTyping.set(false);
+      addAssistantMessage("Sorry, I encountered an error. Please try again.");
     }
   }
 
@@ -142,7 +118,7 @@
   }
 
   $effect(() => {
-    if ($messages.length) {
+    if ($agentState.messages.length) {
       scrollToBottom();
     }
   });
@@ -160,11 +136,11 @@
         <span class="mock-tag">Mock</span>
       {/if}
     </div>
-    <button class="btn" onclick={clearMessages}>Clear</button>
+    <button class="btn" onclick={clearConversation}>Clear</button>
   </div>
 
   <div class="messages" bind:this={messagesContainer}>
-    {#if $messages.length === 0}
+    {#if $agentState.messages.length === 0}
       <div class="empty-state">
         <div class="empty-icon">AI</div>
         <h3>Financial AI Analyst</h3>
@@ -179,43 +155,16 @@
       </div>
     {/if}
 
-    {#each $messages as msg}
+    {#each $agentState.messages as msg}
       <div class="message" class:user={msg.role === "user"} class:assistant={msg.role === "assistant"}>
         <div class="message-role">{msg.role === "user" ? "You" : "Analyst"}</div>
         <div class="message-content">
           {@html msg.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>")}
         </div>
-        {#if msg.tables.length > 0}
-          {#each msg.tables as table}
-            <div class="agent-table">
-              <div class="table-title">{table.title}</div>
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    {#each table.columns as col}
-                      <th>{col}</th>
-                    {/each}
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each table.data as row}
-                    <tr>
-                      {#each row as cell, i}
-                        <td class:text-right={i > 0} class:mono={i > 0}>
-                          {typeof cell === "number" ? cell.toLocaleString() : cell}
-                        </td>
-                      {/each}
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          {/each}
-        {/if}
       </div>
     {/each}
 
-    {#if $isAgentTyping}
+    {#if $agentState.isStreaming}
       <div class="message assistant">
         <div class="message-role">Analyst</div>
         <div class="typing-indicator">
@@ -236,7 +185,7 @@
     <button
       class="btn btn-primary send-btn"
       onclick={() => sendMessage()}
-      disabled={!inputText.trim() || $isAgentTyping}
+      disabled={!inputText.trim() || $agentState.isStreaming}
     >
       Send
     </button>
