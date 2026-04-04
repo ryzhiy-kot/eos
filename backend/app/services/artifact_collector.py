@@ -49,11 +49,28 @@ class ArtifactCollector:
 
         elif chart_type == "line":
             line_data = []
-            for _, row in df.iterrows():
+            for idx, row in enumerate(df.iterrows()):
+                row = row[1]
+                time_val = row.get("timestamp") or row.get("date") or row.get("time")
+                if time_val and isinstance(time_val, str):
+                    if time_val.isdigit():
+                        time_val = int(time_val)
+                    else:
+                        try:
+                            from datetime import datetime
+
+                            dt = datetime.strptime(time_val, "%Y-%m-%d")
+                            time_val = int(dt.timestamp())
+                        except:
+                            time_val = idx + 1
+                else:
+                    time_val = idx + 1
+
+                value = float(row.get("value") or row.get("rate") or row.get("pnl") or 0)
                 line_data.append(
                     {
-                        "time": row.get("timestamp") or row.get("date") or "",
-                        "value": float(row.get("value") or row.get("rate") or row.get("pnl") or 0),
+                        "time": time_val,
+                        "value": value,
                     }
                 )
             return {"type": "line", "data": line_data, "title": title}
