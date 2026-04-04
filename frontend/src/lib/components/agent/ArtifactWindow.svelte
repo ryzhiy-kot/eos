@@ -21,15 +21,21 @@
   let resizeStart = $state({ width: 0, height: 0, x: 0, y: 0 });
 
   function handleMouseDown(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest(".window-controls")) return;
-    if ((e.target as HTMLElement).classList.contains("resize-handle")) {
+    const target = e.target as HTMLElement;
+    if (target.closest(".window-controls")) return;
+    
+    const isResizeHandle = target.classList.contains("resize-handle") || target.closest(".resize-handle");
+    if (isResizeHandle) {
       isResizing = true;
       resizeStart = { width: size.width, height: size.height, x: e.clientX, y: e.clientY };
       e.preventDefault();
+      e.stopPropagation();
       return;
     }
+    
     isDragging = true;
     dragStart = { x: e.clientX - position.x, y: e.clientY - position.y };
+    e.stopPropagation();
   }
 
   function handleMouseMove(e: MouseEvent) {
@@ -71,6 +77,7 @@
   class="artifact-window"
   class:minimized={isMinimized}
   class:dragging={isDragging}
+  onmousedown={handleMouseDown}
   style="left: {position.x}px; top: {position.y}px; width: {size.width}px; height: {size.height}px;"
 >
   <div class="window-header" onmousedown={handleMouseDown}>

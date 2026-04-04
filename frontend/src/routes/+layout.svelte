@@ -23,7 +23,10 @@
   const isLoginPage = $derived($page.url.pathname === "/login");
 
   function handleTerminalMouseDown(e: MouseEvent) {
-    if ((e.target as HTMLElement).classList.contains("resize-handle")) {
+    const target = e.target as HTMLElement;
+    const isResizeHandle = target.classList.contains("resize-handle") || target.closest(".resize-handle");
+    
+    if (isResizeHandle) {
       isResizing = true;
       resizeStart = {
         width: $agentState.terminalSize.width,
@@ -32,11 +35,14 @@
         y: e.clientY,
       };
       e.preventDefault();
+      e.stopPropagation();
       return;
     }
-    if ((e.target as HTMLElement).closest(".terminal-header")) {
+    
+    if (target.closest(".terminal-header")) {
       isDragging = true;
       dragStart = { x: e.clientX - $agentState.terminalPosition.x, y: e.clientY - $agentState.terminalPosition.y };
+      e.stopPropagation();
     }
   }
 
