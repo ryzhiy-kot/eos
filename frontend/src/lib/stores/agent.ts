@@ -12,6 +12,7 @@ export interface Artifact {
   pdfData?: string;
   format?: string;
   created_at: string;
+  visible: boolean;
 }
 
 export interface Message {
@@ -29,6 +30,8 @@ export interface AgentState {
   isStreaming: boolean;
   panelExpanded: boolean;
   sessionId: string;
+  terminalPosition: { x: number; y: number };
+  terminalSize: { width: number; height: number };
 }
 
 const initialState: AgentState = {
@@ -39,6 +42,8 @@ const initialState: AgentState = {
   isStreaming: false,
   panelExpanded: true,
   sessionId: crypto.randomUUID(),
+  terminalPosition: { x: 20, y: 20 },
+  terminalSize: { width: 450, height: 400 },
 };
 
 export const agentState = writable<AgentState>(initialState);
@@ -51,6 +56,8 @@ export const isPanelExpanded = derived(
 export const currentMessages = derived(agentState, ($state) => $state.messages);
 
 export const currentArtifacts = derived(agentState, ($state) => $state.artifacts);
+
+export const visibleArtifacts = derived(agentState, ($state) => $state.artifacts.filter(a => a.visible));
 
 function addMessageToHistory(input: string) {
   agentState.update((state) => {
@@ -135,14 +142,14 @@ export function appendToLastMessage(extraContent: string) {
 export function addArtifact(artifact: Artifact) {
   agentState.update((state) => ({
     ...state,
-    artifacts: [...state.artifacts, artifact],
+    artifacts: [...state.artifacts, { ...artifact, visible: artifact.visible ?? true }],
   }));
 }
 
 export function updateArtifacts(artifacts: Artifact[]) {
   agentState.update((state) => ({
     ...state,
-    artifacts,
+    artifacts: artifacts.map((a) => ({ ...a, visible: a.visible ?? true })),
   }));
 }
 
@@ -150,6 +157,34 @@ export function removeArtifact(id: string) {
   agentState.update((state) => ({
     ...state,
     artifacts: state.artifacts.filter((a) => a.id !== id),
+  }));
+}
+
+export function hideArtifact(id: string) {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: state.artifacts.map((a) => (a.id === id ? { ...a, visible: false } : a)),
+  }));
+}
+
+export function showArtifact(id: string) {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: state.artifacts.map((a) => (a.id === id ? { ...a, visible: true } : a)),
+  }));
+}
+
+export function deleteArtifact(id: string) {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: state.artifacts.filter((a) => a.id !== id),
+  }));
+}
+
+export function clearAllArtifacts() {
+  agentState.update((state) => ({
+    ...state,
+    artifacts: [],
   }));
 }
 
@@ -176,6 +211,14 @@ export function clearConversation() {
     artifacts: [],
     sessionId: crypto.randomUUID(),
   }));
+}
+
+export function updateTerminalPosition(position: { x: number; y: number }) {
+  agentState.update((state) => ({ ...state, terminalPosition: position }));
+}
+
+export function updateTerminalSize(size: { width: number; height: number }) {
+  agentState.update((state) => ({ ...state, terminalSize: size }));
 }
 
 export function getHistory(): Array<{ role: string; content: string }> {

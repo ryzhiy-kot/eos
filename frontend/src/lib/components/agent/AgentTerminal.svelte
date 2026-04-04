@@ -8,6 +8,9 @@
     addArtifact,
     updateArtifacts,
     removeArtifact,
+    showArtifact,
+    deleteArtifact,
+    clearAllArtifacts,
     setStreaming,
     clearConversation,
     navigateHistory,
@@ -17,7 +20,6 @@
     type Artifact,
   } from "$lib/stores/agent";
   import { api } from "$lib/api/client";
-  import ArtifactWindow from "./ArtifactWindow.svelte";
 
   let inputValue = $state("");
   let inputRef: HTMLInputElement;
@@ -98,8 +100,44 @@
           addAssistantMessage("No artifacts yet.");
           return;
         }
-        const list = state.artifacts.map((a, i) => `[${i}] ${a.type}: ${a.title || "Untitled"}`).join("\n");
-        addAssistantMessage(`Available artifacts:\n${list}\n\nUse !cat <n> to view details or !export <n> to save.`);
+        const list = state.artifacts.map((a, i) => `[${i}] ${a.type}: ${a.title || "Untitled"}${a.visible ? "" : " (hidden)"}`).join("\n");
+        addAssistantMessage(`Available artifacts:\n${list}\n\nUse !show <n> to display an artifact, !cat <n> for details.`);
+        break;
+      }
+      case "show": {
+        if (parts.length === 0) {
+          addAssistantMessage("Usage: !show <index> (e.g., !show 0)");
+          return;
+        }
+        const idx = parseInt(parts[0], 10);
+        const artifact = getArtifactByIndex(idx);
+        if (!artifact) {
+          addAssistantMessage(`Artifact ${idx} not found.`);
+          return;
+        }
+        showArtifact(artifact.id);
+        addAssistantMessage(`Artifact ${idx} (${artifact.type}: ${artifact.title}) is now visible.`);
+        break;
+      }
+      case "del":
+      case "delete": {
+        if (parts.length === 0) {
+          addAssistantMessage("Usage: !del <index> (e.g., !del 0)");
+          return;
+        }
+        const idx = parseInt(parts[0], 10);
+        const artifact = getArtifactByIndex(idx);
+        if (!artifact) {
+          addAssistantMessage(`Artifact ${idx} not found.`);
+          return;
+        }
+        deleteArtifact(artifact.id);
+        addAssistantMessage(`Artifact ${idx} (${artifact.type}: ${artifact.title}) deleted.`);
+        break;
+      }
+      case "clear-artifacts": {
+        clearAllArtifacts();
+        addAssistantMessage("All artifacts cleared.");
         break;
       }
       case "cat": {
@@ -128,10 +166,12 @@
       case "help":
         addAssistantMessage(`Available commands:
 !ls, !list - Show all artifacts
+!show <n> - Show/hide artifact
+!del <n> - Delete artifact
 !cat <n> - Show artifact details
 !export <n> [format] - Export artifact
-!save <n> - Alias for export
 !clear - Clear conversation
+!clear-artifacts - Delete all artifacts
 !help - Show this help
 
 Artifact references in prompts:
@@ -243,6 +283,7 @@ Artifact references in prompts:
             pdfData: event.data,
             format: event.format,
             created_at: new Date().toISOString(),
+            visible: true,
           });
           break;
         case "error":
@@ -315,7 +356,7 @@ Artifact references in prompts:
           <div class="empty-icon">❯</div>
           <p>Welcome to FinAgent Terminal</p>
           <p class="hint">Ask about P&L, risk, positions, rates, or market data</p>
-          <p class="hint">Commands: !help, !ls, !export</p>
+          <p class="hint">Commands: !help, !ls, !show, !del</p>
         </div>
       {/if}
 
@@ -336,12 +377,6 @@ Artifact references in prompts:
           </div>
         </div>
       {/if}
-    </div>
-
-    <div class="artifacts-area">
-      {#each $agentState.artifacts as artifact, i}
-        <ArtifactWindow {artifact} index={i} onClose={removeArtifact} />
-      {/each}
     </div>
   </div>
 

@@ -3,17 +3,71 @@
   import { onMount } from "svelte";
   import { checkAuth } from "$lib/stores/auth";
   import { page } from "$app/stores";
-  import { agentState, togglePanel } from "$lib/stores/agent";
+  import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact } from "$lib/stores/agent";
   import AgentTerminal from "$lib/components/agent/AgentTerminal.svelte";
+  import ArtifactWindow from "$lib/components/agent/ArtifactWindow.svelte";
 
   let { children } = $props();
 
+  let terminalRef: HTMLDivElement;
+  let isDragging = $state(false);
+  let dragStart = $state({ x: 0, y: 0 });
+  let isResizing = $state(false);
+  let resizeStart = $state({ width: 0, height: 0, x: 0, y: 0 });
+
   onMount(() => {
     checkAuth();
+    expandPanel();
   });
 
   const isLoginPage = $derived($page.url.pathname === "/login");
+
+  function handleTerminalMouseDown(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const isResizeHandle = target.classList.contains("resize-handle") || target.closest(".resize-handle");
+    
+    if (isResizeHandle) {
+      isResizing = true;
+      resizeStart = {
+        width: $agentState.terminalSize.width,
+        height: $agentState.terminalSize.height,
+        x: e.clientX,
+        y: e.clientY,
+      };
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    
+    if (target.closest(".terminal-header")) {
+      isDragging = true;
+      dragStart = { x: e.clientX - $agentState.terminalPosition.x, y: e.clientY - $agentState.terminalPosition.y };
+      e.stopPropagation();
+    }
+  }
+
+  function handleMouseMove(e: MouseEvent) {
+    if (isDragging) {
+      const newX = Math.max(0, e.clientX - dragStart.x);
+      const newY = Math.max(0, e.clientY - dragStart.y);
+      updateTerminalPosition({ x: newX, y: newY });
+    }
+    if (isResizing) {
+      const deltaX = e.clientX - resizeStart.x;
+      const deltaY = e.clientY - resizeStart.y;
+      const newWidth = Math.max(300, resizeStart.width + deltaX);
+      const newHeight = Math.max(200, resizeStart.height + deltaY);
+      updateTerminalSize({ width: newWidth, height: newHeight });
+    }
+  }
+
+  function handleMouseUp() {
+    isDragging = false;
+    isResizing = false;
+  }
 </script>
+
+<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 {#if isLoginPage}
   {@render children()}
@@ -47,12 +101,30 @@
         </div>
       </div>
     </header>
-    <main class="main-content" class:panel-open={$agentState.panelExpanded}>
+    <main class="main-content">
       {@render children()}
     </main>
+    
     {#if $agentState.panelExpanded}
-      <div class="terminal-panel">
+      <div 
+        class="floating-terminal" 
+        bind:this={terminalRef}
+        onmousedown={handleTerminalMouseDown}
+        style="
+          left: {$agentState.terminalPosition.x}px; 
+          top: {$agentState.terminalPosition.y}px;
+          width: {$agentState.terminalSize.width}px;
+          height: {$agentState.terminalSize.height}px;
+        "
+      >
         <AgentTerminal />
+        <div class="resize-handle"></div>
+      </div>
+      
+      <div class="artifacts-layer">
+        {#each $visibleArtifacts as artifact, i (artifact.id)}
+          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} />
+        {/each}
       </div>
     {/if}
   </div>
@@ -65,6 +137,7 @@
     height: 100vh;
     width: 100vw;
     overflow: hidden;
+    position: relative;
   }
 
   .header {
@@ -176,15 +249,39 @@
     overflow: auto;
     padding: 12px;
     background: var(--bg-primary);
-    transition: height 0.3s ease;
   }
 
-  .main-content.panel-open {
-    height: 60vh;
+  .floating-terminal {
+    position: fixed;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-primary);
   }
 
-  .terminal-panel {
-    height: 40vh;
-    flex-shrink: 0;
+  .resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: se-resize;
+    background: linear-gradient(135deg, transparent 50%, var(--text-muted) 50%);
+  }
+
+  .artifacts-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  .artifacts-layer :global(.artifact-window) {
+    pointer-events: auto;
   }
 </style>
