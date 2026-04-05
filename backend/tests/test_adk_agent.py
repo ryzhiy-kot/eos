@@ -1,3 +1,4 @@
+import os
 import pytest
 import pytest_asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -6,9 +7,15 @@ from google.adk.sessions import InMemorySessionService
 from app.agents.adk_agent import (
     create_main_agent,
     create_code_executor_subagent,
-    get_session_service,
     run_agent,
 )
+from app.services.session_service import get_session_service
+
+def has_llm_key():
+    return bool(os.getenv("GROQ_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+
+
+skip_if_no_llm = pytest.mark.skipif(not has_llm_key(), reason="No LLM API key available")
 
 
 def test_create_code_executor_subagent():
@@ -35,6 +42,7 @@ def test_get_session_service():
 
 
 @pytest.mark.asyncio
+@skip_if_no_llm
 async def test_run_agent_simple_message():
     """Test running the agent with a simple message."""
     events = []
@@ -50,6 +58,7 @@ async def test_run_agent_simple_message():
 
 
 @pytest.mark.asyncio
+@skip_if_no_llm
 async def test_run_agent_with_pnl_query():
     """Test running the agent with a P&L query."""
     events = []
@@ -64,6 +73,7 @@ async def test_run_agent_with_pnl_query():
 
 
 @pytest.mark.asyncio
+@skip_if_no_llm
 async def test_run_agent_returns_done_event():
     """Test that the agent returns a done event at the end."""
     events = []
@@ -89,6 +99,7 @@ def test_main_agent_has_agent_function_tool():
 
 
 @pytest.mark.asyncio
+@skip_if_no_llm
 async def test_run_agent_creates_adk_session():
     """Test that run_agent creates an ADK session."""
     session_service = get_session_service()
@@ -111,6 +122,7 @@ async def test_run_agent_creates_adk_session():
 
 
 @pytest.mark.asyncio
+@skip_if_no_llm
 async def test_multiple_messages_same_session():
     """Test running multiple messages in the same session."""
     session_id = "test_session_multi"

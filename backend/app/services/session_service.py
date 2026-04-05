@@ -115,6 +115,26 @@ class SessionService:
             logger.info(f"Created session {session_id} for user {user_id}")
             return db_session
 
+    async def ensure_session(self, session_id: str, user_id: str, name: str | None = None) -> Session:
+        """Ensure a session exists in the database, creating it if necessary."""
+        async with self._session_factory() as session:
+            db_session = await session.get(Session, session_id)
+            if db_session:
+                return db_session
+            
+            # Create if not found
+            session_name = name or await self._generate_name()
+            db_session = Session(
+                id=session_id,
+                user_id=user_id,
+                name=session_name,
+            )
+            session.add(db_session)
+            await session.commit()
+            await session.refresh(db_session)
+            logger.info(f"Lazily created session {session_id} for user {user_id}")
+            return db_session
+
     async def get_session(self, session_id: str) -> Session | None:
         """Get a session by ID."""
         async with self._session_factory() as session:

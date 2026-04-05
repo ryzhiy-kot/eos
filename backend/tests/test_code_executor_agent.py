@@ -17,8 +17,8 @@ async def test_execute_code_simple_calculation():
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert result["error"] is None
+    assert result.success is True
+    assert result.error is None
 
 
 @pytest.mark.asyncio
@@ -35,15 +35,15 @@ display.chart([{'name': d['desk'], 'value': d['total_pnl']} for d in pnl_data['d
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert len(result["text_outputs"]) > 0 or len(result["artifacts"]) > 0
+    assert result.success is True
+    assert len(result.text_outputs) > 0 or len(result.artifacts) > 0
 
 
 @pytest.mark.asyncio
 async def test_execute_code_with_display_table():
     """Test executing code that generates a table."""
     code = """
-data = [{"name": "AAPL", "price": 150}, {"name": "GOOGL", "price": 2800}]
+data = [{"Name": "AAPL", "price": 150}, {"Name": "GOOGL", "price": 2800}]
 display.table(data, title="Stock Prices")
 """
     result = await execute_code(
@@ -52,9 +52,9 @@ display.table(data, title="Stock Prices")
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert len(result["artifacts"]) > 0
-    assert result["artifacts"][0]["type"] == "table"
+    assert result.success is True
+    assert len(result.artifacts) > 0
+    assert result.artifacts[0]["type"] == "table"
 
 
 @pytest.mark.asyncio
@@ -69,8 +69,8 @@ display.text("# Hello\\n\\nThis is a test.", format='markdown')
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert len(result["text_outputs"]) > 0
+    assert result.success is True
+    assert len(result.text_outputs) > 0
 
 
 @pytest.mark.asyncio
@@ -85,16 +85,14 @@ this is invalid python
         session_id="test_session",
     )
 
-    assert result["success"] is False or result["error"] is not None
-    if result["success"]:
-        assert "text_outputs" in result or "artifacts" in result
+    assert result.success is False or result.error is not None
 
 
 @pytest.mark.asyncio
 async def test_execute_code_multiple_artifacts():
     """Test executing code that generates multiple artifacts."""
     code = """
-data = [{'name': 'AAPL', 'price': 150}]
+data = [{'Name': 'AAPL', 'price': 150}]
 display.chart(data, chart_type='bar', title='Chart 1')
 display.table(data, title='Table 1')
 """
@@ -104,8 +102,8 @@ display.table(data, title='Table 1')
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert len(result["artifacts"]) >= 1
+    assert result.success is True
+    assert len(result.artifacts) >= 1
 
 
 def test_create_execute_code_tool():
@@ -135,8 +133,8 @@ print('FX data retrieved, rates count:', len(fx_data.get('rates', [])))
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert len(result["text_outputs"]) > 0
+    assert result.success is True
+    assert len(result.text_outputs) > 0
 
 
 @pytest.mark.asyncio
@@ -152,5 +150,5 @@ print('Risk data retrieved, desks count:', len(risk_data.get('desks', [])))
         session_id="test_session",
     )
 
-    assert result["success"] is True
-    assert len(result["text_outputs"]) > 0
+    assert result.success is True
+    assert len(result.text_outputs) > 0

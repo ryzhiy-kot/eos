@@ -1,4 +1,5 @@
 import json
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -207,10 +208,8 @@ async def agent_chat(request: AgentChatRequest, current_user: dict = Depends(get
     user_id = current_user.get("sub", "unknown")
     session_service = get_session_service()
 
-    session_id = request.session_id
-    if not session_id:
-        session = await session_service.create_session(user_id=user_id, name=None)
-        session_id = session.id
+    session_id = request.session_id or str(uuid4())
+    await session_service.ensure_session(session_id=session_id, user_id=user_id)
 
     async def generate_response():
         yield json.dumps({"type": "session_id", "session_id": session_id}) + "\n"

@@ -451,10 +451,9 @@ def build_execution_context(
 
 
 class FunctionDoc(BaseModel):
-    description: str = Field(description="Short description of the function")
-    params: dict[str, str] = Field(description="Parameter names and expected types/defaults")
-    returns: str = Field(description="Return type of the function")
-    signature: str = Field(description="Full stringified signature")
+    description: str = Field(description="Full docstring of the function")
+    signature: str = Field(description="Full stringified signature with types and return annotation")
+
 
 
 class NamespaceDoc(BaseModel):
@@ -478,25 +477,19 @@ def get_available_functions() -> list[NamespaceDoc]:
     def _extract_func_info(func) -> FunctionDoc:
         sig = inspect.signature(func)
         doc = inspect.getdoc(func) or "No description provided."
-        desc = doc.split("\n")[0]
-        params = {}
+        desc = doc
 
         # Build clean signature string without 'self'
         filtered_params = []
         for name, param in sig.parameters.items():
             if name == "self":
                 continue
-            param_desc = (
-                str(param.annotation) if param.annotation != inspect.Parameter.empty else "Any"
-            )
-            if param.default != inspect.Parameter.empty:
-                param_desc += f" (default: {param.default})"
-            params[name] = param_desc
 
             # Reconstruct string
             param_str = name
             if param.annotation != inspect.Parameter.empty:
-                param_str += f": {getattr(param.annotation, '__name__', str(param.annotation).replace('typing.', ''))}"
+                attr_name = getattr(param.annotation, "__name__", str(param.annotation).replace("typing.", ""))
+                param_str += f": {attr_name}"
             if param.default != inspect.Parameter.empty:
                 if isinstance(param.default, str):
                     param_str += f" = '{param.default}'"
@@ -506,17 +499,11 @@ def get_available_functions() -> list[NamespaceDoc]:
 
         clean_sig = f"({', '.join(filtered_params)})"
 
-        returns = (
-            str(sig.return_annotation)
-            if sig.return_annotation != inspect.Parameter.empty
-            else "Any"
-        )
-        if getattr(sig.return_annotation, "__name__", None):
-            returns = sig.return_annotation.__name__
-        elif str(sig.return_annotation).startswith("typing."):
-            returns = str(sig.return_annotation).replace("typing.", "")
+        if sig.return_annotation != inspect.Parameter.empty:
+            ret_type = getattr(sig.return_annotation, "__name__", str(sig.return_annotation).replace("typing.", ""))
+            clean_sig += f" -> {ret_type}"
 
-        return FunctionDoc(description=desc, params=params, returns=returns, signature=clean_sig)
+        return FunctionDoc(description=desc, signature=clean_sig)
 
     bq_ns = NamespaceDoc(name="bq", description="Data Query", functions={})
     display_ns = NamespaceDoc(name="display", description="Display Utilities", functions={})
@@ -534,8 +521,10 @@ def get_available_functions() -> list[NamespaceDoc]:
         obj = getattr(ac, name)
         if isinstance(obj, type) and issubclass(obj, BaseModel) and obj.__name__ not in ['BaseModel']:
             schema = obj.model_json_schema()
-            if "title" in schema: del schema["title"]
-            if "type" in schema: del schema["type"]
+            if "title" in schema:
+                del schema["title"]
+            if "type" in schema:
+                del schema["type"]
             display_ns.models[obj.__name__] = schema
 
     return [bq_ns, display_ns]
@@ -545,11 +534,21 @@ def get_execution_environment_doc() -> str:
     """Dynamically generate the markdown documentation for the execution environment."""
     docs = get_available_functions()
 
-    doc_str = "Execution Environment:\n----------------------\nThe following functions and modules are pre-injected into the execution namespace:\n\n"
+    doc_str = """IMPORTANT: These functions are NOT directly callable by you. 
+They are only available INSIDE the code you write for execute_code.
+Write Python code that uses these functions, then pass the code to execute_code.
+
+Execution Environment:
+----------------------
+The following functions and modules are pre-injected into the execution namespace:
+
+"""
     for ns_info in docs:
         doc_str += f"{ns_info.description} ({ns_info.name}.*):\n"
         for func_name, info in ns_info.functions.items():
-            doc_str += f"- {ns_info.name}.{func_name}{info.signature} - {info.description}\n"
+            doc_str += f"- `{ns_info.name}.{func_name}{info.signature}`\n"
+            for line in info.description.split("\n"):
+                doc_str += f"  {line}\n"
         doc_str += "\n"
 
     doc_str += "Standard Modules:\n- pandas (as pd), numpy (as np), json, random, datetime\n\n"

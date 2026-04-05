@@ -85,11 +85,11 @@ Guidelines:
     return main_agent, code_executor_agent
 
 
-def get_session_service() -> InMemorySessionService:
-    """Get or create the global session service."""
-    if not hasattr(get_session_service, "_instance"):
-        get_session_service._instance = InMemorySessionService()
-    return get_session_service._instance
+def get_adk_session_service() -> InMemorySessionService:
+    """Get or create the global ADK in-memory session service."""
+    if not hasattr(get_adk_session_service, "_instance"):
+        get_adk_session_service._instance = InMemorySessionService()
+    return get_adk_session_service._instance
 
 
 async def save_artifacts_to_db(session_id: str, artifacts: list[dict]) -> None:
@@ -148,14 +148,14 @@ async def run_agent(
     Artifacts generated during execution are saved to the database.
     Messages are also persisted to enable session history navigation.
     """
-    db_session_service = get_session_service()
+    adk_session_service = get_adk_session_service()
 
     await save_message_to_db(session_id, "user", message)
 
     previous_messages = await load_messages_from_db(session_id)
     for prev_msg in previous_messages:
         try:
-            await db_session_service.create_session(
+            await adk_session_service.create_session(
                 app_name=APP_NAME,
                 user_id=user_id,
                 session_id=session_id,
@@ -163,32 +163,30 @@ async def run_agent(
             prev_content = types.Content(
                 role=prev_msg["role"], parts=[types.Part(text=prev_msg["content"])]
             )
-            await db_session_service.append_message(
+            await adk_session_service.append_message(
                 app_name=APP_NAME,
                 user_id=user_id,
                 session_id=session_id,
                 message=prev_content,
             )
-        except Exception:
-            pass
-
-    session_service = get_session_service()
+        except Exception as e:
+            logger.debug(f"Failed to append previous message to ADK session: {e}")
 
     try:
-        await session_service.create_session(
+        await adk_session_service.create_session(
             app_name=APP_NAME,
             user_id=user_id,
             session_id=session_id,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"ADK session already exists or failed to create: {e}")
 
     main_agent, _ = create_main_agent(user_id, session_id)
 
     runner = Runner(
         agent=main_agent,
         app_name=APP_NAME,
-        session_service=session_service,
+        session_service=adk_session_service,
     )
 
     content = types.Content(role="user", parts=[types.Part(text=message)])
