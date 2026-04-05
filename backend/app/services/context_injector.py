@@ -1,7 +1,9 @@
+import inspect
 import json
 import random
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from datetime import UTC, datetime, timedelta
+
+from pydantic import BaseModel, Field
 
 from app.services.artifact_collector import ArtifactCollector
 
@@ -69,12 +71,25 @@ def _get_instruments_for_desk(desk: str) -> list:
 
 
 def mock_pnl(
-    date: Optional[str] = None,
-    desk: Optional[str] = None,
+    date: str | None = None,
+    desk: str | None = None,
     currency: str = "USD",
-    strategy: Optional[str] = None,
+    strategy: str | None = None,
 ) -> dict:
-    """Mock P&L attribution data."""
+    """Get P&L attribution data for trading desks.
+
+    Args:
+        date: Date in YYYY-MM-DD format. Defaults to today.
+        desk: Trading desk name. Options: "FX", "Rates", "Credit", "Commodities".
+              Pass None for all desks.
+        currency: Currency code. Default: "USD"
+        strategy: Optional strategy name.
+
+    Returns:
+        dict with keys: date, total_pnl, desks
+        desks: list of {desk, total_pnl, positions, by_attribution}
+        positions: list of {symbol, name, pnl, notional, attribution}
+    """
     selected_desks = [desk] if desk else MOCK_DESKS
     result = {"date": date or datetime.now().date().isoformat(), "desks": []}
 
@@ -122,11 +137,23 @@ def _aggregate_by_attribution(positions: list) -> dict:
 
 
 def mock_risk(
-    date: Optional[str] = None,
-    desk: Optional[str] = None,
+    date: str | None = None,
+    desk: str | None = None,
     metric_type: str = "full",
 ) -> dict:
-    """Mock risk metrics data."""
+    """Get risk metrics (VaR, Greeks) for trading desks.
+
+    Args:
+        date: Date in YYYY-MM-DD format. Defaults to today.
+        desk: Trading desk name. Options: "FX", "Rates", "Credit", "Commodities".
+              Pass None for all desks.
+        metric_type: Type of risk metrics. Options: "full", "summary". Default: "full"
+
+    Returns:
+        dict with keys: date, desks, portfolio
+        desks: list of {desk, var_95, var_99, var_95_daily, delta, gamma, vega, theta, rho, notional}
+        portfolio: aggregate risk metrics across all desks
+    """
     selected_desks = [desk] if desk else MOCK_DESKS
 
     result = {"date": date or datetime.now().date().isoformat(), "desks": []}
@@ -163,11 +190,21 @@ def mock_risk(
 
 
 def mock_fx_rates(
-    pair: Optional[str] = None,
-    date: Optional[str] = None,
+    pair: str | None = None,
+    date: str | None = None,
     source: str = "mid",
 ) -> dict:
-    """Mock FX rates data."""
+    """Get current FX rates.
+
+    Args:
+        pair: Currency pair code, e.g., "EURUSD", "GBPUSD". Pass None for all pairs.
+        date: Date in YYYY-MM-DD format. Defaults to today.
+        source: Rate source. Options: "mid", "bid", "ask". Default: "mid"
+
+    Returns:
+        dict with keys: date, rates
+        rates: list of {pair, bid, ask, mid, change_bp, volume_1d}
+    """
     base_rates = {
         "EURUSD": 1.0850,
         "GBPUSD": 1.2650,
@@ -207,10 +244,20 @@ def mock_fx_rates(
 
 
 def mock_interest_curves(
-    curve_type: Optional[str] = None,
-    date: Optional[str] = None,
+    curve_type: str | None = None,
+    date: str | None = None,
 ) -> dict:
-    """Mock interest rate curve data."""
+    """Get interest rate curves.
+
+    Args:
+        curve_type: Curve currency. Options: "USD", "EUR", "GBP", "JPY", "CHF".
+                    Pass None for all curves.
+        date: Date in YYYY-MM-DD format. Defaults to today.
+
+    Returns:
+        dict with keys: date, curves
+        curves: list of {curve_type, tenors, rates, discount_factors}
+    """
     selected_curves = [curve_type] if curve_type else MOCK_CURVE_TYPES
 
     base_curves = {
@@ -243,11 +290,23 @@ def mock_interest_curves(
 
 
 def mock_positions(
-    desk: Optional[str] = None,
-    book: Optional[str] = None,
-    instrument: Optional[str] = None,
+    desk: str | None = None,
+    book: str | None = None,
+    instrument: str | None = None,
 ) -> dict:
-    """Mock positions data."""
+    """Get current trading positions.
+
+    Args:
+        desk: Trading desk name. Options: "FX", "Rates", "Credit", "Commodities".
+              Pass None for all desks.
+        book: Book name within desk. Pass None for all books.
+        instrument: Specific instrument symbol. Pass None for all.
+
+    Returns:
+        dict with keys: date, positions
+        positions: list of {id, desk, book, symbol, name, quantity, avg_price,
+                          current_price, pnl, market_value}
+    """
     selected_desks = [desk] if desk else MOCK_DESKS
     instruments = _get_instruments_for_desk(selected_desks[0]) if selected_desks else []
 
@@ -295,11 +354,21 @@ def mock_positions(
 
 
 def mock_news(
-    instrument: Optional[str] = None,
-    keywords: Optional[str] = None,
+    instrument: str | None = None,
+    keywords: str | None = None,
     max_results: int = 10,
 ) -> dict:
-    """Mock market news data."""
+    """Get market news headlines.
+
+    Args:
+        instrument: Specific instrument symbol to filter news.
+        keywords: Search keywords to filter headlines.
+        max_results: Maximum number of results. Default: 10
+
+    Returns:
+        dict with keys: news, timestamp
+        news: list of {id, headline, source, timestamp, relevance}
+    """
     headlines = [
         "Fed signals potential rate cut amid inflation concerns",
         "ECB maintains cautious stance on monetary policy",
@@ -314,7 +383,7 @@ def mock_news(
     ]
 
     selected = random.sample(headlines, min(max_results, len(headlines)))
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
 
     result = {"news": [], "timestamp": timestamp.isoformat()}
 
@@ -332,23 +401,44 @@ def mock_news(
     return result
 
 
+class DotDict:
+    """A dict subclass that allows attribute-style access."""
+
+    def __init__(self, data: dict):
+        object.__setattr__(self, "_data", data)
+
+    def __getattr__(self, name: str):
+        try:
+            return self._data[name]
+        except KeyError:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def __setattr__(self, name: str, value):
+        self._data[name] = value
+
+    def __dir__(self):
+        return list(self._data.keys())
+
+
 def build_execution_context(
     user_id: str,
-    conversation_history: Optional[list] = None,
+    conversation_history: list | None = None,
 ) -> tuple[dict, ArtifactCollector]:
     """Builds the context injected into the sandbox."""
 
     collector = ArtifactCollector()
 
+    bq_data = {
+        "pnl": mock_pnl,
+        "risk": mock_risk,
+        "fx_rates": mock_fx_rates,
+        "curves": mock_interest_curves,
+        "positions": mock_positions,
+        "news": mock_news,
+    }
+
     context = {
-        "bq": {
-            "pnl": mock_pnl,
-            "risk": mock_risk,
-            "fx_rates": mock_fx_rates,
-            "curves": mock_interest_curves,
-            "positions": mock_positions,
-            "news": mock_news,
-        },
+        "bq": DotDict(bq_data),
         "display": collector,
         "pd": None,
         "np": None,
@@ -360,99 +450,113 @@ def build_execution_context(
     return context, collector
 
 
-def get_available_functions() -> dict:
-    """Returns documentation about available functions for the LLM."""
-    return {
-        "bq": {
-            "pnl": {
-                "description": "Get P&L attribution data",
-                "params": {
-                    "date": "optional date string (YYYY-MM-DD)",
-                    "desk": f"optional desk name: {', '.join(MOCK_DESKS)}",
-                    "currency": "default 'USD'",
-                    "strategy": "optional strategy name",
-                },
-                "returns": "dict with total_pnl, positions, by_attribution",
-            },
-            "risk": {
-                "description": "Get risk metrics (VaR, Greeks)",
-                "params": {
-                    "date": "optional date string",
-                    "desk": f"optional desk: {', '.join(MOCK_DESKS)}",
-                    "metric_type": "default 'full'",
-                },
-                "returns": "dict with var_95, var_99, delta, gamma, vega, theta",
-            },
-            "fx_rates": {
-                "description": "Get current FX rates",
-                "params": {
-                    "pair": "optional currency pair (e.g. 'EURUSD')",
-                    "date": "optional date",
-                    "source": "default 'mid'",
-                },
-                "returns": "dict with rates (bid, ask, mid, change_bp)",
-            },
-            "curves": {
-                "description": "Get interest rate curves",
-                "params": {
-                    "curve_type": f"optional: {', '.join(MOCK_CURVE_TYPES)}",
-                    "date": "optional date",
-                },
-                "returns": "dict with tenors, rates, discount_factors",
-            },
-            "positions": {
-                "description": "Get current positions",
-                "params": {
-                    "desk": f"optional: {', '.join(MOCK_DESKS)}",
-                    "book": "optional book name",
-                },
-                "returns": "dict with position list",
-            },
-            "news": {
-                "description": "Get market news",
-                "params": {
-                    "instrument": "optional instrument symbol",
-                    "keywords": "optional search keywords",
-                    "max_results": "default 10",
-                },
-                "returns": "dict with news headlines",
-            },
-        },
-        "display": {
-            "chart": {
-                "description": "Render a chart from data",
-                "params": {
-                    "data": "pandas DataFrame or list of dicts",
-                    "chart_type": "'bar', 'line', 'candlestick', 'gauge'",
-                    "title": "optional title",
-                    "**kwargs": "additional chart options",
-                },
-                "returns": "artifact reference string",
-            },
-            "table": {
-                "description": "Render a table from data",
-                "params": {
-                    "data": "pandas DataFrame or list of dicts",
-                    "title": "optional title",
-                    "max_rows": "default 50",
-                },
-                "returns": "artifact reference string",
-            },
-            "pdf": {
-                "description": "Generate a PDF report",
-                "params": {
-                    "content": "dict with title, tables, text",
-                    "title": "optional title",
-                },
-                "returns": "artifact reference string",
-            },
-            "text": {
-                "description": "Display text or markdown",
-                "params": {
-                    "content": "text content",
-                    "format": "'markdown' or 'plain'",
-                },
-                "returns": "artifact reference string",
-            },
-        },
+class FunctionDoc(BaseModel):
+    description: str = Field(description="Full docstring of the function")
+    signature: str = Field(description="Full stringified signature with types and return annotation")
+
+
+
+class NamespaceDoc(BaseModel):
+    name: str = Field(description="Namespace identifier (e.g. 'bq' or 'display')")
+    description: str = Field(description="Description of the namespace")
+    functions: dict[str, FunctionDoc] = Field(description="Map of function names to their docs")
+    models: dict[str, dict] = Field(default_factory=dict, description="JSON schemas of complex types used in this namespace")
+
+
+def get_available_functions() -> list[NamespaceDoc]:
+    """Returns documentation about available functions by inspecting their signatures."""
+    bq_funcs = {
+        "pnl": mock_pnl,
+        "risk": mock_risk,
+        "fx_rates": mock_fx_rates,
+        "curves": mock_interest_curves,
+        "positions": mock_positions,
+        "news": mock_news,
     }
+
+    def _extract_func_info(func) -> FunctionDoc:
+        sig = inspect.signature(func)
+        doc = inspect.getdoc(func) or "No description provided."
+        desc = doc
+
+        # Build clean signature string without 'self'
+        filtered_params = []
+        for name, param in sig.parameters.items():
+            if name == "self":
+                continue
+
+            # Reconstruct string
+            param_str = name
+            if param.annotation != inspect.Parameter.empty:
+                attr_name = getattr(param.annotation, "__name__", str(param.annotation).replace("typing.", ""))
+                param_str += f": {attr_name}"
+            if param.default != inspect.Parameter.empty:
+                if isinstance(param.default, str):
+                    param_str += f" = '{param.default}'"
+                else:
+                    param_str += f" = {param.default}"
+            filtered_params.append(param_str)
+
+        clean_sig = f"({', '.join(filtered_params)})"
+
+        if sig.return_annotation != inspect.Parameter.empty:
+            ret_type = getattr(sig.return_annotation, "__name__", str(sig.return_annotation).replace("typing.", ""))
+            clean_sig += f" -> {ret_type}"
+
+        return FunctionDoc(description=desc, signature=clean_sig)
+
+    bq_ns = NamespaceDoc(name="bq", description="Data Query", functions={})
+    display_ns = NamespaceDoc(name="display", description="Display Utilities", functions={})
+
+    for name, func in bq_funcs.items():
+        bq_ns.functions[name] = _extract_func_info(func)
+
+    for name in dir(ArtifactCollector):
+        if not name.startswith("_") and callable(getattr(ArtifactCollector, name)):
+            func = getattr(ArtifactCollector, name)
+            display_ns.functions[name] = _extract_func_info(func)
+        
+    import app.services.artifact_collector as ac
+    for name in dir(ac):
+        obj = getattr(ac, name)
+        if isinstance(obj, type) and issubclass(obj, BaseModel) and obj.__name__ not in ['BaseModel']:
+            schema = obj.model_json_schema()
+            if "title" in schema:
+                del schema["title"]
+            if "type" in schema:
+                del schema["type"]
+            display_ns.models[obj.__name__] = schema
+
+    return [bq_ns, display_ns]
+
+
+def get_execution_environment_doc() -> str:
+    """Dynamically generate the markdown documentation for the execution environment."""
+    docs = get_available_functions()
+
+    doc_str = """IMPORTANT: These functions are NOT directly callable by you. 
+They are only available INSIDE the code you write for execute_code.
+Write Python code that uses these functions, then pass the code to execute_code.
+
+Execution Environment:
+----------------------
+The following functions and modules are pre-injected into the execution namespace:
+
+"""
+    for ns_info in docs:
+        doc_str += f"{ns_info.description} ({ns_info.name}.*):\n"
+        for func_name, info in ns_info.functions.items():
+            doc_str += f"- `{ns_info.name}.{func_name}{info.signature}`\n"
+            for line in info.description.split("\n"):
+                doc_str += f"  {line}\n"
+        doc_str += "\n"
+
+    doc_str += "Standard Modules:\n- pandas (as pd), numpy (as np), json, random, datetime\n\n"
+    
+    doc_str += "Data Structures:\n----------------\n"
+    import json
+    for ns_info in docs:
+        for model_name, schema in ns_info.models.items():
+            doc_str += f"Schema for {model_name}:\n{json.dumps(schema, indent=2)}\n\n"
+            
+    return doc_str

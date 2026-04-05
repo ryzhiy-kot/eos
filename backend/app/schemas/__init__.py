@@ -113,3 +113,52 @@ class ReportRequest(BaseModel):
     report_type: str  # risk, pnl, attribution
     parameters: dict = {}
     format: str = "pdf"
+
+
+class SessionCreate(BaseModel):
+    name: str | None = None
+
+
+class SessionUpdate(BaseModel):
+    name: str
+
+
+class SessionResponse(BaseModel):
+    id: str
+    user_id: str
+    name: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionResponse]
+
+
+class ArtifactResponse(BaseModel):
+    id: str
+    session_id: str
+    type: str
+    title: str | None = None
+    spec: dict | None = None
+    columns: list | None = None
+    data: dict | None = None
+    content: str | None = None
+    format: str | None = None
+    created_at: datetime
+
+
+class ArtifactListResponse(BaseModel):
+    artifacts: list[ArtifactResponse]
+
+
+class MessageResponse(BaseModel):
+    id: str
+    session_id: str
+    role: str
+    content: str
+    created_at: datetime
+
+
+class MessageListResponse(BaseModel):
+    messages: list[MessageResponse]

@@ -17,6 +17,8 @@
     getHistory,
     parsePrompt,
     getArtifactByIndex,
+    fetchSessions,
+    loadSession,
     type Artifact,
   } from "$lib/stores/agent";
   import { api } from "$lib/api/client";
@@ -24,9 +26,12 @@
   let inputValue = $state("");
   let inputRef: HTMLInputElement;
   let messagesContainer: HTMLDivElement;
+  let showSessionPicker = $state(false);
+  let selectedSessionIndex = $state<number | null>(null);
+  let isLoadingSession = $state(false);
 
-  onMount(() => {
-    // Use real API by default - backend handles mock/demo mode
+  onMount(async () => {
+    await fetchSessions();
   });
 
   async function handleExport(artifactIndex: number, format: string = "png") {
@@ -57,7 +62,9 @@
       return;
     }
 
-    const svg = document.querySelector(`.artifact-window[data-index="${artifactIndex}"] svg`);
+    const svg = document.querySelector(
+      `.artifact-window[data-index="${artifactIndex}"] svg`,
+    );
     if (svg) {
       const serializer = new XMLSerializer();
       const svgStr = serializer.serializeToString(svg);
@@ -77,12 +84,30 @@
 
   async function handleCommand(cmd: string, args: string) {
     const parts = args.trim().split(/\s+/);
-    
+
     switch (cmd) {
+      case "sessions": {
+        await fetchSessions();
+        const sessions = $agentState.availableSessions;
+        if (sessions.length === 0) {
+          addAssistantMessage(
+            "No previous sessions found. Start a conversation to create one.",
+          );
+          return;
+        }
+        showSessionPicker = true;
+        selectedSessionIndex = null;
+        addAssistantMessage(
+          `Select a session to load (enter number):\n${sessions.map((s, i) => `  [${i + 1}] ${s.name} - ${new Date(s.updated_at).toLocaleString()}`).join("\n")}\n\nPress Enter to select, or Esc to cancel.`,
+        );
+        return;
+      }
       case "export":
       case "save": {
         if (parts.length === 0) {
-          addAssistantMessage(`Usage: !export <index> [format]\n  !export 0 png\n  !export 1 pdf\n  !export 2`);
+          addAssistantMessage(
+            `Usage: !export <index> [format]\n  !export 0 png\n  !export 1 pdf\n  !export 2`,
+          );
           return;
         }
         const idx = parseInt(parts[0], 10);
@@ -100,8 +125,15 @@
           addAssistantMessage("No artifacts yet.");
           return;
         }
-        const list = state.artifacts.map((a, i) => `[${i}] ${a.type}: ${a.title || "Untitled"}${a.visible ? "" : " (hidden)"}`).join("\n");
-        addAssistantMessage(`Available artifacts:\n${list}\n\nUse !show <n> to display an artifact, !cat <n> for details.`);
+        const list = state.artifacts
+          .map(
+            (a, i) =>
+              `[${i}] ${a.type}: ${a.title || "Untitled"}${a.visible ? "" : " (hidden)"}`,
+          )
+          .join("\n");
+        addAssistantMessage(
+          `Available artifacts:\n${list}\n\nUse !show <n> to display an artifact, !cat <n> for details.`,
+        );
         break;
       }
       case "show": {
@@ -116,7 +148,9 @@
           return;
         }
         showArtifact(artifact.id);
-        addAssistantMessage(`Artifact ${idx} (${artifact.type}: ${artifact.title}) is now visible.`);
+        addAssistantMessage(
+          `Artifact ${idx} (${artifact.type}: ${artifact.title}) is now visible.`,
+        );
         break;
       }
       case "del":
@@ -132,7 +166,9 @@
           return;
         }
         deleteArtifact(artifact.id);
-        addAssistantMessage(`Artifact ${idx} (${artifact.type}: ${artifact.title}) deleted.`);
+        addAssistantMessage(
+          `Artifact ${idx} (${artifact.type}: ${artifact.title}) deleted.`,
+        );
         break;
       }
       case "clear-artifacts": {
@@ -152,11 +188,17 @@
           return;
         }
         if (artifact.type === "text" || artifact.type === "table") {
-          addAssistantMessage(artifact.content || JSON.stringify(artifact.data, null, 2));
+          addAssistantMessage(
+            artifact.content || JSON.stringify(artifact.data, null, 2),
+          );
         } else if (artifact.type === "chart") {
-          addAssistantMessage(`Chart: ${artifact.title}\nType: ${artifact.chart_type || artifact.spec}`);
+          addAssistantMessage(
+            `Chart: ${artifact.title}\nType: ${artifact.chart_type || artifact.spec}`,
+          );
         } else if (artifact.type === "pdf") {
-          addAssistantMessage(`PDF: ${artifact.title} (${artifact.pdfData?.length || 0} bytes)`);
+          addAssistantMessage(
+            `PDF: ${artifact.title} (${artifact.pdfData?.length || 0} bytes)`,
+          );
         }
         break;
       }
@@ -172,6 +214,7 @@
 !export <n> [format] - Export artifact
 !clear - Clear conversation
 !clear-artifacts - Delete all artifacts
+!sessions - Show and switch between previous sessions
 !help - Show this help
 
 Artifact references in prompts:
@@ -191,7 +234,7 @@ Artifact references in prompts:
     inputValue = "";
 
     const parsed = parsePrompt(userMessage);
-    
+
     if (parsed.command) {
       await handleCommand(parsed.command, parsed.text);
       return;
@@ -218,11 +261,15 @@ Artifact references in prompts:
     if (references.length > 0) {
       const ref = references[0];
       if (ref.type === "chart") {
-        addAssistantMessage(`This chart shows ${ref.title || "data"}. The key insight is the trend displayed in the visualization.`);
+        addAssistantMessage(
+          `This chart shows ${ref.title || "data"}. The key insight is the trend displayed in the visualization.`,
+        );
         return;
       }
       if (ref.type === "table") {
-        addAssistantMessage(`This table contains ${ref.data?.length || 0} rows of ${ref.title || "data"}.`);
+        addAssistantMessage(
+          `This table contains ${ref.data?.length || 0} rows of ${ref.title || "data"}.`,
+        );
         return;
       }
     }
@@ -230,38 +277,67 @@ Artifact references in prompts:
     const msg = userMsg.toLowerCase();
 
     if (msg.includes("pnl") || msg.includes("profit")) {
-      addAssistantMessage("Mock P&L analysis: Your portfolio shows positive performance today.");
+      addAssistantMessage(
+        "Mock P&L analysis: Your portfolio shows positive performance today.",
+      );
     } else if (msg.includes("risk") || msg.includes("var")) {
-      addAssistantMessage("Mock Risk Analysis: VaR (95%) is within limits at $2.5M.");
+      addAssistantMessage(
+        "Mock Risk Analysis: VaR (95%) is within limits at $2.5M.",
+      );
     } else if (msg.includes("curve") || msg.includes("interest")) {
-      addAssistantMessage("Interest rate curves show inverted yield curve scenario.");
-    } else if (msg.includes("fx") || msg.includes("rate") || msg.includes("currency")) {
-      addAssistantMessage("FX rates: EURUSD 1.0850, GBPUSD 1.2650, USDJPY 149.50");
+      addAssistantMessage(
+        "Interest rate curves show inverted yield curve scenario.",
+      );
+    } else if (
+      msg.includes("fx") ||
+      msg.includes("rate") ||
+      msg.includes("currency")
+    ) {
+      addAssistantMessage(
+        "FX rates: EURUSD 1.0850, GBPUSD 1.2650, USDJPY 149.50",
+      );
     } else if (msg.includes("position")) {
-      addAssistantMessage("Current positions: 45 active positions across FX, Rates, Credit, Commodities.");
+      addAssistantMessage(
+        "Current positions: 45 active positions across FX, Rates, Credit, Commodities.",
+      );
     } else if (msg.includes("news")) {
-      addAssistantMessage("Market news: Fed signals potential rate cut amid inflation concerns.");
+      addAssistantMessage(
+        "Market news: Fed signals potential rate cut amid inflation concerns.",
+      );
     } else {
-      addAssistantMessage("I can help analyze P&L, risk, positions, and market data. What would you like to explore?\n\nTry: \"What's my P&L?\", \"Show risk\", \"FX rates\", \"interest curves\"");
+      addAssistantMessage(
+        'I can help analyze P&L, risk, positions, and market data. What would you like to explore?\n\nTry: "What\'s my P&L?", "Show risk", "FX rates", "interest curves"',
+      );
     }
   }
 
   async function handleRealResponse(userMsg: string, references: Artifact[]) {
     let enhancedMsg = userMsg;
-    
+
     if (references.length > 0) {
-      const refContext = references.map((r, i) => 
-        `Artifact ${i} (${r.type}): ${r.title || "Untitled"} - ${JSON.stringify(r.data || r.content || r.spec).slice(0, 200)}`
-      ).join("\n");
+      const refContext = references
+        .map(
+          (r, i) =>
+            `Artifact ${i} (${r.type}): ${r.title || "Untitled"} - ${JSON.stringify(r.data || r.content || r.spec).slice(0, 200)}`,
+        )
+        .join("\n");
       enhancedMsg = `${userMsg}\n\nReferenced artifacts:\n${refContext}`;
     }
 
     const history = getHistory();
 
-    for await (const event of api.agentChat(enhancedMsg, $agentState.sessionId, history)) {
+    for await (const event of api.agentChat(
+      enhancedMsg,
+      $agentState.sessionId,
+      history,
+    )) {
       switch (event.type) {
         case "text":
-          if ($agentState.messages.length > 0 && $agentState.messages[$agentState.messages.length - 1].role === "assistant") {
+          if (
+            $agentState.messages.length > 0 &&
+            $agentState.messages[$agentState.messages.length - 1].role ===
+              "assistant"
+          ) {
             appendToLastMessage(event.content);
           } else {
             addAssistantMessage(event.content);
@@ -302,6 +378,63 @@ Artifact references in prompts:
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (showSessionPicker) {
+      if (e.key === "Escape") {
+        showSessionPicker = false;
+        selectedSessionIndex = null;
+        addAssistantMessage("Session selection cancelled.");
+        return;
+      }
+
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (
+          selectedSessionIndex !== null &&
+          selectedSessionIndex >= 0 &&
+          selectedSessionIndex < $agentState.availableSessions.length
+        ) {
+          const session = $agentState.availableSessions[selectedSessionIndex];
+          isLoadingSession = true;
+          loadSession(session.id).then(() => {
+            isLoadingSession = false;
+            showSessionPicker = false;
+            selectedSessionIndex = null;
+            addAssistantMessage(`Loaded session: ${session.name}`);
+          });
+        } else if (inputValue.trim()) {
+          const num = parseInt(inputValue.trim(), 10);
+          if (
+            !isNaN(num) &&
+            num >= 1 &&
+            num <= $agentState.availableSessions.length
+          ) {
+            selectedSessionIndex = num - 1;
+            inputValue = "";
+          } else {
+            addAssistantMessage(
+              `Invalid selection. Enter a number between 1 and ${$agentState.availableSessions.length}.`,
+            );
+          }
+        }
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const current = selectedSessionIndex ?? -1;
+        selectedSessionIndex = Math.max(0, current - 1);
+      }
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const current = selectedSessionIndex ?? -1;
+        selectedSessionIndex = Math.min(
+          $agentState.availableSessions.length - 1,
+          current + 1,
+        );
+      }
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -338,12 +471,31 @@ Artifact references in prompts:
     <div class="terminal-title">
       <span class="terminal-icon">❯</span>
       <span>FinAgent Terminal</span>
+      {#if $agentState.sessionName}
+        <span class="session-name">{$agentState.sessionName}</span>
+      {/if}
       {#if $agentState.isStreaming}
         <span class="streaming-indicator">Processing...</span>
       {/if}
     </div>
     <div class="terminal-actions">
-      <button class="terminal-btn" onclick={clearConversation} title="Clear conversation">
+      <button
+        class="terminal-btn"
+        onclick={() => {
+          fetchSessions();
+          addAssistantMessage(
+            "Fetching sessions... Type !sessions to view and switch sessions.",
+          );
+        }}
+        title="Refresh sessions"
+      >
+        ↻
+      </button>
+      <button
+        class="terminal-btn"
+        onclick={clearConversation}
+        title="Clear conversation"
+      >
         Clear
       </button>
     </div>
@@ -355,13 +507,19 @@ Artifact references in prompts:
         <div class="empty-terminal">
           <div class="empty-icon">❯</div>
           <p>Welcome to FinAgent Terminal</p>
-          <p class="hint">Ask about P&L, risk, positions, rates, or market data</p>
-          <p class="hint">Commands: !help, !ls, !show, !del</p>
+          <p class="hint">
+            Ask about P&L, risk, positions, rates, or market data
+          </p>
+          <p class="hint">Commands: !help, !ls, !sessions</p>
         </div>
       {/if}
 
       {#each $agentState.messages as msg}
-        <div class="message" class:user={msg.role === "user"} class:assistant={msg.role === "assistant"}>
+        <div
+          class="message"
+          class:user={msg.role === "user"}
+          class:assistant={msg.role === "assistant"}
+        >
           <div class="message-label">{msg.role === "user" ? ">" : "❯"}</div>
           <div class="message-content">{msg.content}</div>
         </div>
@@ -436,6 +594,15 @@ Artifact references in prompts:
     font-size: 10px;
     color: var(--yellow);
     font-weight: normal;
+  }
+
+  .session-name {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: normal;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
   }
 
   .terminal-actions {

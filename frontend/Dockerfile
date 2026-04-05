@@ -1,4 +1,6 @@
-FROM node:20-alpine AS builder
+FROM docker.io/library/node:20-alpine AS builder
+
+ARG PUBLIC_API_BASE_URL=/api
 
 WORKDIR /app
 
@@ -7,7 +9,7 @@ RUN npm install
 
 COPY . .
 
-RUN npm run build
+RUN sh -c 'echo "Building with PUBLIC_API_BASE_URL=$PUBLIC_API_BASE_URL" && PUBLIC_API_BASE_URL=$PUBLIC_API_BASE_URL npm run build'
 
 FROM node:20-alpine
 

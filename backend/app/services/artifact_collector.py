@@ -1,24 +1,83 @@
 import base64
-import json
-import random
-from datetime import datetime, timedelta
-from io import BytesIO
-from typing import Any
+from typing import Optional, Union, Literal
+from pydantic import BaseModel, Field
+
+
+class BarData(BaseModel):
+    label: str = Field(description="Label for the bar")
+    value: float = Field(description="Numeric value")
+
+
+class LineData(BaseModel):
+    time: Union[int, str] = Field(
+        description="Unix timestamp or YYYY-MM-DD date string"
+    )
+    value: float = Field(description="Numeric value at this time point")
+
+
+class CandleData(BaseModel):
+    time: Union[int, str] = Field(
+        description="Unix timestamp or YYYY-MM-DD date string"
+    )
+    open: float = Field(description="Open price")
+    high: float = Field(description="High price")
+    low: float = Field(description="Low price")
+    close: float = Field(description="Close price")
+
+
+class GaugeData(BaseModel):
+    value: float = Field(description="Gauge scalar value")
+
+
+ChartDataParam = Union[list[BarData], list[LineData], list[CandleData], list[GaugeData]]
+
+
+class PdfTable(BaseModel):
+    title: str = Field(default="", description="Table title")
+    data: list[dict[str, Union[float, int, str, bool]]] = Field(
+        description="Rows as key-value mappings"
+    )
+
+
+class PdfContent(BaseModel):
+    title: str = Field(default="Report", description="Main PDF title")
+    tables: Optional[list[PdfTable]] = Field(
+        default=None, description="List of tables to include"
+    )
+    text: Optional[str] = Field(default=None, description="Text content for the PDF")
+
+
+TableDataParam = list[dict[str, Union[float, int, str, bool]]]
 
 
 class ArtifactCollector:
-    """Captures artifacts generated during code execution."""
+    """Captures artifacts generated during code execution.
+
+    Each display function returns a dict that can be directly rendered by the GUI.
+    """
 
     def __init__(self):
         self.artifacts = []
 
     def _transform_to_lightweight_charts(
-        self, data: Any, chart_type: str, title: str, **kwargs
+        self,
+        data: ChartDataParam,
+        chart_type: Literal["bar", "candlestick", "line", "gauge"],
+        title: str,
+        **kwargs: Union[int, float, str, bool, None],
     ) -> dict:
-        """Transform data to lightweight-charts format."""
         import pandas as pd
 
-        df = data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        # Internal standardization using Pydantic dumping if needed
+        raw_data = (
+            [d.model_dump() for d in data]
+            if isinstance(data, list)
+            and len(data) > 0
+            and hasattr(data[0], "model_dump")
+            else data
+        )
+
+        df = pd.DataFrame(raw_data)
 
         if chart_type == "bar":
             series = []
@@ -66,7 +125,9 @@ class ArtifactCollector:
                 else:
                     time_val = idx + 1
 
-                value = float(row.get("value") or row.get("rate") or row.get("pnl") or 0)
+                value = float(
+                    row.get("value") or row.get("rate") or row.get("pnl") or 0
+                )
                 line_data.append(
                     {
                         "time": time_val,
@@ -85,18 +146,17 @@ class ArtifactCollector:
 
         return {"type": "unknown", "data": [], "title": title}
 
-    def _transform_to_table(self, data: Any, max_rows: int = 50) -> dict:
-        """Transform data to table format."""
+    def _transform_to_table(self, data: TableDataParam, max_rows: int = 50) -> dict:
         import pandas as pd
 
-        df = data if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+        df = pd.DataFrame(data)
 
         columns = list(df.columns)
         rows = df.head(max_rows).to_dict("records")
 
         return {"columns": columns, "rows": rows}
 
-    def _generate_pdf(self, content: Any) -> bytes:
+    def _generate_pdf(self, content: Union[PdfContent, str]) -> bytes:
         """Generate PDF from content."""
         try:
             from fpdf import FPDF
@@ -104,6 +164,9 @@ class ArtifactCollector:
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=12)
+
+            if hasattr(content, "model_dump"):
+                content = content.model_dump()
 
             if isinstance(content, dict):
                 title = content.get("title", "Report")
@@ -119,7 +182,7 @@ class ArtifactCollector:
                         pdf.set_font("Arial", size=10)
                         for row in table.get("data", [])[:20]:
                             line = " | ".join(f"{k}: {v}" for k, v in row.items())
-                            pdf.cell(200, 8, txt=line, ln=True)
+                            pdf.cell(200, 8, txt=line[:80], ln=True)
                         pdf.ln(5)
             else:
                 text = str(content)
@@ -130,60 +193,132 @@ class ArtifactCollector:
         except ImportError:
             return b"PDF generation not available"
 
-    def chart(self, data: Any, chart_type: str = "bar", title: str = "", **kwargs):
-        """Generate and register a chart artifact."""
+    def chart(
+        self,
+        data: ChartDataParam,
+        chart_type: Literal["bar", "candlestick", "line", "gauge"] = "bar",
+        title: str = "",
+        **kwargs: Union[int, float, str, bool, None],
+    ) -> dict:
+        """Generate and register a chart artifact.
+
+        Args:
+            data: List of dicts or pandas DataFrame with chart data.
+                For bar charts: [{"label": "FX", "value": 75000}, ...]
+                For line charts: [{"time": "2024-01-15", "value": 1.085}, ...]
+                For gauges: [{"value": 85}] or just the number
+            chart_type: Type of chart. Options: "bar", "line", "candlestick", "gauge".
+            title: Chart title for display in GUI.
+            **kwargs: Additional options like "max" for gauge charts.
+
+        Returns:
+            dict: {
+                "type": "chart",
+                "chart_type": str,
+                "title": str,
+                "spec": {
+                    "type": str,
+                    "data": list,
+                    "title": str
+                }
+            }
+        """
         spec = self._transform_to_lightweight_charts(data, chart_type, title, **kwargs)
         artifact = {
-            "id": f"chart_{len(self.artifacts)}",
             "type": "chart",
             "chart_type": chart_type,
             "spec": spec,
             "title": title,
-            "created_at": datetime.now().isoformat(),
         }
         self.artifacts.append(artifact)
-        return f"[Chart {len(self.artifacts) - 1}]"
+        return artifact
 
-    def table(self, data: Any, title: str = "", max_rows: int = 50, **kwargs):
-        """Generate and register a table artifact."""
+    def table(
+        self,
+        data: TableDataParam,
+        title: str = "",
+        max_rows: int = 50,
+        **kwargs: Union[int, float, str, bool, None],
+    ) -> dict:
+        """Generate and register a table artifact.
+
+        Args:
+            data: List of dicts or pandas DataFrame with tabular data.
+                [{"symbol": "EURUSD", "pnl": 2500, "quantity": 5000}, ...]
+            title: Table title for display in GUI.
+            max_rows: Maximum rows to include. Default: 50.
+
+        Returns:
+            dict: {
+                "type": "table",
+                "title": str,
+                "columns": list[str],
+                "data": list[dict]
+            }
+        """
         table_data = self._transform_to_table(data, max_rows)
         artifact = {
-            "id": f"table_{len(self.artifacts)}",
             "type": "table",
             "title": title,
             "columns": table_data["columns"],
             "data": table_data["rows"],
-            "created_at": datetime.now().isoformat(),
         }
         self.artifacts.append(artifact)
-        return f"[Table {len(self.artifacts) - 1}]"
+        return artifact
 
-    def pdf(self, content: Any, title: str = "", **kwargs):
-        """Generate and register a PDF artifact."""
+    def pdf(
+        self,
+        content: Union[PdfContent, str],
+        title: str = "",
+        **kwargs: Union[int, float, str, bool, None],
+    ) -> dict:
+        """Generate and register a PDF artifact.
+
+        Args:
+            content: Dict with report content or string.
+                {"title": "Report Title", "tables": [...], "text": "..."}
+                Or simply a string with the report text.
+            title: Report title for display in GUI.
+
+        Returns:
+            dict: {
+                "type": "pdf",
+                "title": str,
+                "data": str (base64 encoded PDF)
+            }
+        """
         pdf_bytes = self._generate_pdf(content)
         artifact = {
-            "id": f"pdf_{len(self.artifacts)}",
             "type": "pdf",
             "title": title,
             "data": base64.b64encode(pdf_bytes).decode(),
-            "created_at": datetime.now().isoformat(),
         }
         self.artifacts.append(artifact)
-        return f"[PDF {len(self.artifacts) - 1}]"
+        return artifact
 
-    def text(self, content: Any, format: str = "markdown"):
-        """Generate and register a text artifact."""
+    def text(
+        self,
+        content: str,
+        format: Literal["markdown", "plain"] = "markdown",
+        **kwargs: Union[int, float, str, bool, None],
+    ) -> dict:
+        """Generate and register a text artifact.
+
+        Args:
+            content: Text content to display. Can be markdown or plain text.
+            format: Format type. Options: "markdown", "plain". Default: "markdown".
+
+        Returns:
+            dict: {
+                "type": "text",
+                "content": str,
+                "format": str
+            }
+        """
         artifact = {
-            "id": f"text_{len(self.artifacts)}",
             "type": "text",
             "format": format,
             "content": str(content),
-            "created_at": datetime.now().isoformat(),
         }
         self.artifacts.append(artifact)
-        return f"[Text {len(self.artifacts) - 1}]"
-
-
-def create_collector() -> ArtifactCollector:
-    """Factory function to create a new collector."""
-    return ArtifactCollector()
+        return artifact

@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 class ApiClient {
   private token: string | null = null;
@@ -180,6 +180,18 @@ class ApiClient {
 
   getConversations() {
     return this.get<any>("/agents/conversations");
+  }
+
+  getSessions() {
+    return this.get<{ sessions: Array<{ id: string; name: string; created_at: string; updated_at: string }> }>("/agents/sessions");
+  }
+
+  getSessionArtifacts(sessionId: string) {
+    return this.get<{ artifacts: any[] }>(`/agents/sessions/${sessionId}/artifacts`);
+  }
+
+  getSessionMessages(sessionId: string) {
+    return this.get<{ messages: Array<{ id: string; session_id: string; role: string; content: string; created_at: string }> }>(`/agents/sessions/${sessionId}/messages`);
   }
 }
 
