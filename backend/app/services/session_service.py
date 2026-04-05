@@ -14,7 +14,7 @@ settings = get_settings()
 
 engine = create_async_engine(
     settings.SESSION_DB_URL,
-    echo=settings.DEBUG,
+    echo=settings.DB_ECHO,
 )
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

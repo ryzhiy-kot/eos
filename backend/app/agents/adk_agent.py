@@ -8,9 +8,9 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.tools import AgentTool
 from google.genai import types
 
-from app.agents.groq_agent import GroqAgent
 from app.config import get_settings
 from app.services.context_injector import get_execution_environment_doc
+from app.services.llm_factory import create_llm_agent
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,6 @@ settings = get_settings()
 
 APP_NAME = "finagent"
 MAIN_AGENT_NAME = "FinancialOrchestratorAgent"
-
 
 
 def create_code_executor_subagent(user_id: str, session_id: str) -> LlmAgent:
@@ -46,7 +45,7 @@ def create_main_agent(
     agent_function_tool = AgentTool(agent=code_executor_agent)
 
     tools = [agent_function_tool]
-    
+
     execution_env_doc = get_execution_environment_doc()
 
     system_instruction = f"""You are a Quantitative Analyst for FX, Rates, Credit, and Commodities trading. Help traders analyze P&L, risk, and market data.
@@ -60,27 +59,12 @@ Guidelines:
 2. Explain findings in plain English
 3. Format currency values properly (e.g., $1,234,567.89)"""
 
-    if settings.LLM_PROVIDER == "groq":
-        logger.info(
-            f"Using GroqAgent with model {settings.GROQ_MODEL}, API key set: {bool(settings.GROQ_API_KEY)}"
-        )
-        main_agent = GroqAgent(
-            name=MAIN_AGENT_NAME,
-            model=settings.GROQ_MODEL,
-            api_key=settings.GROQ_API_KEY,
-            instruction=system_instruction,
-            description="Financial trading assistant orchestrator with data analysis capabilities",
-            tools=tools,
-        )
-    else:
-        logger.info(f"Using Gemini for main agent (provider: {settings.LLM_PROVIDER})")
-        main_agent = LlmAgent(
-            name=MAIN_AGENT_NAME,
-            model="gemini-2.0-flash",
-            instruction=system_instruction,
-            description="Financial trading assistant orchestrator with data analysis capabilities",
-            tools=tools,
-        )
+    main_agent = create_llm_agent(
+        name=MAIN_AGENT_NAME,
+        instruction=system_instruction,
+        description="Financial trading assistant orchestrator with data analysis capabilities",
+        tools=tools,
+    )
 
     return main_agent, code_executor_agent
 
@@ -218,8 +202,12 @@ async def run_agent(
                 if part.code_execution_result:
                     outcome = part.code_execution_result.outcome
                     output = part.code_execution_result.output
-                    assistant_response += f"\n\n> **Execution {outcome}**:\n```\n{output}\n```\n"
-                    text_output = f"\n\n> **Execution {outcome}**:\n```\n{output}\n```\n"
+                    assistant_response += (
+                        f"\n\n> **Execution {outcome}**:\n```\n{output}\n```\n"
+                    )
+                    text_output = (
+                        f"\n\n> **Execution {outcome}**:\n```\n{output}\n```\n"
+                    )
                     yield {"type": "text", "content": text_output}
 
                 if part.function_call:
