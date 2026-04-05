@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Optional
 
@@ -73,6 +74,31 @@ async def refresh_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         raise ValueError(f"Unknown function: {panel.bq_function}")
 
     return func(**panel.bq_params)
+
+
+async def stream_panel(websocket, panel_id: uuid.UUID, user_id: uuid.UUID):
+    """Stream panel data updates via WebSocket."""
+    panel = await get_panel(panel_id, user_id)
+    if not panel:
+        await websocket.send_json({"error": "Panel not found"})
+        return
+
+    func = BQ_FUNCTIONS.get(panel.bq_function)
+    if not func:
+        await websocket.send_json({"error": f"Unknown function: {panel.bq_function}"})
+        return
+
+    try:
+        while True:
+            data = func(**panel.bq_params)
+            await websocket.send_json({
+                "type": "panel_update",
+                "panel_id": str(panel_id),
+                "data": data,
+            })
+            await asyncio.sleep(panel.refresh_interval)
+    except Exception as e:
+        await websocket.send_json({"error": str(e)})
 
 
 async def delete_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> bool:

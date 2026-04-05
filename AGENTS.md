@@ -67,8 +67,11 @@ chart.update(data);  // Just render the data
 
 ### 4. Refresh Architecture
 
-- **Pull-based**: Frontend polls backend at configured interval
-- **Push-ready**: Endpoint designed for future WebSocket push
+- **Pull-based**: Frontend polls backend at configured interval via REST `/panels/{id}/refresh`
+- **Push-based**: WebSocket streaming via `/ws/panels/{id}` for real-time updates
+- **Backend decides**: Panel's `refresh_interval` determines which method to use:
+  - `0` = no auto-refresh (manual only)
+  - `> 0` = WebSocket streaming for real-time updates
 - **Data-only**: Refresh returns raw data, not full artifacts
 
 ---
@@ -317,9 +320,11 @@ The panels system allows users to pin floating artifacts as tabs in the header.
 - `app/models/panel.py` - SQLAlchemy model for storing panel config
 - `app/services/panel_service.py` - CRUD + execute_panel for refreshing data
 - `app/api/routes/panels.py` - REST endpoints
+- `app/api/websocket/__init__.py` - WebSocket streaming endpoint `/ws/panels/{id}`
 
 **Frontend components:**
 - `lib/stores/agent.ts` - Panel state, pinArtifact, unpinPanel functions
+- `lib/api/client.ts` - connectPanelStream() WebSocket helper
 - `lib/components/layout/TabBar.svelte` - Tab bar in header
 - `+layout.svelte` - Integrates tabs, shows active panel content
 
@@ -329,8 +334,12 @@ The panels system allows users to pin floating artifacts as tabs in the header.
 3. Backend stores panel config (bq_function, bq_params, refresh_interval)
 4. Tab appears in header, replaces navigation
 5. When clicked, tab content shows in main area
-6. Frontend polls `/api/v1/panels/{id}/refresh` at interval
-7. Backend re-runs bq function, returns fresh data
+6. If `refresh_interval > 0`: Frontend connects to WebSocket `/ws/panels/{id}` for real-time updates
+7. If `refresh_interval = 0`: No auto-refresh, manual only
+
+**Streaming vs Polling:**
+- **WebSocket** (`refresh_interval > 0`): Real-time streaming, lower latency
+- **Polling** (`refresh_interval = 0`): Manual refresh via REST endpoint
 
 ---
 

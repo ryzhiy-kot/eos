@@ -223,6 +223,31 @@ class ApiClient {
       body: JSON.stringify(updates),
     });
   }
+
+  connectPanelStream(panelId: string, onMessage: (data: unknown) => void): () => void {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/panels/${panelId}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "panel_update") {
+          onMessage(data.data);
+        }
+      } catch (e) {
+        console.error("WebSocket message error:", e);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }
 }
 
 export const api = new ApiClient();

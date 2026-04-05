@@ -4,6 +4,7 @@
   import { checkAuth } from "$lib/stores/auth";
   import { page } from "$app/stores";
   import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact, panels, activeTabId, fetchPanels, pinArtifact, refreshPanelData, type Artifact } from "$lib/stores/agent";
+  import { api } from "$lib/api/client";
   import AgentTerminal from "$lib/components/agent/AgentTerminal.svelte";
   import ArtifactWindow from "$lib/components/agent/ArtifactWindow.svelte";
   import TabBar from "$lib/components/layout/TabBar.svelte";
@@ -24,31 +25,38 @@
     fetchPanels();
   });
 
+  let wsConnections = $state<Record<string, () => void>>({});
+
+  $effect(() => {
+    const active = $activeTabId;
+    if (!active) return;
+    
+    const panel = $panels.find((p) => p.id === active);
+    if (!panel) return;
+
+    // Clean up old connection
+    if (wsConnections[active]) {
+      wsConnections[active]();
+      delete wsConnections[active];
+    }
+
+    // Use WebSocket for streaming if interval > 0
+    if (panel.refresh_interval > 0) {
+      const cleanup = api.connectPanelStream(panel.id, (data) => {
+        panelData = { ...panelData, [panel.id]: { data, last_updated: new Date().toISOString() } };
+      });
+      wsConnections[active] = cleanup;
+    }
+  });
+
+  function handleTabClick(panelId: string) {
+    activeTabId.set(panelId);
+  }
+
   const isLoginPage = $derived($page.url.pathname === "/login");
   const hasTabs = $derived($panels.length > 0);
   const activePanel = $derived($panels.find((p) => p.id === $activeTabId));
   const activePanelData = $derived(activePanel ? panelData[activePanel.id] : null);
-
-  function handleTabClick(panelId: string) {
-    activeTabId.set(panelId);
-    const panel = $panels.find((p) => p.id === panelId);
-    if (panel && panel.refresh_interval > 0) {
-      startPanelRefresh(panel.id, panel.refresh_interval);
-    }
-  }
-
-  function startPanelRefresh(panelId: string, interval: number) {
-    refreshPanelData(panelId).then((result) => {
-      panelData = { ...panelData, [panelId]: result };
-    });
-    if (interval > 0) {
-      setInterval(() => {
-        refreshPanelData(panelId).then((result) => {
-          panelData = { ...panelData, [panelId]: result };
-        });
-      }, interval * 1000);
-    }
-  }
 
   async function handlePinArtifact(artifact: Artifact) {
     let bqFunction = "pnl";
