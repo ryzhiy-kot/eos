@@ -302,3 +302,28 @@ git commit -m "Description of changes"
 git checkout master
 git merge feature/my-feature
 ```
+
+---
+
+## Multi-Agent Workflow
+
+For full-stack features, delegate to specialized agents:
+
+1. **@backend** - Implement API endpoints, schemas, and services
+2. **@bridge** - Sync Pydantic schemas to TypeScript interfaces
+3. **@frontend** - Build UI components using synced types
+
+### Example: Adding a new feature
+
+```
+@backend "Add a /rates/current GET endpoint returning current FX rates"
+@bridge "Sync the new RatesResponse schema to frontend types"
+@frontend "Build a Rates dashboard page showing current FX rates"
+```
+
+### Agent Definitions
+
+See `.opencode/agents/` for detailed agent instructions:
+- `backend.md` - FastAPI logic, SQLAlchemy, ADK agents
+- `bridge.md` - Type synchronization
+- `frontend.md` - SvelteKit UI, API client

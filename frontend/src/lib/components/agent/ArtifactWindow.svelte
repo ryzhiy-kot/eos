@@ -13,7 +13,8 @@
   let { artifact, index, onClose }: Props = $props();
 
   let isMinimized = $state(false);
-  let position = $state({ x: 100 + (index % 4) * 50, y: 100 + Math.floor(index / 4) * 50 });
+  let initialPosition = $derived({ x: 100 + (index % 4) * 50, y: 100 + Math.floor(index / 4) * 50 });
+  let position = $state({ x: initialPosition.x, y: initialPosition.y });
   let size = $state({ width: 400, height: 320 });
   let zIndex = $state(10);
   let isDragging = $state(false);
@@ -85,11 +86,14 @@
   class="artifact-window"
   class:minimized={isMinimized}
   class:dragging={isDragging}
+  role="application"
+  tabindex="-1"
   onmousedown={handleMouseDown}
   onclick={bringToFront}
+  onkeydown={(e) => e.key === 'Enter' && bringToFront()}
   style="left: {position.x}px; top: {position.y}px; width: {size.width}px; height: {size.height}px; z-index: {zIndex};"
 >
-  <div class="window-header" onmousedown={handleMouseDown}>
+  <div class="window-header" role="toolbar" onmousedown={handleMouseDown} onkeydown={(e) => e.key === 'Enter' && handleMouseDown(e as unknown as MouseEvent)}>
     <span class="window-title">
       [{index}] {artifact.type}: {artifact.title || "Untitled"}
     </span>

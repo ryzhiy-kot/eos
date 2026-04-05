@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://finagent:finagent@localhost:5432/finagent"
     DATABASE_URL_SYNC: str = "postgresql://finagent:finagent@localhost:5432/finagent"
 
+    # Session Database (SQLite for local dev, can use any SQLAlchemy-supported DB)
+    SESSION_DB_URL: str = "sqlite+aiosqlite:///./data/sessions.db"
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -38,7 +41,7 @@ class Settings(BaseSettings):
 
     # GROQ
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # LLM Provider: "gemini" or "groq"
     LLM_PROVIDER: str = "groq"

@@ -24,6 +24,7 @@ dependencies = [
     "numpy>=2.1.0",
     "pandas>=2.0.0",
     "fpdf>=1.7.2",
+    "aiosqlite>=0.20.0",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +45,7 @@ packages = ["app"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+autofix = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
@@ -54,3 +56,17 @@ python_version = "3.11"
 strict = false
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_default_fixture_loop_scope = "function"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]

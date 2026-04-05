@@ -1,6 +1,7 @@
-import os
 from typing import Any, Literal
+
 from pydantic import BaseModel
+
 from app.config import get_settings
 
 settings = get_settings()

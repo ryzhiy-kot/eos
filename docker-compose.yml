@@ -1,52 +1,23 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: finagent
-      POSTGRES_PASSWORD: finagent
-      POSTGRES_DB: finagent
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U finagent"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   backend:
     build: ./backend
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://finagent:finagent@postgres:5432/finagent
-      DATABASE_URL_SYNC: postgresql://finagent:finagent@postgres:5432/finagent
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: sqlite+aiosqlite:///./sqlite.db
+      DATABASE_URL_SYNC: sqlite:///./sqlite.db
       MOCK_MODE: "true"
-      DEBUG: "true"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      DEBUG: "true"      
+      LLM_PROVIDER: "groq"
+    volumes:
+      - ./backend/app:/app/app
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        PUBLIC_API_BASE_URL: "http://backend:8000/api"
     ports:
       - "3000:3000"
     depends_on:
       - backend
-
-volumes:
-  pgdata:

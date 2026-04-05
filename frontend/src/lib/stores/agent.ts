@@ -22,6 +22,13 @@ export interface Message {
   timestamp: Date;
 }
 
+export interface Session {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AgentState {
   messages: Message[];
   artifacts: Artifact[];
@@ -30,6 +37,8 @@ export interface AgentState {
   isStreaming: boolean;
   panelExpanded: boolean;
   sessionId: string;
+  sessionName: string;
+  availableSessions: Session[];
   terminalPosition: { x: number; y: number };
   terminalSize: { width: number; height: number };
 }
@@ -42,6 +51,8 @@ const initialState: AgentState = {
   isStreaming: false,
   panelExpanded: true,
   sessionId: crypto.randomUUID(),
+  sessionName: "",
+  availableSessions: [],
   terminalPosition: { x: 20, y: 20 },
   terminalSize: { width: 450, height: 400 },
 };
@@ -285,6 +296,7 @@ export function parsePrompt(text: string): ParsedPrompt {
   }
   
   let command: string | null = null;
+  
   if (cleanText.startsWith("!")) {
     const spaceIdx = cleanText.indexOf(" ");
     if (spaceIdx === -1) {
@@ -297,4 +309,82 @@ export function parsePrompt(text: string): ParsedPrompt {
   }
   
   return { command, references, text: cleanText || text };
+}
+
+export async function fetchSessions() {
+  try {
+    const { api } = await import("$lib/api/client");
+    const response = await api.getSessions();
+    agentState.update((state) => ({
+      ...state,
+      availableSessions: response.sessions,
+    }));
+    return response.sessions;
+  } catch (e) {
+    console.error("Failed to fetch sessions:", e);
+    return [];
+  }
+}
+
+export async function loadSession(sessionId: string) {
+  try {
+    const { api } = await import("$lib/api/client");
+    
+    const [messagesRes, artifactsRes] = await Promise.all([
+      api.getSessionMessages(sessionId),
+      api.getSessionArtifacts(sessionId),
+    ]);
+    
+    const messages: Message[] = messagesRes.messages.map((m) => ({
+      id: m.id,
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      timestamp: new Date(m.created_at),
+    }));
+    
+    const artifacts: Artifact[] = artifactsRes.artifacts.map((a) => ({
+      id: a.id,
+      type: a.type as Artifact["type"],
+      title: a.title || "",
+      chart_type: a.spec?.type,
+      spec: a.spec,
+      columns: a.columns,
+      data: a.data,
+      content: a.content,
+      pdfData: a.data,
+      format: a.format,
+      created_at: a.created_at,
+      visible: true,
+    }));
+    
+    const session = await api.getSessions();
+    const sessionInfo = session.sessions.find((s) => s.id === sessionId);
+    
+    agentState.update((state) => ({
+      ...state,
+      sessionId,
+      sessionName: sessionInfo?.name || "",
+      messages,
+      artifacts,
+    }));
+    
+    return true;
+  } catch (e) {
+    console.error("Failed to load session:", e);
+    return false;
+  }
+}
+
+export function setSessionId(sessionId: string) {
+  agentState.update((state) => ({
+    ...state,
+    sessionId,
+  }));
+}
+
+export function setSessionName(name: string) {
+  agentState.update((state) => ({
+    ...state,
+    sessionName: name,
+  }));
 }

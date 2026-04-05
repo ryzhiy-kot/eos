@@ -10,3 +10,20 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# Logs
+logs/
+*.log
+
+# System
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.tox/
+
+# DB
+*.sqlite
+*.sqlite3
+*.db
