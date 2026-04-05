@@ -376,32 +376,61 @@ Frontend: onMessage receives data, updates panelData store
 Chart/Table re-renders with new data
 ```
 
-### Agent Integration
+### Creating Panels via Agent (Terminal)
 
-When the agent generates a chart or table, it also determines how that artifact can be refreshed:
+The panel system is designed to work seamlessly with the agent. Here's the complete flow:
 
-**Agent generates artifact with metadata:**
-```python
-# Agent code (executed in sandbox)
-data = bq.pnl(desk='FX')
-display.chart(data, chart_type='bar', title='P&L by Desk')
+**Step 1: User asks agent in terminal**
+```
+User: "Show my P&L by desk and refresh every 30 seconds"
 ```
 
-**What gets stored in Panel:**
-- `bq_function`: "pnl" (the function to call for refresh)
-- `bq_params`: `{ desk: 'FX' }` (parameters to pass)
-- `refresh_interval`: 0 or user-specified value (e.g., 30 for 30s updates)
+**Step 2: Agent processes request**
+The agent generates Python code that:
+1. Fetches data using `bq.pnl()`
+2. Creates an artifact with `display.chart()` or `display.table()`
+3. Optionally: Sets up refresh configuration
 
-**How refresh works:**
-1. User pins the artifact (clicks 📌 button)
-2. Backend stores panel with `bq_function` and `bq_params`
-3. When refreshing, backend calls: `BQ_FUNCTIONS[bq_function](**bq_params)`
-4. Returns fresh data to frontend
+**Step 3: Artifact appears as floating window**
+```
+Backend executes:
+  data = bq.pnl()
+  display.chart(data, chart_type='bar', title='P&L by Desk')
 
-**User can configure refresh via natural language:**
-- "Show my P&L and refresh every 10 seconds"
-- Agent could parse this and set `refresh_interval=10` when creating panel
-- Currently: User pins first, then can update refresh_interval via API
+Frontend renders:
+  → Floating ArtifactWindow with chart
+  → User sees artifact in floating window
+```
+
+**Step 4: User pins the artifact**
+- User clicks 📌 button on the artifact window
+- Frontend calls `POST /api/v1/panels/` with:
+  - `artifact_id`: The artifact's ID
+  - `name`: "P&L by Desk"
+  - `bq_function`: "pnl" (determined from artifact type)
+  - `bq_params`: `{}` (empty, can be enhanced later)
+  - `refresh_interval`: 30 (user specified in Step 1)
+
+**Step 5: Tab appears in header**
+- Tab "P&L by Desk" appears in header, replacing nav links
+- When clicked, shows content in main content area
+
+**Step 6: Automatic refresh kicks in**
+- Since `refresh_interval = 30`, frontend connects to WebSocket
+- Backend sends updates every 30 seconds
+- Chart auto-updates with new data
+
+**Terminal Commands for Panels:**
+```bash
+!ls          # List all artifacts (including pinned ones)
+!show 0      # Show/hide a hidden artifact
+!del 0       # Delete an artifact (also unpins if pinned)
+```
+
+**Current Limitations:**
+- Refresh interval must be set manually after pinning
+- Agent doesn't yet parse refresh requests like "refresh every X seconds"
+- Future: Agent could auto-set refresh_interval based on user request
 
 ### Panel API Endpoints
 
