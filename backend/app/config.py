@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     # Session Database (SQLite for local dev, can use any SQLAlchemy-supported DB)
     SESSION_DB_URL: str = "sqlite+aiosqlite:///./data/sessions.db"
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
-
     # Auth - JWT
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -35,16 +32,10 @@ class Settings(BaseSettings):
     LDAP_USER_SEARCH_FILTER: str = "(uid={username})"
     LDAP_GROUP_SEARCH_BASE: str = "ou=groups,dc=company,dc=com"
 
-    # Google ADK / Gemini
-    GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-
-    # GROQ
-    GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
-
-    # LLM Provider: "gemini" or "groq"
-    LLM_PROVIDER: str = "groq"
+    # LLM Settings
+    LLM_PROVIDER: str = "groq"  # "gemini" or "groq"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "llama-3.1-8b-instant"
 
     # Demo Mode (mock LLM responses when no API key available)
     DEMO_MODE: bool = True
