@@ -26,6 +26,53 @@ FinAgent is a TUI-style financial assistant for traders (FX, Rates, Credit, Comm
 
 ---
 
+## Core Principles
+
+### 1. Backend-Centric Architecture
+
+All business logic MUST reside in the backend:
+- **Data fetching**: Backend functions (`bq.*` in `context_injector.py`)
+- **Data refresh**: Backend re-executes functions, returns raw data only
+- **No business logic in frontend**: Frontend only renders, never calculates
+
+```python
+# Backend owns data - frontend just polls
+@router.get("/panels/{id}/refresh")
+async def refresh_panel(panel_id: UUID):
+    data = await execute_panel(panel_id)  # Backend runs bq function
+    return {"data": data, "last_updated": datetime.now()}  # Data only
+```
+
+```typescript
+// Frontend - display only, no business logic
+const data = await api.get(`/panels/${panelId}/refresh`);
+chart.update(data);  // Just render the data
+```
+
+### 2. Artifact-Centric UI
+
+- **No pre-configured panels**: All content created through agent interaction
+- **Terminal-first**: User interaction starts with floating terminal
+- **Pinning**: Floating artifacts can be pinned to tabs in header
+- **Tabs replace navigation**: Header shows pinned tabs, not static pages
+
+### 3. Frontend Rendering Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| `GenericChart` | Charts from backend data |
+| `ArtifactWindow` | Floating artifact windows |
+| `TabBar` | Pinned artifacts as tabs |
+| Main content area | Active tab display |
+
+### 4. Refresh Architecture
+
+- **Pull-based**: Frontend polls backend at configured interval
+- **Push-ready**: Endpoint designed for future WebSocket push
+- **Data-only**: Refresh returns raw data, not full artifacts
+
+---
+
 ## Development Approach
 
 ### 1. Backend-First Data Flow
@@ -262,6 +309,28 @@ DEMO_MODE=true
 1. Create route in `app/api/routes/`
 2. Add schema in `app/schemas/`
 3. Register in `app/main.py`
+
+### Panels (Pinned Artifacts)
+The panels system allows users to pin floating artifacts as tabs in the header.
+
+**Backend components:**
+- `app/models/panel.py` - SQLAlchemy model for storing panel config
+- `app/services/panel_service.py` - CRUD + execute_panel for refreshing data
+- `app/api/routes/panels.py` - REST endpoints
+
+**Frontend components:**
+- `lib/stores/agent.ts` - Panel state, pinArtifact, unpinPanel functions
+- `lib/components/layout/TabBar.svelte` - Tab bar in header
+- `+layout.svelte` - Integrates tabs, shows active panel content
+
+**Flow:**
+1. User creates artifact via agent (e.g., "show my P&L")
+2. User clicks pin button on artifact window
+3. Backend stores panel config (bq_function, bq_params, refresh_interval)
+4. Tab appears in header, replaces navigation
+5. When clicked, tab content shows in main area
+6. Frontend polls `/api/v1/panels/{id}/refresh` at interval
+7. Backend re-runs bq function, returns fresh data
 
 ---
 

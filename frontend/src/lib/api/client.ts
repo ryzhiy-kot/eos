@@ -193,6 +193,36 @@ class ApiClient {
   getSessionMessages(sessionId: string) {
     return this.get<{ messages: Array<{ id: string; session_id: string; role: string; content: string; created_at: string }> }>(`/agents/sessions/${sessionId}/messages`);
   }
+
+  // Panels
+  getPanels() {
+    return this.get<any[]>("/panels");
+  }
+
+  createPanel(panel: {
+    artifact_id: string;
+    name: string;
+    bq_function: string;
+    bq_params: object;
+    refresh_interval: number;
+  }) {
+    return this.post<any>("/panels", panel);
+  }
+
+  getPanelRefresh(panelId: string) {
+    return this.get<{ data: unknown; last_updated: string }>(`/panels/${panelId}/refresh`);
+  }
+
+  deletePanel(panelId: string) {
+    return this.request<void>(`/panels/${panelId}`, { method: "DELETE" });
+  }
+
+  updatePanel(panelId: string, updates: { name?: string; refresh_interval?: number }) {
+    return this.request<any>(`/panels/${panelId}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  }
 }
 
 export const api = new ApiClient();

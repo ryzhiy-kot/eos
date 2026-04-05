@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.middleware import LoggingMiddleware
-from app.api.routes import agents, auth, market, pnl, risk
+from app.api.routes import agents, auth, market, panels, pnl, risk
 from app.api.websocket import router as ws_router
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -54,6 +54,7 @@ app.include_router(market.router, prefix=settings.API_PREFIX)
 app.include_router(risk.router, prefix=settings.API_PREFIX)
 app.include_router(pnl.router, prefix=settings.API_PREFIX)
 app.include_router(agents.router, prefix=settings.API_PREFIX)
+app.include_router(panels.router, prefix=settings.API_PREFIX)
 app.include_router(ws_router)
 
 

@@ -1,4 +1,5 @@
 import { writable, derived, get } from "svelte/store";
+import { api } from "$lib/api/client";
 
 export interface Artifact {
   id: string;
@@ -13,6 +14,18 @@ export interface Artifact {
   format?: string;
   created_at: string;
   visible: boolean;
+}
+
+export interface Panel {
+  id: string;
+  artifact_id: string;
+  name: string;
+  bq_function: string;
+  bq_params: Record<string, unknown>;
+  refresh_interval: number;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Message {
@@ -387,4 +400,37 @@ export function setSessionName(name: string) {
     ...state,
     sessionName: name,
   }));
+}
+
+export const panels = writable<Panel[]>([]);
+export const activeTabId = writable<string | null>(null);
+
+export async function fetchPanels() {
+  try {
+    const result = await api.getPanels();
+    panels.set(result);
+  } catch (e) {
+    console.error("Failed to fetch panels:", e);
+  }
+}
+
+export async function pinArtifact(artifact: Artifact, bqFunction: string, refreshInterval = 0) {
+  const result = await api.createPanel({
+    artifact_id: artifact.id,
+    name: artifact.title || artifact.type,
+    bq_function: bqFunction,
+    bq_params: artifact.spec || {},
+    refresh_interval: refreshInterval,
+  });
+  panels.update((p) => [...p, result]);
+  return result;
+}
+
+export async function unpinPanel(panelId: string) {
+  await api.deletePanel(panelId);
+  panels.update((p) => p.filter((panel) => panel.id !== panelId));
+}
+
+export async function refreshPanelData(panelId: string) {
+  return api.getPanelRefresh(panelId);
 }
