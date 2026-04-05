@@ -414,7 +414,7 @@ export async function fetchPanels() {
   }
 }
 
-export async function pinArtifact(artifact: Artifact, bqFunction: string, refreshInterval = 0) {
+export async function pinArtifact(artifact: Artifact, bqFunction: string, refreshInterval = 300) {
   const result = await api.createPanel({
     artifact_id: artifact.id,
     name: artifact.title || artifact.type,
@@ -429,6 +429,12 @@ export async function pinArtifact(artifact: Artifact, bqFunction: string, refres
 export async function unpinPanel(panelId: string) {
   await api.deletePanel(panelId);
   panels.update((p) => p.filter((panel) => panel.id !== panelId));
+}
+
+export async function updatePanelRefresh(panelId: string, refreshInterval: number) {
+  const result = await api.updatePanel(panelId, { refresh_interval: refreshInterval });
+  panels.update((p) => p.map((panel) => panel.id === panelId ? { ...panel, refresh_interval: refreshInterval } : panel));
+  return result;
 }
 
 export async function refreshPanelData(panelId: string) {

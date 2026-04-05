@@ -49,6 +49,32 @@
     }
   });
 
+  // Watch for refresh interval changes on active panel
+  $effect(() => {
+    const active = $activeTabId;
+    if (!active) return;
+    
+    const panel = $panels.find((p) => p.id === active);
+    if (!panel) return;
+
+    // Clean up old connection when interval changes to 0
+    if (panel.refresh_interval === 0 && wsConnections[active]) {
+      wsConnections[active]();
+      delete wsConnections[active];
+    }
+    
+    // Create new connection when interval changes to > 0
+    if (panel.refresh_interval > 0) {
+      if (wsConnections[active]) {
+        wsConnections[active]();
+      }
+      const cleanup = api.connectPanelStream(panel.id, (data) => {
+        panelData = { ...panelData, [panel.id]: { data, last_updated: new Date().toISOString() } };
+      });
+      wsConnections[active] = cleanup;
+    }
+  });
+
   function handleTabClick(panelId: string) {
     activeTabId.set(panelId);
   }
