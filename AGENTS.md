@@ -341,6 +341,100 @@ The panels system allows users to pin floating artifacts as tabs in the header.
 - **WebSocket** (`refresh_interval > 0`): Real-time streaming, lower latency
 - **Polling** (`refresh_interval = 0`): Manual refresh via REST endpoint
 
+### Panel Refresh Modes
+
+**Mode 1: Manual Refresh (Default)**
+- `refresh_interval = 0` (or not set)
+- User manually refreshes via REST endpoint: `GET /api/v1/panels/{id}/refresh`
+- Frontend calls REST API on demand
+- No automatic updates
+
+**Mode 2: WebSocket Streaming**
+- `refresh_interval > 0` (e.g., 5, 10, 30 seconds)
+- Frontend connects to `ws://host/api/ws/panels/{id}`
+- Backend streams data at configured interval
+- Lower latency, real-time updates
+- Automatic reconnection handled by frontend
+
+**Panel Data Flow:**
+```
+User clicks tab with refresh_interval > 0
+         │
+         ▼
+Frontend: api.connectPanelStream(panelId, callback)
+         │
+         ▼
+Backend: WebSocket /ws/panels/{id} accepts connection
+         │
+         ▼
+Backend: stream_panel() runs loop, sends panel_update every N seconds
+         │
+         ▼
+Frontend: onMessage receives data, updates panelData store
+         │
+         ▼
+Chart/Table re-renders with new data
+```
+
+### Agent Integration
+
+When the agent generates a chart or table, it also determines how that artifact can be refreshed:
+
+**Agent generates artifact with metadata:**
+```python
+# Agent code (executed in sandbox)
+data = bq.pnl(desk='FX')
+display.chart(data, chart_type='bar', title='P&L by Desk')
+```
+
+**What gets stored in Panel:**
+- `bq_function`: "pnl" (the function to call for refresh)
+- `bq_params`: `{ desk: 'FX' }` (parameters to pass)
+- `refresh_interval`: 0 or user-specified value (e.g., 30 for 30s updates)
+
+**How refresh works:**
+1. User pins the artifact (clicks 📌 button)
+2. Backend stores panel with `bq_function` and `bq_params`
+3. When refreshing, backend calls: `BQ_FUNCTIONS[bq_function](**bq_params)`
+4. Returns fresh data to frontend
+
+**User can configure refresh via natural language:**
+- "Show my P&L and refresh every 10 seconds"
+- Agent could parse this and set `refresh_interval=10` when creating panel
+- Currently: User pins first, then can update refresh_interval via API
+
+### Panel API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/panels/` | GET | List user's pinned panels |
+| `/api/v1/panels/` | POST | Create/pin a panel |
+| `/api/v1/panels/{id}` | GET | Get panel details |
+| `/api/v1/panels/{id}/refresh` | GET | Get fresh data (polling) |
+| `/api/v1/panels/{id}` | PUT | Update panel (name, interval) |
+| `/api/v1/panels/{id}` | DELETE | Unpin/delete panel |
+| `/api/ws/panels/{id}` | WebSocket | Stream panel data |
+
+**Example: Creating a panel via API**
+```bash
+curl -X POST /api/v1/panels/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "artifact_id": "artifact_123",
+    "name": "P&L by Desk",
+    "bq_function": "pnl",
+    "bq_params": {"desk": "FX"},
+    "refresh_interval": 30
+  }'
+```
+
+**Example: Manual refresh**
+```bash
+curl /api/v1/panels/{id}/refresh \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: { "data": {...}, "last_updated": "2024-01-15T10:30:00Z" }
+```
+
 ---
 
 ## Troubleshooting
