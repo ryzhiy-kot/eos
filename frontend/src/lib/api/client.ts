@@ -85,6 +85,10 @@ class ApiClient {
 
   logout() {
     this.clearToken();
+    fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+    }).catch(() => {});
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }

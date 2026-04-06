@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.config import get_settings
 from app.schemas import LoginRequest, TokenResponse, UserResponse
@@ -11,12 +12,14 @@ from app.services.auth import (
     decode_token,
     get_current_user,
     hash_password,
+    invalidate_token,
     ldap_authenticate,
     verify_password,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+security = HTTPBearer()
 
 # Fixed UUIDs for consistent user IDs across restarts
 TRADER_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -62,7 +65,9 @@ async def login(request: LoginRequest):
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
             )
     else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
 
     access_token = create_access_token(user_data["id"], user_data["role"])
     refresh_token = create_refresh_token(user_data["id"])
@@ -114,3 +119,9 @@ async def get_me(current_user: dict = Depends(get_current_user)):
                 last_login=datetime.now(UTC),
             )
     raise HTTPException(status_code=404, detail="User not found")
+
+
+@router.post("/logout")
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    invalidate_token(credentials.credentials)
+    return {"message": "Logged out successfully"}

@@ -10,6 +10,9 @@ from app.config import get_settings
 settings = get_settings()
 security = HTTPBearer()
 
+# In-memory token blacklist (use Redis in production)
+token_blacklist: set[str] = set()
+
 
 def create_access_token(user_id: str, role: str) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -24,11 +27,21 @@ def create_refresh_token(user_id: str) -> str:
 
 
 def decode_token(token: str) -> dict:
+    if token in token_blacklist:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+def invalidate_token(token: str) -> None:
+    """Add token to blacklist to invalidate it."""
+    token_blacklist.add(token)
+    # Clean up expired tokens periodically (simplified)
+    if len(token_blacklist) > 1000:
+        token_blacklist.clear()
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:

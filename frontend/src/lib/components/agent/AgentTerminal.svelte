@@ -371,14 +371,32 @@ Artifact references in prompts:
 
     const history = getHistory();
 
+    let capturedSessionId: string | null = null;
+
     for await (const event of api.agentChat(
       enhancedMsg,
       $agentState.sessionId,
       history,
     )) {
       switch (event.type) {
+        case "session_id":
+          capturedSessionId = event.session_id;
+          if (event.session_id !== $agentState.sessionId) {
+            agentState.update((s) => ({ ...s, sessionId: event.session_id }));
+          }
+          break;
         case "text":
-          if (
+          if (event.id) {
+            addArtifact({
+              id: event.id,
+              type: "text",
+              title: event.title || "",
+              content: event.content,
+              format: event.format,
+              created_at: new Date().toISOString(),
+              visible: true,
+            });
+          } else if (
             $agentState.messages.length > 0 &&
             $agentState.messages[$agentState.messages.length - 1].role ===
               "assistant"
@@ -391,7 +409,6 @@ Artifact references in prompts:
         case "chart":
         case "table":
         case "pdf":
-        case "text":
           addArtifact({
             id: event.id || `artifact_${$agentState.artifacts.length}`,
             type: event.type,

@@ -11,10 +11,13 @@
 
 <div class="tab-bar">
   {#each $panels as panel (panel.id)}
-    <button
+    <div
       class="tab"
       class:active={$activeTabId === panel.id}
       onclick={() => onTabClick(panel.id)}
+      onkeydown={(e) => e.key === 'Enter' && onTabClick(panel.id)}
+      role="tab"
+      tabindex="0"
     >
       <span class="tab-name">{panel.name}</span>
       <button
@@ -24,7 +27,7 @@
       >
         ×
       </button>
-    </button>
+    </div>
   {/each}
 </div>
 

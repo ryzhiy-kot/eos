@@ -6,23 +6,7 @@ from sqlalchemy import delete, select
 
 from app.db.session import async_session
 from app.models.panel import Panel
-from app.services.context_injector import (
-    mock_fx_rates,
-    mock_interest_curves,
-    mock_news,
-    mock_pnl,
-    mock_positions,
-    mock_risk,
-)
-
-BQ_FUNCTIONS = {
-    "pnl": mock_pnl,
-    "risk": mock_risk,
-    "fx_rates": mock_fx_rates,
-    "curves": mock_interest_curves,
-    "positions": mock_positions,
-    "news": mock_news,
-}
+from app.services.namespace_registry import NamespaceRegistry
 
 
 async def create_panel(
@@ -69,11 +53,11 @@ async def refresh_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> dict:
     if not panel:
         raise ValueError("Panel not found")
 
-    func = BQ_FUNCTIONS.get(panel.bq_function)
-    if not func:
+    func_info = NamespaceRegistry.get_function("bq", panel.bq_function)
+    if not func_info:
         raise ValueError(f"Unknown function: {panel.bq_function}")
 
-    return func(**panel.bq_params)
+    return func_info.func(**panel.bq_params)
 
 
 async def stream_panel(websocket, panel_id: uuid.UUID, user_id: uuid.UUID):
@@ -83,14 +67,14 @@ async def stream_panel(websocket, panel_id: uuid.UUID, user_id: uuid.UUID):
         await websocket.send_json({"error": "Panel not found"})
         return
 
-    func = BQ_FUNCTIONS.get(panel.bq_function)
-    if not func:
+    func_info = NamespaceRegistry.get_function("bq", panel.bq_function)
+    if not func_info:
         await websocket.send_json({"error": f"Unknown function: {panel.bq_function}"})
         return
 
     try:
         while True:
-            data = func(**panel.bq_params)
+            data = func_info.func(**panel.bq_params)
             await websocket.send_json({
                 "type": "panel_update",
                 "panel_id": str(panel_id),

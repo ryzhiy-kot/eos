@@ -19,10 +19,14 @@
   let resizeStart = $state({ width: 0, height: 0, x: 0, y: 0 });
   let panelData = $state<Record<string, { data: unknown; last_updated: string }>>({});
 
-  onMount(() => {
-    checkAuth();
+  onMount(async () => {
+    await checkAuth();
     expandPanel();
-    fetchPanels();
+    
+    // Only fetch panels if we have a token (user is authenticated)
+    if (localStorage.getItem("access_token")) {
+      fetchPanels();
+    }
   });
 
   let wsConnections = $state<Record<string, () => void>>({});
@@ -156,13 +160,6 @@
         </div>
         {#if hasTabs}
           <TabBar onTabClick={handleTabClick} />
-        {:else}
-          <nav class="nav-links">
-            <a href="/" class="nav-link" class:active={$page.url.pathname === "/"}>Dashboard</a>
-            <a href="/market" class="nav-link" class:active={$page.url.pathname === "/market"}>Market</a>
-            <a href="/risk" class="nav-link" class:active={$page.url.pathname === "/risk"}>Risk</a>
-            <a href="/pnl" class="nav-link" class:active={$page.url.pathname === "/pnl"}>P&amp;L</a>
-          </nav>
         {/if}
       </div>
       <div class="header-right">
@@ -170,6 +167,9 @@
           <span class="terminal-icon">❯</span>
           <span>Terminal</span>
           <span class="toggle-arrow" class:expanded={$agentState.panelExpanded}>▼</span>
+        </button>
+        <button class="logout-btn" onclick={() => { api.logout(); window.location.href = "/login"; }}>
+          Logout
         </button>
         <div class="live-indicator">
           <span class="live-dot"></span>
@@ -330,6 +330,23 @@
 
   .toggle-arrow.expanded {
     transform: rotate(180deg);
+  }
+
+  .logout-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 4px;
+    padding: 5px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .logout-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
 
   .live-indicator {
