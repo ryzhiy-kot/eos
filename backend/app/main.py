@@ -18,13 +18,13 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting FinAgent Platform...")
+    logger.info(f"Starting {settings.DISPLAY_NAME} Platform...")
     from app.services.session_service import init_db
 
     await init_db()
     logger.info("Database initialized")
     yield
-    logger.info("Shutting down FinAgent Platform...")
+    logger.info(f"Shutting down {settings.DISPLAY_NAME} Platform...")
 
 
 app = FastAPI(
@@ -61,6 +61,15 @@ app.include_router(ws_router)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": "0.1.0"}
+
+
+@app.get("/config")
+async def get_config():
+    return {
+        "app_name": settings.APP_NAME,
+        "display_name": settings.DISPLAY_NAME,
+        "version": "0.1.0",
+    }
 
 
 @app.get("/")

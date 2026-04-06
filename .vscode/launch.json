@@ -13,6 +13,48 @@
       "module": "uvicorn",
       "args": ["app.main:app", "--reload"],
       "jinja": true
+    },
+    {
+      "name": "Frontend: Attach",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true
+    },
+    {
+      "name": "Frontend: Chrome (Debug Only)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Frontend: Vite (Start & Debug)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "npm: dev",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack (All-in-One)",
+      "configurations": [
+        "Python Debugger: FastAPI - .venv",
+        "Frontend: Vite (Start & Debug)"
+      ]
+    },
+    {
+      "name": "Full Debug (Attach + Chrome)",
+      "configurations": [
+        "Python Debugger: FastAPI - .venv",
+        "Frontend: Chrome (Debug Only)"
+      ]
     }
   ]
 }

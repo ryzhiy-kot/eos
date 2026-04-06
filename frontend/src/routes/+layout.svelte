@@ -1,7 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
-  import { checkAuth } from "$lib/stores/auth";
+  import { checkAuth, loadConfig, displayName } from "$lib/stores/auth";
   import { page } from "$app/stores";
   import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact, panels, activeTabId, fetchPanels, pinArtifact, refreshPanelData, type Artifact } from "$lib/stores/agent";
   import { api } from "$lib/api/client";
@@ -20,6 +20,7 @@
   let panelData = $state<Record<string, { data: unknown; last_updated: string }>>({});
 
   onMount(async () => {
+    await loadConfig();
     await checkAuth();
     expandPanel();
     
@@ -156,7 +157,7 @@
             <rect width="24" height="24" rx="4" fill="#3b82f6" />
             <path d="M7 12L12 7L17 12L12 17Z" fill="white" />
           </svg>
-          <span class="logo-text">FinAgent</span>
+          <span class="logo-text">{$displayName}</span>
         </div>
         {#if hasTabs}
           <TabBar onTabClick={handleTabClick} />

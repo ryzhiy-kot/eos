@@ -1,9 +1,14 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { login, isLoading, authError } from "$lib/stores/auth";
+  import { login, isLoading, authError, loadConfig, displayName } from "$lib/stores/auth";
 
   let username = $state("trader");
   let password = $state("trader123");
+
+  onMount(async () => {
+    await loadConfig();
+  });
 
   async function handleLogin(e: Event) {
     e.preventDefault();
@@ -24,7 +29,7 @@
         <path d="M7 12L12 7L17 12L12 17Z" fill="white" />
       </svg>
     </div>
-    <h1>FinAgent</h1>
+    <h1>{$displayName}</h1>
     <p class="subtitle">AI-Powered Financial Platform</p>
 
     <form onsubmit={handleLogin}>

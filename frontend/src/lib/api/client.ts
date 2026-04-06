@@ -94,6 +94,10 @@ class ApiClient {
     }
   }
 
+  getConfig() {
+    return this.get<{ app_name: string; display_name: string; version: string }>("/config");
+  }
+
   // Market
   getInstruments(params?: { asset_class?: string; search?: string }) {
     const query = new URLSearchParams();

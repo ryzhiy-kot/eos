@@ -24,6 +24,7 @@
     type Artifact,
   } from "$lib/stores/agent";
   import { api } from "$lib/api/client";
+  import { displayName } from "$lib/stores/auth";
 
   let inputValue = $state("");
   let inputRef: HTMLInputElement;
@@ -532,7 +533,7 @@ Artifact references in prompts:
   <div class="terminal-header">
     <div class="terminal-title">
       <span class="terminal-icon">❯</span>
-      <span>FinAgent Terminal</span>
+      <span>{$displayName} Terminal</span>
       {#if $agentState.sessionName}
         <span class="session-name">{$agentState.sessionName}</span>
       {/if}
@@ -568,7 +569,7 @@ Artifact references in prompts:
       {#if $agentState.messages.length === 0}
         <div class="empty-terminal">
           <div class="empty-icon">❯</div>
-          <p>Welcome to FinAgent Terminal</p>
+          <p>Welcome to {$displayName} Terminal</p>
           <p class="hint">
             Ask about P&L, risk, positions, rates, or market data
           </p>

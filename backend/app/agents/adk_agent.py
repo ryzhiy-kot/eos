@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools import AgentTool
+from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
 from app.config import get_settings

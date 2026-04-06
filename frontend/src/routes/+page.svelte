@@ -13,7 +13,7 @@
 <div class="dashboard">
   <div class="empty-state">
     <div class="icon">📊</div>
-    <h2>Welcome to FinAgent</h2>
+    <h2>Welcome to EoS</h2>
     <p>Use the terminal below to interact with the agent</p>
     <p class="hint">Try commands like "show my pnl" or "show interest rate curves"</p>
   </div>

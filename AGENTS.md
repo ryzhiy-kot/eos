@@ -1,10 +1,10 @@
-# FinAgent Development Guide
+# EoS Development Guide
 
-This document outlines the development approach, coding standards, and project structure for the FinAgent platform.
+This document outlines the development approach, coding standards, and project structure for the EoS platform.
 
 ## Project Overview
 
-FinAgent is a TUI-style financial assistant for traders (FX, Rates, Credit, Commodities) that:
+EoS is a TUI-style financial assistant for traders (FX, Rates, Credit, Commodities) that:
 - Uses code-generating agents (GROQ/Gemini) to analyze P&L, risk, positions, rates, curves
 - Generates artifacts (charts, tables, PDFs, text) via Python code execution in a sandbox
 - Displays artifacts in floating, draggable, resizable windows
