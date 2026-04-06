@@ -372,7 +372,7 @@
 
   .floating-terminal {
     position: fixed;
-    z-index: 1001;
+    z-index: 10000;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     border: 1px solid var(--border-primary);
     border-radius: 8px;
@@ -397,7 +397,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 999;
+    z-index: 9999;
   }
 
   .artifacts-layer :global(.artifact-window) {
