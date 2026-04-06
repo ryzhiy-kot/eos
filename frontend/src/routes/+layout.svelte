@@ -90,13 +90,17 @@
   const activePanelData = $derived(activePanel ? panelData[activePanel.id] : null);
 
   async function handlePinArtifact(artifact: Artifact) {
-    let bqFunction = "pnl";
+    let bqFunction = "mock_pnl";
     if (artifact.type === "chart") {
       const spec = artifact.spec as { type?: string } | undefined;
-      if (spec?.type === "bar") bqFunction = "pnl";
-      else if (spec?.type === "line") bqFunction = "curves";
+      if (spec?.type === "bar") bqFunction = "mock_pnl";
+      else if (spec?.type === "line") bqFunction = "mock_interest_curves";
     }
-    await pinArtifact(artifact, bqFunction, 0);
+    try {
+      await pinArtifact(artifact, bqFunction, 0);
+    } catch (e) {
+      console.error("Failed to pin artifact:", e);
+    }
   }
 
   function handleTerminalMouseDown(e: MouseEvent) {
@@ -368,7 +372,7 @@
 
   .floating-terminal {
     position: fixed;
-    z-index: 1000;
+    z-index: 1001;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     border: 1px solid var(--border-primary);
     border-radius: 8px;
