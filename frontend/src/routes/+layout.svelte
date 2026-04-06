@@ -123,6 +123,7 @@
     if (target.closest(".terminal-header")) {
       isDragging = true;
       dragStart = { x: e.clientX - $agentState.terminalPosition.x, y: e.clientY - $agentState.terminalPosition.y };
+      e.preventDefault();
       e.stopPropagation();
     }
   }
