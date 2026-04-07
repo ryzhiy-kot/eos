@@ -434,13 +434,16 @@ Artifact references in prompts:
           break;
         case "done":
           if (event.artifacts && event.artifacts.length > 0) {
-            const newArtifactIds = new Set(event.artifacts.map((a: any) => a.id));
-            agentState.update((state) => ({
-              ...state,
-              artifacts: state.artifacts.filter((a) => newArtifactIds.has(a.id)).concat(
-                event.artifacts.map((a: any) => ({ ...a, visible: true }))
-              ),
-            }));
+            const existingIds = new Set($agentState.artifacts.map((a) => a.id));
+            const newArtifacts = event.artifacts
+              .filter((a: any) => !existingIds.has(a.id))
+              .map((a: any) => ({ ...a, visible: true }));
+            if (newArtifacts.length > 0) {
+              agentState.update((state) => ({
+                ...state,
+                artifacts: [...state.artifacts, ...newArtifacts],
+              }));
+            }
           }
           break;
       }
