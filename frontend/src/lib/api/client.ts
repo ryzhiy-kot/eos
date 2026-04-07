@@ -92,8 +92,12 @@ class ApiClient {
     }
   }
 
-  getConfig() {
-    return this.request<{ app_name: string; display_name: string; version: string }>("/config");
+  async getConfig() {
+    const response = await fetch("/config");
+    if (!response.ok) {
+      throw new Error("Failed to load config");
+    }
+    return response.json();
   }
 
   // Market
