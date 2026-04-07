@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.middleware import LoggingMiddleware
-from app.api.routes import agents, auth, market, panels, pnl, risk
+from app.api.routes import agents, auth, config, market, panels, pnl, risk
 from app.api.websocket import router as ws_router
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -50,6 +50,7 @@ app.add_middleware(
 
 # API routes
 app.include_router(auth.router, prefix=settings.API_PREFIX)
+app.include_router(config.router, prefix=settings.API_PREFIX)
 app.include_router(market.router, prefix=settings.API_PREFIX)
 app.include_router(risk.router, prefix=settings.API_PREFIX)
 app.include_router(pnl.router, prefix=settings.API_PREFIX)
@@ -61,15 +62,6 @@ app.include_router(ws_router)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": "0.1.0"}
-
-
-@app.get(f"{settings.API_PREFIX}/config")
-async def get_config():
-    return {
-        "app_name": settings.APP_NAME,
-        "display_name": settings.DISPLAY_NAME,
-        "version": "0.1.0",
-    }
 
 
 @app.get("/")

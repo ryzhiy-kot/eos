@@ -93,7 +93,7 @@ class ApiClient {
   }
 
   getConfig() {
-    return this.get<{ app_name: string; display_name: string; version: string }>(`${API_BASE}/config`);
+    return this.get<{ app_name: string; display_name: string; version: string }>("/config");
   }
 
   // Market
