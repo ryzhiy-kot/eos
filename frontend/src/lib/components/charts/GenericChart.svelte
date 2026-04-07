@@ -49,16 +49,16 @@
     ...colors,
   };
 
-  function normalizeTime(time: Time | number | string | undefined): Time {
-    if (!time) return 1700000000 as UTCTimestamp;
+  function normalizeTime(time: Time | number | string | undefined, index: number): Time {
+    if (!time) return (1700000000 + index) as UTCTimestamp;
     if (typeof time === "number") return time as UTCTimestamp;
     if (typeof time === "string") {
       if (time.match(/^\d+$/)) return parseInt(time) as UTCTimestamp;
       const date = new Date(time);
       if (!isNaN(date.getTime())) return Math.floor(date.getTime() / 1000) as UTCTimestamp;
-      return 1700000000 as UTCTimestamp;
+      return (1700000000 + index) as UTCTimestamp;
     }
-    return 1700000000 as UTCTimestamp;
+    return (1700000000 + index) as UTCTimestamp;
   }
 
   onMount(() => {
@@ -117,8 +117,8 @@
       chart.removeSeries(series);
     }
 
-    const normalizedData = data.map((d) => ({
-      time: normalizeTime(d.time),
+    const normalizedData = data.map((d, i) => ({
+      time: normalizeTime(d.time, i),
       value: d.value ?? d.close ?? 0,
       open: d.open,
       high: d.high,

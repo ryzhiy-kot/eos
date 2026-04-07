@@ -407,24 +407,25 @@ Artifact references in prompts:
             addAssistantMessage(event.content);
           }
           break;
-        case "chart":
-        case "table":
-        case "pdf":
-          addArtifact({
-            id: event.id || `artifact_${$agentState.artifacts.length}`,
-            type: event.type,
-            title: event.title || "",
-            chart_type: event.chart_type,
-            spec: event.spec,
-            columns: event.columns,
-            data: event.data,
-            content: event.content,
-            pdfData: event.data,
-            format: event.format,
-            created_at: new Date().toISOString(),
-            visible: true,
-          });
-          break;
+          case "chart":
+          case "table":
+          case "pdf":
+          case "text":
+            addArtifact({
+              id: event.id || `artifact_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: event.type,
+              title: event.title || "",
+              chart_type: event.chart_type,
+              spec: event.spec,
+              columns: event.columns,
+              data: event.data,
+              content: event.content,
+              pdfData: event.data,
+              format: event.format,
+              created_at: new Date().toISOString(),
+              visible: true,
+            });
+            break;
         case "error":
           addAssistantMessage(`Error: ${event.content}`);
           break;
