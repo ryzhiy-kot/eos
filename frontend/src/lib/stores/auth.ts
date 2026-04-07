@@ -45,7 +45,7 @@ export function logout() {
 }
 
 export async function checkAuth() {
-  const token = api.getToken();
+  const token = api.getTokenSync();
   if (!token) return;
   try {
     const userData = await api.get<User>("/auth/me");

@@ -90,8 +90,7 @@
   role="application"
   tabindex="-1"
   onmousedown={handleMouseDown}
-  onclick={bringToFront}
-  onkeydown={(e) => e.key === 'Enter' && bringToFront()}
+  onkeydown={(e) => e.key === 'Enter' && handleMouseDown(e as unknown as MouseEvent)}
   style="left: {position.x}px; top: {position.y}px; width: {size.width}px; height: {size.height}px; z-index: {zIndex};"
 >
   <div class="window-header" role="toolbar" onmousedown={handleMouseDown} onkeydown={(e) => e.key === 'Enter' && handleMouseDown(e as unknown as MouseEvent)}>
@@ -199,7 +198,8 @@
 
   .artifact-window.minimized {
     min-width: 200px;
-    height: auto !important;
+    height: 32px !important;
+    overflow: hidden;
   }
 
   .artifact-window.minimized .window-content {
@@ -214,19 +214,21 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 10px;
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-primary);
+    padding: 6px 10px;
     cursor: grab;
     user-select: none;
   }
 
-  .window-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .window-header:active {
+    cursor: grabbing;
+  }
+
+  .artifact-window.minimized {
+    min-width: 200px;
+    height: 32px !important;
+    overflow: hidden;
   }
 
   .window-controls {

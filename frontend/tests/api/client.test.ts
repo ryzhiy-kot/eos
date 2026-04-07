@@ -7,24 +7,31 @@ declare const global: {
 const API_BASE = "/api";
 
 class TestApiClient {
-  private token: string | null = null;
+  private _token: string | null = null;
 
   constructor() {
-    this.token = localStorage.getItem("access_token");
+    // Read initial token from localStorage
+    this._token = localStorage.getItem("access_token");
+  }
+
+  private getToken(): string | null {
+    // Always read fresh from localStorage to ensure we have the latest token
+    this._token = localStorage.getItem("access_token");
+    return this._token;
   }
 
   setToken(token: string) {
-    this.token = token;
+    this._token = token;
     localStorage.setItem("access_token", token);
   }
 
   clearToken() {
-    this.token = null;
+    this._token = null;
     localStorage.removeItem("access_token");
   }
 
-  getToken(): string | null {
-    return this.token;
+  getTokenSync(): string | null {
+    return this.getToken();
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -33,8 +40,9 @@ class TestApiClient {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_BASE}${path}`, {
@@ -103,20 +111,50 @@ describe("ApiClient", () => {
     it("should initialize with token from localStorage", () => {
       localStorage.setItem("access_token", "test_token");
       const client = new TestApiClient();
-      expect(client.getToken()).toBe("test_token");
+      // After construction, token is cached but getToken() reads fresh
+      expect(client.getTokenSync()).toBe("test_token");
     });
 
     it("should set token and save to localStorage", () => {
+      const client = new TestApiClient();
       client.setToken("new_token");
-      expect(client.getToken()).toBe("new_token");
+      expect(client.getTokenSync()).toBe("new_token");
       expect(localStorage.getItem("access_token")).toBe("new_token");
     });
 
     it("should clear token and remove from localStorage", () => {
+      const client = new TestApiClient();
       client.setToken("test_token");
       client.clearToken();
-      expect(client.getToken()).toBeNull();
+      expect(client.getTokenSync()).toBeNull();
       expect(localStorage.getItem("access_token")).toBeNull();
+    });
+
+    it("should read fresh token from localStorage on each request", async () => {
+      // Set token initially
+      const client = new TestApiClient();
+      client.setToken("initial_token");
+      
+      // Simulate token being updated in localStorage (e.g., after refresh)
+      localStorage.setItem("access_token", "updated_token");
+      
+      // Mock fetch to check what's being sent
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+      
+      await client.get("/test");
+      
+      // Should use the updated token from localStorage, not cached one
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/test",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: "Bearer updated_token",
+          }),
+        })
+      );
     });
   });
 
@@ -136,7 +174,7 @@ describe("ApiClient", () => {
       const result = await client.login("trader", "trader123");
 
       expect(result.access_token).toBe("jwt_token");
-      expect(client.getToken()).toBe("jwt_token");
+      expect(client.getTokenSync()).toBe("jwt_token");
     });
 
     it("should throw error on login failure", async () => {

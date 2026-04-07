@@ -1,31 +1,40 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 class ApiClient {
-  private token: string | null = null;
+  private _token: string | null = null;
 
   constructor() {
     if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("access_token");
+      this._token = localStorage.getItem("access_token");
     }
   }
 
+  private getToken(): string | null {
+    // Always read fresh from localStorage to ensure we have the latest token
+    if (typeof window !== "undefined") {
+      this._token = localStorage.getItem("access_token");
+    }
+    return this._token;
+  }
+
+  // Public method to get token for external use (e.g., auth checks)
+  getTokenSync(): string | null {
+    return this.getToken();
+  }
+
   setToken(token: string) {
-    this.token = token;
+    this._token = token;
     if (typeof window !== "undefined") {
       localStorage.setItem("access_token", token);
     }
   }
 
   clearToken() {
-    this.token = null;
+    this._token = null;
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
     }
-  }
-
-  getToken(): string | null {
-    return this.token;
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -34,8 +43,9 @@ class ApiClient {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_BASE}${path}`, {
@@ -85,9 +95,10 @@ class ApiClient {
 
   logout() {
     this.clearToken();
+    const token = this.getToken();
     fetch(`${API_BASE}/auth/logout`, {
       method: "POST",
-      headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).catch(() => {});
     if (typeof window !== "undefined") {
       window.location.href = "/login";
@@ -142,8 +153,9 @@ class ApiClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const body: Record<string, unknown> = { message };
