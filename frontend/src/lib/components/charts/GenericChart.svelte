@@ -136,6 +136,18 @@
           downColor: defaultColors.downColor,
         } as any);
         series.setData(normalizedData as any);
+        
+        if (data[0]?.label) {
+          const labels = data.map(d => d.label || d.name || "");
+          chart.applyOptions({
+            timeScale: {
+              tickMarkFormatter: (time: number) => {
+                const idx = normalizedData.findIndex(d => d.time === time);
+                return idx >= 0 && labels[idx] ? labels[idx] : "";
+              },
+            },
+          });
+        }
         break;
 
       case "area":
