@@ -38,11 +38,24 @@ async def generate_mock_response(
     msg_lower = message.lower()
 
     from app.services.session_service import get_session_service
+    import uuid
 
     def get_artifact_fields(artifact: dict, fallback_id: str = "artifact") -> dict:
         """Safely extract artifact fields with fallbacks."""
+        existing_id = artifact.get("id")
+        if existing_id:
+            return {
+                "id": existing_id,
+                "title": artifact.get("title", ""),
+                "chart_type": artifact.get("chart_type"),
+                "spec": artifact.get("spec"),
+                "columns": artifact.get("columns"),
+                "data": artifact.get("data"),
+                "content": artifact.get("content"),
+                "format": artifact.get("format"),
+            }
         return {
-            "id": artifact.get("id", fallback_id),
+            "id": f"{fallback_id}_{uuid.uuid4().hex[:8]}",
             "title": artifact.get("title", ""),
             "chart_type": artifact.get("chart_type"),
             "spec": artifact.get("spec"),
