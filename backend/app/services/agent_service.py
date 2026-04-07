@@ -80,12 +80,13 @@ async def generate_mock_response(
         ]
         collector.chart(chart_data, chart_type="bar", title="P&L by Desk")
         artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "chart_pnl")
         yield {
             "type": "chart",
-            "id": artifact.get("id", "chart_pnl"),
-            "title": artifact.get("title", "P&L by Desk"),
-            "chart_type": artifact.get("chart_type"),
-            "spec": artifact.get("spec"),
+            "id": af["id"],
+            "title": af["title"],
+            "chart_type": af["chart_type"],
+            "spec": af["spec"],
         }
 
         all_positions = []
