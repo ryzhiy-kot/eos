@@ -122,4 +122,108 @@ describe("agent store", () => {
       expect(result.command).toBeNull();
     });
   });
+
+  describe("artifact ID uniqueness", () => {
+    it("addArtifact allows duplicates (deduplication happens at terminal level)", () => {
+      addArtifact({
+        id: "chart_123",
+        type: "chart",
+        title: "First Chart",
+        spec: { type: "bar", data: [] },
+        created_at: new Date().toISOString(),
+        visible: true,
+      });
+      
+      addArtifact({
+        id: "chart_123",
+        type: "chart",
+        title: "Second Chart",
+        spec: { type: "line", data: [] },
+        created_at: new Date().toISOString(),
+        visible: true,
+      });
+      
+      const state = get(agentState);
+      expect(state.artifacts).toHaveLength(2);
+    });
+
+    it("should allow multiple artifacts with unique IDs", () => {
+      addArtifact({
+        id: "chart_abc",
+        type: "chart",
+        title: "P&L Chart",
+        spec: { type: "bar", data: [] },
+        created_at: new Date().toISOString(),
+        visible: true,
+      });
+      
+      addArtifact({
+        id: "chart_xyz",
+        type: "chart",
+        title: "Risk Chart",
+        spec: { type: "gauge", data: [] },
+        created_at: new Date().toISOString(),
+        visible: true,
+      });
+      
+      const state = get(agentState);
+      expect(state.artifacts).toHaveLength(2);
+      expect(state.artifacts.map(a => a.id)).toEqual(["chart_abc", "chart_xyz"]);
+    });
+
+    it("should handle merge of new artifacts without duplicates", () => {
+      addArtifact({
+        id: "chart_existing",
+        type: "chart",
+        title: "Existing",
+        spec: { type: "bar", data: [] },
+        created_at: new Date().toISOString(),
+        visible: true,
+      });
+
+      const incomingArtifacts = [
+        { id: "chart_existing", type: "chart", title: "Existing", spec: {}, visible: true },
+        { id: "chart_new", type: "chart", title: "New", spec: {}, visible: true },
+      ];
+      
+      const existingIds = new Set(get(agentState).artifacts.map((a) => a.id));
+      const newArtifacts = incomingArtifacts
+        .filter((a: any) => !existingIds.has(a.id))
+        .map((a: any) => ({ ...a, visible: true }));
+      
+      agentState.update((state) => ({
+        ...state,
+        artifacts: [...state.artifacts, ...newArtifacts],
+      }));
+      
+      const state = get(agentState);
+      expect(state.artifacts).toHaveLength(2);
+      expect(state.artifacts.map(a => a.id)).toEqual(["chart_existing", "chart_new"]);
+    });
+
+    it("should handle empty incoming artifacts", () => {
+      addArtifact({
+        id: "chart_test",
+        type: "chart",
+        title: "Test",
+        spec: { type: "bar", data: [] },
+        created_at: new Date().toISOString(),
+        visible: true,
+      });
+
+      const incomingArtifacts: any[] = [];
+      const existingIds = new Set(get(agentState).artifacts.map((a) => a.id));
+      const newArtifacts = incomingArtifacts
+        .filter((a) => !existingIds.has(a.id))
+        .map((a) => ({ ...a, visible: true }));
+      
+      agentState.update((state) => ({
+        ...state,
+        artifacts: [...state.artifacts, ...newArtifacts],
+      }));
+      
+      const state = get(agentState);
+      expect(state.artifacts).toHaveLength(1);
+    });
+  });
 });
