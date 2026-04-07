@@ -117,14 +117,17 @@
       chart.removeSeries(series);
     }
 
-    const normalizedData = data.map((d, i) => ({
-      time: normalizeTime(d.time, i),
-      value: d.value ?? d.close ?? 0,
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close,
-    }));
+    const normalizedData = data.map((d, i) => {
+      const value = d.value ?? d.close ?? 0;
+      return {
+        time: normalizeTime(d.time, i),
+        value: value,
+        open: d.open ?? value,
+        high: d.high ?? value,
+        low: d.low ?? value,
+        close: d.close ?? value,
+      };
+    });
 
     switch (chartType) {
       case "bar":
