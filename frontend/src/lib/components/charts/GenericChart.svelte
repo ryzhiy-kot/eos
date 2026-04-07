@@ -119,8 +119,12 @@
 
     const normalizedData = data.map((d, i) => {
       const value = d.value ?? d.close ?? 0;
+      const label = d.label || d.name || "";
+      const time = chartType === "bar" && label 
+        ? label 
+        : normalizeTime(d.time, i);
       return {
-        time: normalizeTime(d.time, i),
+        time: time,
         value: value,
         open: d.open ?? value,
         high: d.high ?? value,
@@ -136,18 +140,6 @@
           downColor: defaultColors.downColor,
         } as any);
         series.setData(normalizedData as any);
-        
-        if (data[0]?.label) {
-          const labels = data.map(d => d.label || d.name || "");
-          chart.applyOptions({
-            timeScale: {
-              tickMarkFormatter: (time: number) => {
-                const idx = normalizedData.findIndex(d => d.time === time);
-                return idx >= 0 && labels[idx] ? labels[idx] : "";
-              },
-            },
-          });
-        }
         break;
 
       case "area":
