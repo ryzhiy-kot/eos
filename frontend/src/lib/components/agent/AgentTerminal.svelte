@@ -433,8 +433,14 @@ Artifact references in prompts:
           addAssistantMessage(event.content);
           break;
         case "done":
-          if (event.artifacts) {
-            updateArtifacts(event.artifacts);
+          if (event.artifacts && event.artifacts.length > 0) {
+            const newArtifactIds = new Set(event.artifacts.map((a: any) => a.id));
+            agentState.update((state) => ({
+              ...state,
+              artifacts: state.artifacts.filter((a) => newArtifactIds.has(a.id)).concat(
+                event.artifacts.map((a: any) => ({ ...a, visible: true }))
+              ),
+            }));
           }
           break;
       }
