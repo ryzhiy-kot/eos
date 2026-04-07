@@ -109,16 +109,26 @@
   {#if !isMinimized}
     <div class="window-content">
       {#if artifact.type === "chart" && artifact.spec}
-        {@const spec = artifact.spec as { type: string; data: unknown[] }}
-        {@const chartData = (spec.data || []).map((d: any) => ({
-          time: d.time || d.label || d.name || 1700000000,
-          value: d.value !== undefined ? Number(d.value) : (d.rate !== undefined ? Number(d.rate) : 0),
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-        }))}
-        <GenericChart data={chartData} chartType={spec.type as any} />
+        {@const spec = artifact.spec as { type: string; data: unknown[]; value?: number; max?: number }}
+        {#if spec.type === "gauge"}
+          <div class="gauge-display">
+            <div class="gauge-value">{spec.value?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || "N/A"}</div>
+            <div class="gauge-label">{spec.title || "VaR"}</div>
+            <div class="gauge-bar">
+              <div class="gauge-fill" style="width: {Math.min(100, ((spec.value || 0) / (spec.max || 1)) * 100)}%"></div>
+            </div>
+          </div>
+        {:else}
+          {@const chartData = (spec.data || []).map((d: any) => ({
+            time: d.time || d.label || d.name || 1700000000,
+            value: d.value !== undefined ? Number(d.value) : (d.rate !== undefined ? Number(d.rate) : 0),
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+          }))}
+          <GenericChart data={chartData} chartType={spec.type as any} />
+        {/if}
       {:else if artifact.type === "table" && artifact.columns && artifact.data}
         <div class="table-wrapper">
           <table class="data-table">
@@ -363,6 +373,47 @@
 
   .download-link:hover {
     background: var(--accent-hover);
+  }
+
+  .gauge-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+  }
+
+  .gauge-value {
+    font-size: 48px;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .gauge-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+  }
+
+  .gauge-bar {
+    width: 80%;
+    height: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .gauge-fill {
+    height: 100%;
+    background: var(--yellow);
+    border-radius: 6px;
+    transition: width 0.3s ease;
   }
 
   .text-content {
