@@ -63,7 +63,7 @@ async def health_check():
     return {"status": "healthy", "version": "0.1.0"}
 
 
-@app.get("/config")
+@app.get(f"{settings.API_PREFIX}/config")
 async def get_config():
     return {
         "app_name": settings.APP_NAME,
