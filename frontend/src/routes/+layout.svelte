@@ -218,6 +218,7 @@
           top: {$agentState.terminalPosition.y}px;
           width: {$agentState.terminalSize.width}px;
           height: {$agentState.terminalSize.height}px;
+          z-index: 10000;
         "
       >
         <AgentTerminal />

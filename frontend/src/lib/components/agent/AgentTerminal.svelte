@@ -640,6 +640,12 @@ Artifact references in prompts:
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-primary);
     flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .terminal-header:active {
+    cursor: grabbing;
   }
 
   .terminal-title {
