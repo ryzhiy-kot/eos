@@ -95,11 +95,20 @@
       const spec = artifact.spec as { type?: string } | undefined;
       if (spec?.type === "bar") bqFunction = "mock_pnl";
       else if (spec?.type === "line") bqFunction = "mock_interest_curves";
+      else if (spec?.type === "gauge") bqFunction = "mock_risk";
     }
     try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        console.warn("No token, cannot pin artifact");
+        return;
+      }
       await pinArtifact(artifact, bqFunction, 0);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to pin artifact:", e);
+      if (e.message === "Unauthorized" || e.message?.includes("401")) {
+        console.warn("Auth error on pin - ignoring to preserve session");
+      }
     }
   }
 

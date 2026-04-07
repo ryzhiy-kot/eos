@@ -1,20 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 class ApiClient {
-  private _token: string | null = null;
-
-  constructor() {
-    if (typeof window !== "undefined") {
-      this._token = localStorage.getItem("access_token");
-    }
-  }
-
   private getToken(): string | null {
-    // Always read fresh from localStorage to ensure we have the latest token
-    if (typeof window !== "undefined") {
-      this._token = localStorage.getItem("access_token");
-    }
-    return this._token;
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("access_token");
   }
 
   // Public method to get token for external use (e.g., auth checks)
@@ -23,14 +12,12 @@ class ApiClient {
   }
 
   setToken(token: string) {
-    this._token = token;
     if (typeof window !== "undefined") {
       localStorage.setItem("access_token", token);
     }
   }
 
   clearToken() {
-    this._token = null;
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
