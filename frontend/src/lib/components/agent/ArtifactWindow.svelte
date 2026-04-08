@@ -109,7 +109,7 @@
   {#if !isMinimized}
     <div class="window-content">
       {#if artifact.type === "chart" && artifact.spec}
-        {@const spec = artifact.spec as { type: string; data: unknown[]; value?: number; max?: number }}
+        {@const spec = artifact.spec as { type: string; data: unknown[]; value?: number; max?: number; title?: string }}
         {#if spec.type === "gauge"}
           <div class="gauge-display">
             <div class="gauge-value">{spec.value?.toLocaleString(undefined, { maximumFractionDigits: 0 }) || "N/A"}</div>
