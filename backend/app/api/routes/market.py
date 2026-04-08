@@ -1,8 +1,12 @@
+"""Market routes — REST API for market data (quotes, instruments, OHLCV)."""
+
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 
 from app.schemas import InstrumentResponse, OHLCVResponse, QuoteResponse
 from app.services.auth import get_current_user
-from app.services.financial_api import mock_service
+from app.services.financial_api import MockFinancialService, mock_service
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -19,12 +23,18 @@ INSTRUMENTS = [
 ]
 
 
+def get_mock_service() -> MockFinancialService:
+    """Dependency injection for MockFinancialService."""
+    return mock_service
+
+
 @router.get("/instruments", response_model=list[InstrumentResponse])
 async def list_instruments(
-    asset_class: str | None = Query(None),
-    search: str | None = Query(None),
+    asset_class: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
-):
+) -> list[InstrumentResponse]:
+    """List available instruments with optional filtering."""
     results = INSTRUMENTS
     if asset_class:
         results = [i for i in results if i.asset_class == asset_class]
@@ -35,8 +45,13 @@ async def list_instruments(
 
 
 @router.get("/quote/{symbol}", response_model=QuoteResponse)
-async def get_quote(symbol: str, current_user: dict = Depends(get_current_user)):
-    return mock_service.get_quote(symbol)
+async def get_quote(
+    symbol: str,
+    current_user: dict = Depends(get_current_user),
+    mock_svc: MockFinancialService = Depends(get_mock_service),
+) -> dict:
+    """Get a quote for a specific symbol."""
+    return mock_svc.get_quote(symbol)
 
 
 @router.get("/ohlcv/{symbol}", response_model=list[OHLCVResponse])
@@ -44,5 +59,7 @@ async def get_ohlcv(
     symbol: str,
     days: int = Query(90, ge=1, le=365),
     current_user: dict = Depends(get_current_user),
-):
-    return mock_service.get_ohlcv(symbol, days=days)
+    mock_svc: MockFinancialService = Depends(get_mock_service),
+) -> list[dict]:
+    """Get OHLCV data for a symbol."""
+    return mock_svc.get_ohlcv(symbol, days=days)

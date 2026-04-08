@@ -4,9 +4,9 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.config import get_settings
-from app.schemas import LoginRequest, TokenResponse, UserResponse
-from app.services.auth import (
+from ...config import get_settings
+from ...schemas import LoginRequest, TokenResponse, UserResponse
+from ...services.auth import (
     create_access_token,
     create_refresh_token,
     decode_token,

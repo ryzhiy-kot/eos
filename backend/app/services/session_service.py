@@ -6,7 +6,7 @@ from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.config import get_settings
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 

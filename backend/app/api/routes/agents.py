@@ -18,18 +18,24 @@ from app.schemas import (
 from app.services.agent_service import chat_stream
 from app.services.auth import get_current_user
 from app.services.context_injector import get_available_functions
-from app.services.session_service import get_session_service
+from app.services.dependencies import get_session_service
+from app.services.session_service import SessionService
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+def get_session_service_dep() -> SessionService:
+    """Dependency injection for SessionService."""
+    return get_session_service()
 
 
 @router.post("/sessions", response_model=SessionResponse)
 async def create_session(
     request: SessionCreate,
     current_user: dict = Depends(get_current_user),
-):
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> SessionResponse:
     """Create a new session for the current user."""
-    session_service = get_session_service()
     session = await session_service.create_session(
         user_id=current_user.get("sub", "unknown"),
         name=request.name,
@@ -44,9 +50,11 @@ async def create_session(
 
 
 @router.get("/sessions", response_model=SessionListResponse)
-async def list_sessions(current_user: dict = Depends(get_current_user)):
+async def list_sessions(
+    current_user: dict = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> SessionListResponse:
     """List all sessions for the current user."""
-    session_service = get_session_service()
     sessions = await session_service.list_sessions(user_id=current_user.get("sub", "unknown"))
     return SessionListResponse(
         sessions=[
@@ -63,9 +71,12 @@ async def list_sessions(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
-async def get_session(session_id: str, current_user: dict = Depends(get_current_user)):
+async def get_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> SessionResponse:
     """Get a specific session by ID."""
-    session_service = get_session_service()
     session = await session_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -85,9 +96,9 @@ async def update_session(
     session_id: str,
     request: SessionUpdate,
     current_user: dict = Depends(get_current_user),
-):
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> SessionResponse:
     """Update a session's name."""
-    session_service = get_session_service()
     session = await session_service.update_session(session_id, request.name)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -103,9 +114,12 @@ async def update_session(
 
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> dict:
     """Delete a session and its artifacts."""
-    session_service = get_session_service()
     session = await session_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -119,9 +133,9 @@ async def delete_session(session_id: str, current_user: dict = Depends(get_curre
 async def list_session_artifacts(
     session_id: str,
     current_user: dict = Depends(get_current_user),
-):
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> ArtifactListResponse:
     """List all artifacts for a session."""
-    session_service = get_session_service()
     session = await session_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -148,9 +162,12 @@ async def list_session_artifacts(
 
 
 @router.get("/artifacts/{artifact_id}", response_model=ArtifactResponse)
-async def get_artifact(artifact_id: str, current_user: dict = Depends(get_current_user)):
+async def get_artifact(
+    artifact_id: str,
+    current_user: dict = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> ArtifactResponse:
     """Get a specific artifact by ID."""
-    session_service = get_session_service()
     artifact = await session_service.get_artifact(artifact_id)
     if not artifact:
         raise HTTPException(status_code=404, detail="Artifact not found")
@@ -175,9 +192,9 @@ async def get_artifact(artifact_id: str, current_user: dict = Depends(get_curren
 async def list_session_messages(
     session_id: str,
     current_user: dict = Depends(get_current_user),
-):
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> MessageListResponse:
     """List all messages for a session."""
-    session_service = get_session_service()
     session = await session_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -199,14 +216,17 @@ async def list_session_messages(
 
 
 @router.post("/chat")
-async def agent_chat(request: AgentChatRequest, current_user: dict = Depends(get_current_user)):
+async def agent_chat(
+    request: AgentChatRequest,
+    current_user: dict = Depends(get_current_user),
+    session_service: SessionService = Depends(get_session_service_dep),
+) -> StreamingResponse:
     """Send a message to the AI agent and stream the response.
 
     The backend manages session history via Google ADK. If session_id is not provided,
     a new session is automatically created.
     """
     user_id = current_user.get("sub", "unknown")
-    session_service = get_session_service()
 
     session_id = request.session_id or str(uuid4())
     await session_service.ensure_session(session_id=session_id, user_id=user_id)
@@ -217,6 +237,7 @@ async def agent_chat(request: AgentChatRequest, current_user: dict = Depends(get
             message=request.message,
             user_id=user_id,
             session_id=session_id,
+            session_service=session_service,
         ):
             yield json.dumps(event) + "\n"
 
@@ -228,6 +249,8 @@ async def agent_chat(request: AgentChatRequest, current_user: dict = Depends(get
 
 
 @router.get("/functions")
-async def list_functions(current_user: dict = Depends(get_current_user)):
+async def list_functions(
+    current_user: dict = Depends(get_current_user),
+) -> list:
     """List available functions for the agent."""
     return get_available_functions()
