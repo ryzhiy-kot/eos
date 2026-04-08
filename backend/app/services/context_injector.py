@@ -72,7 +72,7 @@ def _get_instruments_for_desk(desk: str) -> list:
 
 
 @NamespaceRegistry.register("bq", "Get P&L attribution data for trading desks")
-def mock_pnl(
+def pnl(
     date: str | None = None,
     desk: str | None = None,
     currency: str = "USD",
@@ -139,7 +139,7 @@ def _aggregate_by_attribution(positions: list) -> dict:
 
 
 @NamespaceRegistry.register("bq", "Get risk metrics (VaR, Greeks) for trading desks")
-def mock_risk(
+def risk(
     date: str | None = None,
     desk: str | None = None,
     metric_type: str = "full",
@@ -193,7 +193,7 @@ def mock_risk(
 
 
 @NamespaceRegistry.register("bq", "Get current FX rates for currency pairs")
-def mock_fx_rates(
+def fx_rates(
     pair: str | None = None,
     date: str | None = None,
     source: str = "mid",
@@ -248,7 +248,7 @@ def mock_fx_rates(
 
 
 @NamespaceRegistry.register("bq", "Get interest rate curves for different currencies")
-def mock_interest_curves(
+def interest_curves(
     curve_type: str | None = None,
     date: str | None = None,
 ) -> dict:
@@ -295,7 +295,7 @@ def mock_interest_curves(
 
 
 @NamespaceRegistry.register("bq", "Get current trading positions")
-def mock_positions(
+def positions(
     desk: str | None = None,
     book: str | None = None,
     instrument: str | None = None,
@@ -360,7 +360,7 @@ def mock_positions(
 
 
 @NamespaceRegistry.register("bq", "Get market news headlines")
-def mock_news(
+def news(
     instrument: str | None = None,
     keywords: str | None = None,
     max_results: int = 10,

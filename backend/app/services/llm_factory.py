@@ -57,8 +57,8 @@ def create_llm_agent(
     if output_schema:
         agent_kwargs["output_schema"] = output_schema
 
-    # Special handling for local API keys if needed (though agents handle env fallback)
-    if api_key:
+    # Only pass api_key to GroqAgent - LlmAgent from google.adk doesn't accept extra fields
+    if api_key and agent_class is GroqAgent:
         agent_kwargs["api_key"] = api_key
 
     return agent_class(**agent_kwargs)
