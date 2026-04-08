@@ -162,3 +162,34 @@ class MessageResponse(BaseModel):
 
 class MessageListResponse(BaseModel):
     messages: list[MessageResponse]
+
+
+class PanelCreate(BaseModel):
+    artifact_id: str
+    name: str
+    bq_function: str
+    bq_params: dict = {}
+    refresh_interval: int = 0
+
+
+class PanelUpdate(BaseModel):
+    name: str | None = None
+    refresh_interval: int | None = None
+
+
+class PanelResponse(BaseModel):
+    id: str
+    user_id: str
+    artifact_id: str
+    name: str
+    bq_function: str
+    bq_params: dict
+    refresh_interval: int
+    is_pinned: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PanelDataResponse(BaseModel):
+    data: dict
+    last_updated: datetime

@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     # App
-    APP_NAME: str = "FinAgent Platform"
+    APP_NAME: str = "EoS Platform"
+    DISPLAY_NAME: str = "EoS"
     DEBUG: bool = True
     SECRET_KEY: str = "change-me-in-production-use-openssl-rand-hex-32"
     API_PREFIX: str = "/api"

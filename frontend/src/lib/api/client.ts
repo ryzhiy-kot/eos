@@ -1,31 +1,27 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 class ApiClient {
-  private token: string | null = null;
+  private getToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("access_token");
+  }
 
-  constructor() {
-    if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("access_token");
-    }
+  // Public method to get token for external use (e.g., auth checks)
+  getTokenSync(): string | null {
+    return this.getToken();
   }
 
   setToken(token: string) {
-    this.token = token;
     if (typeof window !== "undefined") {
       localStorage.setItem("access_token", token);
     }
   }
 
   clearToken() {
-    this.token = null;
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
     }
-  }
-
-  getToken(): string | null {
-    return this.token;
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -34,8 +30,9 @@ class ApiClient {
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_BASE}${path}`, {
@@ -85,9 +82,18 @@ class ApiClient {
 
   logout() {
     this.clearToken();
+    const token = this.getToken();
+    fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).catch(() => {});
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
+  }
+
+  getConfig() {
+    return this.get<{ app_name: string; display_name: string; version: string }>("/config");
   }
 
   // Market
@@ -134,8 +140,9 @@ class ApiClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (this.token) {
-      headers["Authorization"] = `Bearer ${this.token}`;
+    const token = this.getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const body: Record<string, unknown> = { message };
@@ -192,6 +199,64 @@ class ApiClient {
 
   getSessionMessages(sessionId: string) {
     return this.get<{ messages: Array<{ id: string; session_id: string; role: string; content: string; created_at: string }> }>(`/agents/sessions/${sessionId}/messages`);
+  }
+
+  // Panels
+  getPanels() {
+    return this.get<any[]>("/panels/");
+  }
+
+  createPanel(panel: {
+    artifact_id: string;
+    name: string;
+    bq_function: string;
+    bq_params: object;
+    refresh_interval: number;
+  }) {
+    return this.post<any>("/panels/", panel);
+  }
+
+  getPanelRefresh(panelId: string) {
+    return this.get<{ data: unknown; last_updated: string }>(`/panels/${panelId}/refresh`);
+  }
+
+  deletePanel(panelId: string) {
+    return this.request<void>(`/panels/${panelId}/`, { method: "DELETE" });
+  }
+
+  updatePanel(panelId: string, updates: { name?: string; refresh_interval?: number }) {
+    return this.request<any>(`/panels/${panelId}/`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  }
+
+  connectPanelStream(panelId: string, onMessage: (data: unknown) => void): () => void {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const token = this.getToken();
+    const wsUrl = token 
+      ? `${protocol}//${window.location.host}/api/ws/panels/${panelId}?token=${encodeURIComponent(token)}`
+      : `${protocol}//${window.location.host}/api/ws/panels/${panelId}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "panel_update") {
+          onMessage(data.data);
+        }
+      } catch (e) {
+        console.error("WebSocket message error:", e);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      ws.close();
+    };
   }
 }
 

@@ -13,6 +13,16 @@ export const user = writable<User | null>(null);
 export const isAuthenticated = derived(user, ($user) => $user !== null);
 export const isLoading = writable(false);
 export const authError = writable<string | null>(null);
+export const displayName = writable<string>("EoS");
+
+export async function loadConfig() {
+  try {
+    const config = await api.getConfig();
+    displayName.set(config.display_name);
+  } catch {
+    displayName.set("EoS");
+  }
+}
 
 export async function login(username: string, password: string) {
   isLoading.set(true);
@@ -35,7 +45,7 @@ export function logout() {
 }
 
 export async function checkAuth() {
-  const token = api.getToken();
+  const token = api.getTokenSync();
   if (!token) return;
   try {
     const userData = await api.get<User>("/auth/me");

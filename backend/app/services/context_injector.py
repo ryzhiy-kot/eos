@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel, Field
 
 from app.services.artifact_collector import ArtifactCollector
+from app.services.namespace_registry import NamespaceRegistry
 
 MOCK_DESKS = ["FX", "Rates", "Credit", "Commodities"]
 
@@ -70,6 +71,7 @@ def _get_instruments_for_desk(desk: str) -> list:
     return [i for i in all_instruments if i["desk"] == desk]
 
 
+@NamespaceRegistry.register("bq", "Get P&L attribution data for trading desks")
 def mock_pnl(
     date: str | None = None,
     desk: str | None = None,
@@ -136,6 +138,7 @@ def _aggregate_by_attribution(positions: list) -> dict:
     return {k: round(v, 2) for k, v in attribution.items()}
 
 
+@NamespaceRegistry.register("bq", "Get risk metrics (VaR, Greeks) for trading desks")
 def mock_risk(
     date: str | None = None,
     desk: str | None = None,
@@ -189,6 +192,7 @@ def mock_risk(
     return result
 
 
+@NamespaceRegistry.register("bq", "Get current FX rates for currency pairs")
 def mock_fx_rates(
     pair: str | None = None,
     date: str | None = None,
@@ -243,6 +247,7 @@ def mock_fx_rates(
     return result
 
 
+@NamespaceRegistry.register("bq", "Get interest rate curves for different currencies")
 def mock_interest_curves(
     curve_type: str | None = None,
     date: str | None = None,
@@ -289,6 +294,7 @@ def mock_interest_curves(
     return result
 
 
+@NamespaceRegistry.register("bq", "Get current trading positions")
 def mock_positions(
     desk: str | None = None,
     book: str | None = None,
@@ -353,6 +359,7 @@ def mock_positions(
     return result
 
 
+@NamespaceRegistry.register("bq", "Get market news headlines")
 def mock_news(
     instrument: str | None = None,
     keywords: str | None = None,
@@ -428,24 +435,15 @@ def build_execution_context(
 
     collector = ArtifactCollector()
 
-    bq_data = {
-        "pnl": mock_pnl,
-        "risk": mock_risk,
-        "fx_rates": mock_fx_rates,
-        "curves": mock_interest_curves,
-        "positions": mock_positions,
-        "news": mock_news,
-    }
+    context = {}
+    for ns_name in NamespaceRegistry.list_namespaces():
+        functions = NamespaceRegistry.get_functions_dict(ns_name)
+        context[ns_name] = DotDict(functions)
 
-    context = {
-        "bq": DotDict(bq_data),
-        "display": collector,
-        "pd": None,
-        "np": None,
-        "json": json,
-        "_user_id": user_id,
-        "_history": conversation_history or [],
-    }
+    context["display"] = collector
+    context["json"] = json
+    context["_user_id"] = user_id
+    context["_history"] = conversation_history or []
 
     return context, collector
 
@@ -465,14 +463,6 @@ class NamespaceDoc(BaseModel):
 
 def get_available_functions() -> list[NamespaceDoc]:
     """Returns documentation about available functions by inspecting their signatures."""
-    bq_funcs = {
-        "pnl": mock_pnl,
-        "risk": mock_risk,
-        "fx_rates": mock_fx_rates,
-        "curves": mock_interest_curves,
-        "positions": mock_positions,
-        "news": mock_news,
-    }
 
     def _extract_func_info(func) -> FunctionDoc:
         sig = inspect.signature(func)
@@ -505,12 +495,17 @@ def get_available_functions() -> list[NamespaceDoc]:
 
         return FunctionDoc(description=desc, signature=clean_sig)
 
-    bq_ns = NamespaceDoc(name="bq", description="Data Query", functions={})
+    # Build namespace docs from registry
+    docs = []
+    for ns_name in NamespaceRegistry.list_namespaces():
+        ns_funcs = NamespaceRegistry.get_namespace(ns_name)
+        ns_doc = NamespaceDoc(name=ns_name, description=f"{ns_name} namespace", functions={})
+        for name, info in ns_funcs.items():
+            ns_doc.functions[name] = _extract_func_info(info.func)
+        docs.append(ns_doc)
+
+    # Add display namespace
     display_ns = NamespaceDoc(name="display", description="Display Utilities", functions={})
-
-    for name, func in bq_funcs.items():
-        bq_ns.functions[name] = _extract_func_info(func)
-
     for name in dir(ArtifactCollector):
         if not name.startswith("_") and callable(getattr(ArtifactCollector, name)):
             func = getattr(ArtifactCollector, name)
@@ -527,7 +522,9 @@ def get_available_functions() -> list[NamespaceDoc]:
                 del schema["type"]
             display_ns.models[obj.__name__] = schema
 
-    return [bq_ns, display_ns]
+        docs.append(display_ns)
+
+    return docs
 
 
 def get_execution_environment_doc() -> str:

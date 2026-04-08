@@ -1,4 +1,6 @@
-import { writable, get } from "svelte/store";
+import { writable } from "svelte/store";
+
+const MOCK_MODE = import.meta.env.VITE_MOCK_MODE ?? "true";
 
 export interface MockConfig {
   enabled: boolean;
@@ -6,21 +8,10 @@ export interface MockConfig {
 }
 
 export const mockConfig = writable<MockConfig>({
-  enabled: true,
+  enabled: MOCK_MODE === "true",
   dataDelay: 0,
 });
 
 export function isMockEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  const stored = localStorage.getItem("mock_mode");
-  if (stored === null) {
-    localStorage.setItem("mock_mode", "true");
-    return true;
-  }
-  return stored === "true" || get(mockConfig).enabled;
-}
-
-export function enableMockMode(enabled: boolean = true) {
-  localStorage.setItem("mock_mode", String(enabled));
-  mockConfig.update((c) => ({ ...c, enabled }));
+  return MOCK_MODE === "true";
 }

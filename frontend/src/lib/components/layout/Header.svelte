@@ -1,7 +1,7 @@
 <script lang="ts">
   import { user, logout } from "$lib/stores/auth";
 
-  let { title = "FinAgent" }: { title?: string } = $props();
+  let { title = "EoS" }: { title?: string } = $props();
 </script>
 
 <header class="header">
@@ -11,7 +11,7 @@
         <rect width="24" height="24" rx="4" fill="#3b82f6" />
         <path d="M7 12L12 7L17 12L12 17Z" fill="white" />
       </svg>
-      <span class="logo-text">FinAgent</span>
+      <span class="logo-text">EoS</span>
     </div>
     <nav class="nav-links">
       <a href="/" class="nav-link">Dashboard</a>

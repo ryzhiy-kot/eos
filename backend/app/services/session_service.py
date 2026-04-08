@@ -76,8 +76,26 @@ class Artifact(Base):
     session: Mapped["Session"] = relationship("Session", back_populates="artifacts")
 
 
+class Panel(Base):
+    __tablename__ = "panels"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    artifact_id: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(255))
+    bq_function: Mapped[str] = mapped_column(String(50))
+    bq_params: Mapped[dict] = mapped_column(JSON, default=dict)
+    refresh_interval: Mapped[int] = mapped_column(default=0)
+    is_pinned: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 async def init_db():
     """Initialize the database tables."""
+    from app.models.panel import Panel
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

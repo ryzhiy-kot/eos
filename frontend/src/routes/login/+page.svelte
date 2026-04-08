@@ -1,15 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { login, isLoading, authError, isAuthenticated } from "$lib/stores/auth";
+  import { login, isLoading, authError, loadConfig, displayName } from "$lib/stores/auth";
 
   let username = $state("trader");
   let password = $state("trader123");
 
-  onMount(() => {
-    if ($isAuthenticated) {
-      goto("/");
-    }
+  onMount(async () => {
+    await loadConfig();
   });
 
   async function handleLogin(e: Event) {
@@ -31,7 +29,7 @@
         <path d="M7 12L12 7L17 12L12 17Z" fill="white" />
       </svg>
     </div>
-    <h1>FinAgent</h1>
+    <h1>{$displayName}</h1>
     <p class="subtitle">AI-Powered Financial Platform</p>
 
     <form onsubmit={handleLogin}>
@@ -46,7 +44,6 @@
           class="input"
           bind:value={username}
           placeholder="Enter username"
-          autocomplete="username"
         />
       </div>
       <div class="field">
@@ -57,7 +54,6 @@
           class="input"
           bind:value={password}
           placeholder="Enter password"
-          autocomplete="current-password"
         />
       </div>
       <button type="submit" class="btn btn-primary login-btn" disabled={$isLoading}>
@@ -91,11 +87,6 @@
 
   .login-logo {
     margin: 0 auto 16px;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   h1 {
@@ -121,26 +112,6 @@
     text-align: left;
   }
 
-  .checkbox-field {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .checkbox-field label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-
-  .checkbox-field input {
-    width: 16px;
-    height: 16px;
-  }
-
   label {
     display: block;
     margin-bottom: 6px;
@@ -163,7 +134,7 @@
   .error {
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
-    color: var(--red);
+    color: #ef4444;
     padding: 8px 12px;
     border-radius: 4px;
     font-size: 12px;
@@ -175,5 +146,18 @@
     border-top: 1px solid var(--border-primary);
     font-size: 11px;
     color: var(--text-muted);
+  }
+
+  .btn {
+    background: #3b82f6;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

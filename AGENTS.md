@@ -1,14 +1,16 @@
-# FinAgent Development Guide
+# EoS Development Guide
 
-This document outlines the development approach, coding standards, and project structure for the FinAgent platform.
+This document outlines the development approach, coding standards, and project structure for the EoS platform.
 
 ## Project Overview
 
-FinAgent is a TUI-style financial assistant for traders (FX, Rates, Credit, Commodities) that:
+EoS is a TUI-style financial assistant for traders (FX, Rates, Credit, Commodities) that:
 - Uses code-generating agents (GROQ/Gemini) to analyze P&L, risk, positions, rates, curves
 - Generates artifacts (charts, tables, PDFs, text) via Python code execution in a sandbox
 - Displays artifacts in floating, draggable, resizable windows
 - Is purely terminal-centric (TUI for trading)
+
+For detailed documentation on the panels system, see [docs/PANELS.md](docs/PANELS.md).
 
 ## Tech Stack
 
@@ -23,6 +25,56 @@ FinAgent is a TUI-style financial assistant for traders (FX, Rates, Credit, Comm
 - **Framework**: SvelteKit (Svelte 5 with runes)
 - **Styling**: CSS custom properties, no Tailwind
 - **Charts**: lightweight-charts (TradingView)
+
+---
+
+## Core Principles
+
+### 1. Backend-Centric Architecture
+
+All business logic MUST reside in the backend:
+- **Data fetching**: Backend functions (`bq.*` in `context_injector.py`)
+- **Data refresh**: Backend re-executes functions, returns raw data only
+- **No business logic in frontend**: Frontend only renders, never calculates
+
+```python
+# Backend owns data - frontend just polls
+@router.get("/panels/{id}/refresh")
+async def refresh_panel(panel_id: UUID):
+    data = await execute_panel(panel_id)  # Backend runs bq function
+    return {"data": data, "last_updated": datetime.now()}  # Data only
+```
+
+```typescript
+// Frontend - display only, no business logic
+const data = await api.get(`/panels/${panelId}/refresh`);
+chart.update(data);  // Just render the data
+```
+
+### 2. Artifact-Centric UI
+
+- **No pre-configured panels**: All content created through agent interaction
+- **Terminal-first**: User interaction starts with floating terminal
+- **Pinning**: Floating artifacts can be pinned to tabs in header
+- **Tabs replace navigation**: Header shows pinned tabs, not static pages
+
+### 3. Frontend Rendering Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| `GenericChart` | Charts from backend data |
+| `ArtifactWindow` | Floating artifact windows |
+| `TabBar` | Pinned artifacts as tabs |
+| Main content area | Active tab display |
+
+### 4. Refresh Architecture
+
+- **Pull-based**: Frontend polls backend at configured interval via REST `/panels/{id}/refresh`
+- **Push-based**: WebSocket streaming via `/ws/panels/{id}` for real-time updates
+- **Backend decides**: Panel's `refresh_interval` determines which method to use:
+  - `0` = no auto-refresh (manual only)
+  - `> 0` = WebSocket streaming for real-time updates
+- **Data-only**: Refresh returns raw data, not full artifacts
 
 ---
 
@@ -121,16 +173,20 @@ frontend/
 4. **Error handling** - return meaningful errors, never crash silently
 5. **Pydantic models** for all request/response schemas
 6. **No hardcoded config** - use `app/config.py` settings
-7. **Relative imports** - always use relative imports within the app package
+7. **Relative imports** - use relative imports for same-package imports
 
 ```python
-# Good - relative imports within app package
-from ..services.agent_service import AgentService
-from ...config import settings
+# Good - same package (within services/, agents/, etc.)
+from .module import Something
+from .registry import registry
+from ..sibling_module import Helper
 
-# Bad - absolute imports
-from app.services.agent_service import AgentService
-from app.config import settings
+# Good - cross-package (services -> config, api -> services)
+from app.config import get_settings
+from app.services.session_service import SessionService
+
+# Bad - same package but using absolute
+from app.services.mock_responses.registry import registry  # should be: from .registry import registry
 ```
 
 ```python
@@ -184,10 +240,10 @@ def get_pnl(desk):
 ### Backend Testing
 ```bash
 # Run tests
-cd backend && pytest
+cd backend && uv run pytest
 
 # Run with coverage
-pytest --cov=app
+uv run pytest --cov=app
 ```
 
 ### Frontend Testing
@@ -262,6 +318,11 @@ DEMO_MODE=true
 1. Create route in `app/api/routes/`
 2. Add schema in `app/schemas/`
 3. Register in `app/main.py`
+
+### Panels (Pinned Artifacts)
+The panels system allows users to pin floating artifacts as tabs in the header for real-time data updates.
+
+For detailed documentation, see [docs/PANELS.md](docs/PANELS.md).
 
 ---
 

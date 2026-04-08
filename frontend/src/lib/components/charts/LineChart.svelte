@@ -1,14 +1,20 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import {
-    createChart,
-    LineSeries,
-    ColorType,
-    LineStyle,
-    type IChartApi,
-    type UTCTimestamp,
-  } from "lightweight-charts";
+    Chart,
+    LineController,
+    CategoryScale,
+    LinearScale,
+    LineElement,
+    PointElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler,
+  } from "chart.js";
   import { theme } from "$lib/utils/theme";
+
+  Chart.register(LineController, CategoryScale, LinearScale, LineElement, PointElement, Title, Tooltip, Legend, Filler);
 
   let {
     data = [],
@@ -20,8 +26,9 @@
     height?: number;
   } = $props();
 
-  let container: HTMLDivElement;
-  let chart: IChartApi;
+  let canvas: HTMLCanvasElement;
+  let chartInstance: Chart | null = null;
+
   const fieldColors: Record<string, string> = {
     var_95: theme.yellow,
     var_99: theme.red,
@@ -41,64 +48,86 @@
   };
 
   onMount(() => {
-    chart = createChart(container, {
-      layout: {
-        background: { type: ColorType.Solid, color: theme.chart.background },
-        textColor: theme.chart.textColor,
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: theme.chart.gridColor },
-        horzLines: { color: theme.chart.gridColor },
-      },
-      rightPriceScale: {
-        borderColor: theme.border.primary,
-      },
-      timeScale: {
-        borderColor: theme.border.primary,
-        timeVisible: false,
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const labels = data.map((d) => {
+      const ts = d.timestamp;
+      if (!ts) return "";
+      const date = new Date(ts);
+      return isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+    });
+
+    const datasets = fields.map((field) => ({
+      label: fieldLabels[field] || field,
+      data: data.map((d) => d[field] ?? null),
+      borderColor: fieldColors[field] || theme.blue,
+      backgroundColor: (fieldColors[field] || theme.blue) + "20",
+      fill: false,
+      tension: 0,
+      pointRadius: 2,
+      pointHoverRadius: 4,
+      borderWidth: 2,
+    }));
+
+    chartInstance = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: {
+            position: "top",
+            labels: {
+              color: theme.text.secondary,
+              font: { size: 10 },
+              boxWidth: 12,
+              padding: 8,
+            },
+          },
+          tooltip: {
+            backgroundColor: theme.bg.panel,
+            titleColor: theme.text.primary,
+            bodyColor: theme.text.secondary,
+            borderColor: theme.border.primary,
+            borderWidth: 1,
+          },
+        },
+        scales: {
+          x: {
+            type: "category",
+            grid: { color: theme.chart.gridColor },
+            ticks: { color: theme.chart.textColor, font: { size: 10 }, maxRotation: 45 },
+          },
+          y: {
+            type: "linear",
+            grid: { color: theme.chart.gridColor },
+            ticks: { color: theme.chart.textColor, font: { size: 10 } },
+          },
+        },
       },
     });
 
-    for (const field of fields) {
-      const series = chart.addSeries(LineSeries, {
-        color: fieldColors[field] || theme.blue,
-        lineWidth: 2,
-        title: fieldLabels[field] || field,
-        lineStyle: LineStyle.Solid,
-      });
-
-      const seriesData = data
-        .filter((d) => d[field] !== null && d[field] !== undefined)
-        .map((d) => ({
-          time: Math.floor(new Date(d.timestamp).getTime() / 1000) as UTCTimestamp,
-          value: d[field],
-        }));
-
-      series.setData(seriesData);
-    }
-
-    chart.timeScale().fitContent();
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
-      }
+    const resizeObserver = new ResizeObserver(() => {
+      chartInstance?.resize();
     });
-    resizeObserver.observe(container);
+    resizeObserver.observe(canvas.parentElement || canvas);
+
+    return () => {
+      resizeObserver.disconnect();
+      chartInstance?.destroy();
+    };
   });
 
   onDestroy(() => {
-    chart?.remove();
+    chartInstance?.destroy();
   });
 </script>
 
 <div class="chart-wrapper" style="height: {height}px;">
-  <div bind:this={container} class="chart-container"></div>
+  <canvas bind:this={canvas}></canvas>
 </div>
 
 <style>
@@ -107,8 +136,8 @@
     position: relative;
   }
 
-  .chart-container {
-    width: 100%;
-    height: 100%;
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
   }
 </style>

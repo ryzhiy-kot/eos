@@ -38,11 +38,37 @@ async def generate_mock_response(
     msg_lower = message.lower()
 
     from app.services.session_service import get_session_service
+    import uuid
+
+    def get_artifact_fields(artifact: dict, fallback_id: str = "artifact") -> dict:
+        """Safely extract artifact fields with fallbacks."""
+        existing_id = artifact.get("id")
+        if existing_id:
+            return {
+                "id": existing_id,
+                "title": artifact.get("title", ""),
+                "chart_type": artifact.get("chart_type"),
+                "spec": artifact.get("spec"),
+                "columns": artifact.get("columns"),
+                "data": artifact.get("data"),
+                "content": artifact.get("content"),
+                "format": artifact.get("format"),
+            }
+        return {
+            "id": f"{fallback_id}_{uuid.uuid4().hex[:8]}",
+            "title": artifact.get("title", ""),
+            "chart_type": artifact.get("chart_type"),
+            "spec": artifact.get("spec"),
+            "columns": artifact.get("columns"),
+            "data": artifact.get("data"),
+            "content": artifact.get("content"),
+            "format": artifact.get("format"),
+        }
 
     session_service = get_session_service()
 
     if "pnl" in msg_lower or "profit" in msg_lower or "loss" in msg_lower:
-        pnl_data = exec_context["bq"]["pnl"](desk=None)
+        pnl_data = exec_context["bq"].mock_pnl(desk=None)
         yield {
             "type": "text",
             "content": "## P&L Analysis\n\nBased on the current data, here's the P&L breakdown by desk:",
@@ -53,12 +79,14 @@ async def generate_mock_response(
             for d in pnl_data.get("desks", [])
         ]
         collector.chart(chart_data, chart_type="bar", title="P&L by Desk")
-
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "chart_pnl")
         yield {
             "type": "chart",
-            "id": collector.artifacts[-1]["id"],
-            "title": "P&L by Desk",
-            "spec": collector.artifacts[-1]["spec"],
+            "id": af["id"],
+            "title": af["title"],
+            "chart_type": af["chart_type"],
+            "spec": af["spec"],
         }
 
         all_positions = []
@@ -68,12 +96,14 @@ async def generate_mock_response(
             collector.table(
                 all_positions[:10], title="Top Positions by P&L", max_rows=10
             )
+            artifact = collector.artifacts[-1]
+            af = get_artifact_fields(artifact, "table_positions_pnl")
             yield {
                 "type": "table",
-                "id": collector.artifacts[-1]["id"],
+                "id": af["id"],
                 "title": "Top Positions",
                 "columns": ["symbol", "pnl", "notional"],
-                "data": collector.artifacts[-1]["data"],
+                "data": af["data"],
             }
 
         yield {
@@ -87,7 +117,7 @@ async def generate_mock_response(
         or "greek" in msg_lower
         or "exposure" in msg_lower
     ):
-        risk_data = exec_context["bq"]["risk"](desk=None, metric_type="full")
+        risk_data = exec_context["bq"].mock_risk(desk=None, metric_type="full")
         yield {
             "type": "text",
             "content": "## Risk Analysis\n\nHere's the current risk metrics:",
@@ -102,11 +132,14 @@ async def generate_mock_response(
             }
         ]
         collector.chart(gauge_data, chart_type="gauge", title="Portfolio VaR (95%)")
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "chart_risk")
         yield {
             "type": "chart",
-            "id": collector.artifacts[-1]["id"],
+            "id": af["id"],
             "title": "VaR Gauge",
-            "spec": collector.artifacts[-1]["spec"],
+            "chart_type": af["chart_type"],
+            "spec": af["spec"],
         }
 
         table_data = [
@@ -124,12 +157,14 @@ async def generate_mock_response(
             {"metric": "Theta", "value": f"${portfolio_risk.get('theta', 0):,.0f}"},
         ]
         collector.table(table_data, title="Risk Metrics")
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "table_risk")
         yield {
             "type": "table",
-            "id": collector.artifacts[-1]["id"],
+            "id": af["id"],
             "title": "Greeks",
-            "columns": ["metric", "value"],
-            "data": collector.artifacts[-1]["data"],
+            "columns": af["columns"],
+            "data": af["data"],
         }
 
     elif (
@@ -137,7 +172,7 @@ async def generate_mock_response(
         or "interest" in msg_lower
         or ("rate" in msg_lower and "fx" not in msg_lower)
     ):
-        curves_data = exec_context["bq"]["curves"](curve_type=None)
+        curves_data = exec_context["bq"].mock_interest_curves(curve_type=None)
         yield {"type": "text", "content": "## Interest Rate Curves\n\nCurrent curves:"}
 
         for curve in curves_data.get("curves", []):
@@ -148,15 +183,18 @@ async def generate_mock_response(
             collector.chart(
                 chart_data, chart_type="line", title=f"{curve.get('curve_type')} Curve"
             )
+            artifact = collector.artifacts[-1]
+            af = get_artifact_fields(artifact, f"chart_curve_{curve.get('curve_type')}")
             yield {
                 "type": "chart",
-                "id": collector.artifacts[-1]["id"],
+                "id": af["id"],
                 "title": f"{curve.get('curve_type')} Curve",
-                "spec": collector.artifacts[-1]["spec"],
+                "chart_type": af["chart_type"],
+                "spec": af["spec"],
             }
 
     elif "fx" in msg_lower or "rate" in msg_lower or "currency" in msg_lower:
-        fx_data = exec_context["bq"]["fx_rates"](pair=None)
+        fx_data = exec_context["bq"].mock_fx_rates(pair=None)
         yield {"type": "text", "content": "## FX Rates\n\nCurrent FX rates:"}
 
         table_data = [
@@ -170,16 +208,18 @@ async def generate_mock_response(
             for r in fx_data.get("rates", [])
         ]
         collector.table(table_data, title="FX Rates")
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "table_fx")
         yield {
             "type": "table",
-            "id": collector.artifacts[-1]["id"],
+            "id": af["id"],
             "title": "FX Rates",
             "columns": ["pair", "mid", "change_bp"],
-            "data": collector.artifacts[-1]["data"],
+            "data": af["data"],
         }
 
     elif "position" in msg_lower or "holdings" in msg_lower or "book" in msg_lower:
-        positions_data = exec_context["bq"]["positions"](desk=None)
+        positions_data = exec_context["bq"].mock_positions(desk=None)
         yield {
             "type": "text",
             "content": "## Current Positions\n\nHere's your position breakdown:",
@@ -195,28 +235,32 @@ async def generate_mock_response(
             for p in positions_data.get("positions", [])[:20]
         ]
         collector.table(table_data, title="Positions", max_rows=20)
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "table_positions")
         yield {
             "type": "table",
-            "id": collector.artifacts[-1]["id"],
+            "id": af["id"],
             "title": "Positions",
             "columns": ["desk", "symbol", "quantity", "pnl"],
-            "data": collector.artifacts[-1]["data"],
+            "data": af["data"],
         }
 
     elif "news" in msg_lower or "market" in msg_lower:
-        news_data = exec_context["bq"]["news"](max_results=5)
+        news_data = exec_context["bq"].mock_news(max_results=5)
         yield {"type": "text", "content": "## Market News\n\n"}
 
         text_content = "\n\n".join(
             [f"- **{n['headline']}**" for n in news_data.get("news", [])]
         )
         collector.text(text_content, format="markdown")
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "text_news")
         yield {
             "type": "text",
-            "id": collector.artifacts[-1]["id"],
+            "id": af["id"],
             "title": "News",
-            "content": collector.artifacts[-1]["content"],
-            "format": "markdown",
+            "content": af["content"],
+            "format": af["format"],
         }
 
     elif "report" in msg_lower or "pdf" in msg_lower:
@@ -242,14 +286,16 @@ async def generate_mock_response(
                     ],
                 },
             ],
-            "text": "Report generated by FinAgent",
+            "text": "Report generated by EoS",
         }
         collector.pdf(pdf_content, title="Daily Report")
+        artifact = collector.artifacts[-1]
+        af = get_artifact_fields(artifact, "pdf_report")
         yield {
             "type": "pdf",
-            "id": collector.artifacts[-1]["id"],
+            "id": af["id"],
             "title": "Daily Report",
-            "data": collector.artifacts[-1]["data"],
+            "pdfData": af["data"],
         }
 
     else:
@@ -291,10 +337,24 @@ async def chat_stream(
     user_id: str,
     session_id: str = "default",
 ) -> AsyncGenerator[dict, None]:
-    """Public API for chat endpoint."""
-    async for event in process_agent_message(
-        message=message,
-        user_id=user_id,
-        session_id=session_id,
-    ):
-        yield event
+    """Public API for chat endpoint.
+    
+    Routes to mock or real agent based on DEMO_MODE setting.
+    """
+    from app.config import get_settings
+    settings = get_settings()
+    
+    if settings.DEMO_MODE:
+        async for event in generate_mock_response(
+            message=message,
+            user_id=user_id,
+            session_id=session_id,
+        ):
+            yield event
+    else:
+        async for event in process_agent_message(
+            message=message,
+            user_id=user_id,
+            session_id=session_id,
+        ):
+            yield event

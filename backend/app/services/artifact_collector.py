@@ -1,4 +1,5 @@
 import base64
+import uuid
 from typing import Optional, Union, Literal
 from pydantic import BaseModel, Field
 
@@ -229,6 +230,7 @@ class ArtifactCollector:
             "chart_type": chart_type,
             "spec": spec,
             "title": title,
+            "id": f"chart_{uuid.uuid4().hex[:8]}",
         }
         self.artifacts.append(artifact)
         return artifact
@@ -262,6 +264,7 @@ class ArtifactCollector:
             "title": title,
             "columns": table_data["columns"],
             "data": table_data["rows"],
+            "id": f"table_{uuid.uuid4().hex[:8]}",
         }
         self.artifacts.append(artifact)
         return artifact
@@ -292,6 +295,7 @@ class ArtifactCollector:
             "type": "pdf",
             "title": title,
             "data": base64.b64encode(pdf_bytes).decode(),
+            "id": f"pdf_{uuid.uuid4().hex[:8]}",
         }
         self.artifacts.append(artifact)
         return artifact
@@ -319,6 +323,7 @@ class ArtifactCollector:
             "type": "text",
             "format": format,
             "content": str(content),
+            "id": f"text_{uuid.uuid4().hex[:8]}",
         }
         self.artifacts.append(artifact)
         return artifact

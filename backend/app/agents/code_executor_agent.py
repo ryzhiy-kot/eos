@@ -35,8 +35,12 @@ class CodeExecutorInput(BaseModel):
 class CodeExecutorOutput(BaseModel):
     """Output schema for CodeExecutorAgent."""
 
-    success: bool = Field(description="True if execution succeeded, False if there was an error.")
-    text_outputs: list[str] = Field(description="List of all captured stdout (print calls) output.")
+    success: bool = Field(
+        description="True if execution succeeded, False if there was an error."
+    )
+    text_outputs: list[str] = Field(
+        description="List of all captured stdout (print calls) output."
+    )
     artifacts: list[dict] = Field(description="List of generated visual artifacts.")
     error: str | None = Field(
         default=None, description="Error message if execution failed, None otherwise."
@@ -51,27 +55,6 @@ async def execute_code(
     This function is the primary tool for the CodeExecutorAgent. It runs Python code
     with access to financial data and visualization utilities.
 
-    Execution Environment:
-    ----------------------
-    The following functions and modules are pre-injected into the execution namespace:
-
-    Data Query (bq.*):
-    - bq.pnl(desk=None, date=None, currency="USD") - Get P&L data
-    - bq.risk(desk=None, metric_type="full") - Get risk metrics (VaR, Greeks)
-    - bq.fx_rates(pair=None) - Get real-time FX rates
-    - bq.curves(curve_type=None) - Get interest rate curves (USD, EUR, GBP, JPY, CHF)
-    - bq.positions(desk=None) - Get current trading positions
-    - bq.news(keywords=None, max_results=10) - Get market news
-
-    Display Utilities (display.*):
-    - display.chart(data, chart_type="bar", title="") - bar, line, candlestick, gauge
-    - display.table(data, title="", max_rows=50) - Generate a sortable table
-    - display.text(content, format="markdown") - Render Markdown or plain text
-    - display.pdf(content, title="") - Generate a downloadable PDF report
-
-    Standard Modules:
-    - pandas (as pd), numpy (as np), json, random, datetime
-
     Args:
         request: The initial user request. used as code if `code` is not provided.
         code: Optional Python code to execute directly. Takes precedence over `request`.
@@ -79,12 +62,7 @@ async def execute_code(
         session_id: Active session identifier (for context continuity).
 
     Returns:
-        dict: {
-            "success": bool,           # True if execution succeeded
-            "text_outputs": list[str], # All captured stdout (print calls)
-            "artifacts": list[dict],   # Structured visual artifacts for the GUI
-            "error": str | None        # Error message if execution failed
-        }
+        CodeExecutorOutput: The result of the code execution.
 
     Example:
         >>> code = "pnl = bq.pnl(desk='FX'); display.chart(pnl['history'], title='FX P&L')"
@@ -124,7 +102,9 @@ async def execute_code(
                 # Format and store artifacts (charts, tables, etc.)
                 artifact_data = {
                     "type": event["type"],
-                    "id": event.get("id", f"{event['type']}_{len(result['artifacts'])}"),
+                    "id": event.get(
+                        "id", f"{event['type']}_{len(result['artifacts'])}"
+                    ),
                     "title": event.get("title", ""),
                     "spec": event.get("spec"),
                     "columns": event.get("columns"),
@@ -173,7 +153,7 @@ def create_code_executor_agent(
 ) -> Any:
     """Create the CodeExecutorAgent with appropriate tools."""
     tools = [create_execute_code_tool()]
-    
+
     execution_env_doc = get_execution_environment_doc()
 
     instruction = f"""You are a Code Execution Specialist agent.

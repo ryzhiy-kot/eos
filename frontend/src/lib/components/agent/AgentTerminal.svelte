@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import {
     agentState,
+    panels,
     addUserMessage,
     addAssistantMessage,
     appendToLastMessage,
@@ -19,9 +20,11 @@
     getArtifactByIndex,
     fetchSessions,
     loadSession,
+    updatePanelRefresh,
     type Artifact,
   } from "$lib/stores/agent";
   import { api } from "$lib/api/client";
+  import { displayName } from "$lib/stores/auth";
 
   let inputValue = $state("");
   let inputRef: HTMLInputElement;
@@ -121,18 +124,30 @@
       case "ls":
       case "list": {
         const state = $agentState;
-        if (state.artifacts.length === 0) {
-          addAssistantMessage("No artifacts yet.");
+        if (state.artifacts.length === 0 && $panels.length === 0) {
+          addAssistantMessage("No artifacts or panels yet.");
           return;
         }
-        const list = state.artifacts
-          .map(
-            (a, i) =>
-              `[${i}] ${a.type}: ${a.title || "Untitled"}${a.visible ? "" : " (hidden)"}`,
-          )
-          .join("\n");
+
+        let list = "";
+        if (state.artifacts.length > 0) {
+          list += "Artifacts:\n" + state.artifacts
+            .map(
+              (a, i) =>
+                `[${i}] ${a.type}: ${a.title || "Untitled"}${a.visible ? "" : " (hidden)"}`,
+            )
+            .join("\n");
+        }
+
+        if ($panels.length > 0) {
+          if (list) list += "\n\n";
+          list += "Pinned Panels:\n" + $panels
+            .map((p, i) => `[${i}] ${p.name} (refresh: ${p.refresh_interval}s)`)
+            .join("\n");
+        }
+
         addAssistantMessage(
-          `Available artifacts:\n${list}\n\nUse !show <n> to display an artifact, !cat <n> for details.`,
+          list + "\n\nUse !refresh <n> <seconds> to update panel refresh interval.",
         );
         break;
       }
@@ -176,6 +191,36 @@
         addAssistantMessage("All artifacts cleared.");
         break;
       }
+      case "refresh": {
+        if (parts.length < 2) {
+          addAssistantMessage("Usage: !refresh <panel_index> <seconds>");
+          addAssistantMessage("Example: !refresh 0 30 - Set panel 0 to refresh every 30 seconds");
+          addAssistantMessage("Use 0 to disable auto-refresh (e.g., !refresh 0 0)");
+          return;
+        }
+        const idx = parseInt(parts[0], 10);
+        const interval = parseInt(parts[1], 10);
+
+        if (isNaN(idx) || isNaN(interval)) {
+          addAssistantMessage("Invalid parameters. Usage: !refresh <panel_index> <seconds>");
+          return;
+        }
+
+        const panelList = $panels;
+        if (idx < 0 || idx >= panelList.length) {
+          addAssistantMessage(`Panel ${idx} not found. Use !ls to list panels.`);
+          return;
+        }
+
+        const panel = panelList[idx];
+        await updatePanelRefresh(panel.id, interval);
+        if (interval === 0) {
+          addAssistantMessage(`Auto-refresh disabled for "${panel.name}".`);
+        } else {
+          addAssistantMessage(`Panel "${panel.name}" will refresh every ${interval} seconds.`);
+        }
+        break;
+      }
       case "cat": {
         if (parts.length === 0) {
           addAssistantMessage("Usage: !cat <index>");
@@ -212,6 +257,7 @@
 !del <n> - Delete artifact
 !cat <n> - Show artifact details
 !export <n> [format] - Export artifact
+!refresh <n> <s> - Set panel refresh interval in seconds
 !clear - Clear conversation
 !clear-artifacts - Delete all artifacts
 !sessions - Show and switch between previous sessions
@@ -326,14 +372,32 @@ Artifact references in prompts:
 
     const history = getHistory();
 
+    let capturedSessionId: string | null = null;
+
     for await (const event of api.agentChat(
       enhancedMsg,
       $agentState.sessionId,
       history,
     )) {
       switch (event.type) {
+        case "session_id":
+          capturedSessionId = event.session_id;
+          if (event.session_id !== $agentState.sessionId) {
+            agentState.update((s) => ({ ...s, sessionId: event.session_id }));
+          }
+          break;
         case "text":
-          if (
+          if (event.id) {
+            addArtifact({
+              id: event.id,
+              type: "text",
+              title: event.title || "",
+              content: event.content,
+              format: event.format,
+              created_at: new Date().toISOString(),
+              visible: true,
+            });
+          } else if (
             $agentState.messages.length > 0 &&
             $agentState.messages[$agentState.messages.length - 1].role ===
               "assistant"
@@ -343,25 +407,25 @@ Artifact references in prompts:
             addAssistantMessage(event.content);
           }
           break;
-        case "chart":
-        case "table":
-        case "pdf":
-        case "text":
-          addArtifact({
-            id: event.id || `artifact_${$agentState.artifacts.length}`,
-            type: event.type,
-            title: event.title || "",
-            chart_type: event.chart_type,
-            spec: event.spec,
-            columns: event.columns,
-            data: event.data,
-            content: event.content,
-            pdfData: event.data,
-            format: event.format,
-            created_at: new Date().toISOString(),
-            visible: true,
-          });
-          break;
+          case "chart":
+          case "table":
+          case "pdf":
+          case "text":
+            addArtifact({
+              id: event.id || `artifact_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              type: event.type,
+              title: event.title || "",
+              chart_type: event.chart_type,
+              spec: event.spec,
+              columns: event.columns,
+              data: event.data,
+              content: event.content,
+              pdfData: event.data,
+              format: event.format,
+              created_at: new Date().toISOString(),
+              visible: true,
+            });
+            break;
         case "error":
           addAssistantMessage(`Error: ${event.content}`);
           break;
@@ -369,8 +433,17 @@ Artifact references in prompts:
           addAssistantMessage(event.content);
           break;
         case "done":
-          if (event.artifacts) {
-            updateArtifacts(event.artifacts);
+          if (event.artifacts && event.artifacts.length > 0) {
+            const existingIds = new Set($agentState.artifacts.map((a) => a.id));
+            const newArtifacts = event.artifacts
+              .filter((a: any) => !existingIds.has(a.id))
+              .map((a: any) => ({ ...a, visible: true }));
+            if (newArtifacts.length > 0) {
+              agentState.update((state) => ({
+                ...state,
+                artifacts: [...state.artifacts, ...newArtifacts],
+              }));
+            }
           }
           break;
       }
@@ -470,7 +543,7 @@ Artifact references in prompts:
   <div class="terminal-header">
     <div class="terminal-title">
       <span class="terminal-icon">❯</span>
-      <span>FinAgent Terminal</span>
+      <span>{$displayName} Terminal</span>
       {#if $agentState.sessionName}
         <span class="session-name">{$agentState.sessionName}</span>
       {/if}
@@ -506,11 +579,11 @@ Artifact references in prompts:
       {#if $agentState.messages.length === 0}
         <div class="empty-terminal">
           <div class="empty-icon">❯</div>
-          <p>Welcome to FinAgent Terminal</p>
+          <p>Welcome to {$displayName} Terminal</p>
           <p class="hint">
             Ask about P&L, risk, positions, rates, or market data
           </p>
-          <p class="hint">Commands: !help, !ls, !sessions</p>
+          <p class="hint">Commands: !help, !ls, !refresh, !sessions</p>
         </div>
       {/if}
 
@@ -576,6 +649,12 @@ Artifact references in prompts:
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-primary);
     flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .terminal-header:active {
+    cursor: grabbing;
   }
 
   .terminal-title {

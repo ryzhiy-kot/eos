@@ -1,15 +1,21 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import {
-    createChart,
-    CandlestickSeries,
-    HistogramSeries,
-    ColorType,
-    type IChartApi,
-    type ISeriesApi,
-    type UTCTimestamp,
-  } from "lightweight-charts";
+    Chart,
+    BarController,
+    LineController,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    LineElement,
+    PointElement,
+    Title,
+    Tooltip,
+    Legend,
+  } from "chart.js";
   import { theme } from "$lib/utils/theme";
+
+  Chart.register(BarController, LineController, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
 
   let {
     data = [],
@@ -21,124 +27,115 @@
     height?: number;
   } = $props();
 
-  let container: HTMLDivElement;
-  let chart: IChartApi;
-  let candleSeries: ISeriesApi<"Candlestick">;
-  let volumeSeries: ISeriesApi<"Histogram">;
+  let canvas: HTMLCanvasElement;
+  let chartInstance: Chart | null = null;
+
+  function formatTime(ts: number): string {
+    const date = new Date(ts * 1000);
+    return isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+  }
 
   onMount(() => {
-    chart = createChart(container, {
-      layout: {
-        background: { type: ColorType.Solid, color: theme.chart.background },
-        textColor: theme.chart.textColor,
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 11,
+    const ctx = canvas.getContext("2d");
+    if (!ctx || data.length === 0) return;
+
+    const labels = data.map((d) => formatTime(d.time));
+    const candleData = data.map((d) => d.close - d.open);
+    const volumeData = data.map((d) => d.volume);
+
+    chartInstance = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: symbol || "Price",
+            data: candleData,
+            backgroundColor: data.map((d) => (d.close >= d.open ? theme.chart.upColor : theme.chart.downColor)),
+            borderColor: data.map((d) => (d.close >= d.open ? theme.chart.upColor : theme.chart.downColor)),
+            borderWidth: 1,
+            yAxisID: "y",
+          },
+          {
+            label: "Volume",
+            data: volumeData,
+            backgroundColor: data.map((d) => (d.close >= d.open ? theme.blue + "40" : theme.red + "40")),
+            yAxisID: "y1",
+          },
+        ],
       },
-      grid: {
-        vertLines: { color: theme.chart.gridColor },
-        horzLines: { color: theme.chart.gridColor },
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: {
-          color: theme.chart.crossHairColor,
-          width: 1,
-          style: 2,
-          labelBackgroundColor: theme.bg.tertiary,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            position: "top",
+            labels: { color: theme.text.secondary, font: { size: 10 }, boxWidth: 12 },
+          },
+          tooltip: {
+            backgroundColor: theme.bg.panel,
+            titleColor: theme.text.primary,
+            bodyColor: theme.text.secondary,
+            borderColor: theme.border.primary,
+            borderWidth: 1,
+          },
         },
-        horzLine: {
-          color: theme.chart.crossHairColor,
-          width: 1,
-          style: 2,
-          labelBackgroundColor: theme.bg.tertiary,
+        scales: {
+          x: {
+            type: "category",
+            grid: { color: theme.chart.gridColor },
+            ticks: { color: theme.chart.textColor, font: { size: 9 }, maxRotation: 45 },
+          },
+          y: {
+            type: "linear",
+            position: "left",
+            grid: { color: theme.chart.gridColor },
+            ticks: { color: theme.chart.textColor, font: { size: 10 } },
+            title: { display: true, text: "Price", color: theme.text.secondary },
+          },
+          y1: {
+            type: "linear",
+            position: "right",
+            grid: { drawOnChartArea: false },
+            ticks: { color: theme.text.secondary, font: { size: 10 } },
+            title: { display: true, text: "Volume", color: theme.text.secondary },
+          },
         },
       },
-      rightPriceScale: {
-        borderColor: theme.border.primary,
-        scaleMargins: { top: 0.1, bottom: 0.25 },
-      },
-      timeScale: {
-        borderColor: theme.border.primary,
-        timeVisible: true,
-        secondsVisible: false,
-      },
     });
 
-    candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: theme.chart.upColor,
-      downColor: theme.chart.downColor,
-      borderUpColor: theme.chart.borderUpColor,
-      borderDownColor: theme.chart.borderDownColor,
-      wickUpColor: theme.chart.wickUpColor,
-      wickDownColor: theme.chart.wickDownColor,
-    });
+    const resizeObserver = new ResizeObserver(() => chartInstance?.resize());
+    resizeObserver.observe(canvas.parentElement || canvas);
 
-    volumeSeries = chart.addSeries(HistogramSeries, {
-      color: theme.blue,
-      priceFormat: { type: "volume" },
-      priceScaleId: "",
-    });
-
-    volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
-    });
-
-    if (data.length > 0) {
-      const candleData = data.map((d) => ({
-        time: d.time as UTCTimestamp,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }));
-      const volumeData = data.map((d) => ({
-        time: d.time as UTCTimestamp,
-        value: d.volume,
-        color: d.close >= d.open ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)",
-      }));
-      candleSeries.setData(candleData);
-      volumeSeries.setData(volumeData);
-      chart.timeScale().fitContent();
-    }
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
-      }
-    });
-    resizeObserver.observe(container);
+    return () => {
+      resizeObserver.disconnect();
+      chartInstance?.destroy();
+    };
   });
 
   $effect(() => {
-    if (chart && data.length > 0) {
-      const candleData = data.map((d) => ({
-        time: d.time as UTCTimestamp,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }));
-      const volumeData = data.map((d) => ({
-        time: d.time as UTCTimestamp,
-        value: d.volume,
-        color: d.close >= d.open ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)",
-      }));
-      candleSeries.setData(candleData);
-      volumeSeries.setData(volumeData);
-      chart.timeScale().fitContent();
-    }
+    if (!chartInstance || data.length === 0) return;
+
+    const labels = data.map((d) => formatTime(d.time));
+    const candleData = data.map((d) => d.close - d.open);
+    const volumeData = data.map((d) => d.volume);
+
+    chartInstance.data.labels = labels;
+    chartInstance.data.datasets[0].data = candleData;
+    chartInstance.data.datasets[0].backgroundColor = data.map((d) =>
+      d.close >= d.open ? theme.chart.upColor : theme.chart.downColor
+    );
+    chartInstance.data.datasets[1].data = volumeData;
+    chartInstance.update("none");
   });
 
-  onDestroy(() => {
-    chart?.remove();
-  });
+  onDestroy(() => chartInstance?.destroy());
 </script>
 
 <div class="chart-wrapper" style="height: {height}px;">
-  <div bind:this={container} class="chart-container"></div>
+  <canvas bind:this={canvas}></canvas>
 </div>
 
 <style>
@@ -147,8 +144,8 @@
     position: relative;
   }
 
-  .chart-container {
-    width: 100%;
-    height: 100%;
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
   }
 </style>

@@ -12,6 +12,7 @@ from app.models.user import (
     User,
     UserRole,
 )
+from app.models.panel import Panel
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "PriceSnapshot",
     "AgentConversation",
     "AgentMessage",
+    "Panel",
 ]

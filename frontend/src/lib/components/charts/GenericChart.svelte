@@ -1,22 +1,37 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import {
-    createChart,
-    LineSeries,
-    BarSeries,
-    CandlestickSeries,
-    HistogramSeries,
-    AreaSeries,
-    ColorType,
-    type IChartApi,
-    type ISeriesApi,
-    type UTCTimestamp,
-    type Time,
-  } from "lightweight-charts";
+    Chart,
+    BarController,
+    LineController,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    LineElement,
+    PointElement,
+    Filler,
+    Title,
+    Tooltip,
+    Legend,
+  } from "chart.js";
   import { theme } from "$lib/utils/theme";
 
+  Chart.register(
+    BarController,
+    LineController,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    LineElement,
+    PointElement,
+    Filler,
+    Title,
+    Tooltip,
+    Legend
+  );
+
   interface ChartDataPoint {
-    time?: Time | number;
+    time?: number | string;
     value?: number;
     open?: number;
     high?: number;
@@ -37,141 +52,138 @@
     colors?: { line?: string; upColor?: string; downColor?: string };
   } = $props();
 
-  let container: HTMLDivElement;
-  let chartWrapper: HTMLDivElement;
-  let chart: IChartApi;
-  let series: ISeriesApi<any>;
+  let canvas: HTMLCanvasElement;
+  let chartInstance: Chart | null = null;
 
   const defaultColors = {
-    line: "#3b82f6",
-    upColor: "#22c55e",
-    downColor: "#ef4444",
+    line: theme.blue,
+    upColor: theme.chart.upColor,
+    downColor: theme.chart.downColor,
     ...colors,
   };
 
-  function normalizeTime(time: Time | number | string | undefined): Time {
-    if (!time) return 1700000000 as UTCTimestamp;
-    if (typeof time === "number") return time as UTCTimestamp;
-    if (typeof time === "string") {
-      if (time.match(/^\d+$/)) return parseInt(time) as UTCTimestamp;
-      const date = new Date(time);
-      if (!isNaN(date.getTime())) return Math.floor(date.getTime() / 1000) as UTCTimestamp;
-      return 1700000000 as UTCTimestamp;
-    }
-    return 1700000000 as UTCTimestamp;
+  function getLabels() {
+    return data.map((d, i) => d.label || d.name || d.time?.toString() || `Item ${i + 1}`);
+  }
+
+  function getValues() {
+    return data.map((d) => d.value ?? d.close ?? 0);
   }
 
   onMount(() => {
-    chart = createChart(chartWrapper, {
-      layout: {
-        background: { type: ColorType.Solid, color: theme.chart.background },
-        textColor: theme.chart.textColor,
-        fontFamily: "'Inter', sans-serif",
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: theme.chart.gridColor },
-        horzLines: { color: theme.chart.gridColor },
-      },
-      rightPriceScale: {
-        borderColor: theme.border.primary,
-      },
-      timeScale: {
-        borderColor: theme.border.primary,
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      width: container.clientWidth,
-      height: container.clientHeight,
-    });
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        chart.applyOptions({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
+    const labels = getLabels();
+    const values = getValues();
+
+    const chartConfig: any = {
+      type: chartType === "bar" ? "bar" : "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Value",
+            data: values,
+            backgroundColor:
+              chartType === "bar"
+                ? defaultColors.upColor
+                : chartType === "area"
+                  ? defaultColors.line + "40"
+                  : defaultColors.line,
+            borderColor: defaultColors.line,
+            borderWidth: 2,
+            fill: chartType === "area",
+            tension: 0,
+            pointRadius: chartType === "line" ? 0 : 3,
+            pointHoverRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+          tooltip: {
+            backgroundColor: theme.bg.panel,
+            titleColor: theme.text.primary,
+            bodyColor: theme.text.secondary,
+            borderColor: theme.border.primary,
+            borderWidth: 1,
+            padding: 8,
+            displayColors: false,
+          },
+        },
+        scales: {
+          x: {
+            type: "category",
+            grid: {
+              color: theme.chart.gridColor,
+            },
+            ticks: {
+              color: theme.chart.textColor,
+              font: { size: 10 },
+              maxRotation: 45,
+            },
+          },
+          y: {
+            type: "linear",
+            grid: {
+              color: theme.chart.gridColor,
+            },
+            ticks: {
+              color: theme.chart.textColor,
+              font: { size: 10 },
+            },
+          },
+        },
+      },
+    };
+
+    chartInstance = new Chart(ctx, chartConfig);
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (chartInstance) {
+        chartInstance.resize();
       }
     });
-    resizeObserver.observe(chartWrapper);
+    resizeObserver.observe(canvas.parentElement || canvas);
 
     return () => {
       resizeObserver.disconnect();
-      chart.remove();
+      chartInstance?.destroy();
     };
   });
 
   $effect(() => {
-    if (!chart || !chartWrapper) return;
-    const h = chartWrapper.clientHeight;
-    const w = chartWrapper.clientWidth;
-    if (w > 0 && h > 0) {
-      chart.applyOptions({ width: w, height: h });
+    if (!chartInstance || !data.length) return;
+
+    const labels = getLabels();
+    const values = getValues();
+
+    chartInstance.data.labels = labels;
+    chartInstance.data.datasets[0].data = values;
+
+    if (chartType === "bar") {
+      chartInstance.data.datasets[0].backgroundColor = values.map((v) =>
+        v >= 0 ? defaultColors.upColor : defaultColors.downColor
+      );
     }
+
+    chartInstance.update("none");
   });
 
-  $effect(() => {
-    if (!chart || !data.length) return;
-
-    if (series) {
-      chart.removeSeries(series);
-    }
-
-    const normalizedData = data.map((d) => ({
-      time: normalizeTime(d.time),
-      value: d.value ?? d.close ?? 0,
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close,
-    }));
-
-    switch (chartType) {
-      case "bar":
-        series = chart.addSeries(BarSeries, {
-          upColor: defaultColors.upColor,
-          downColor: defaultColors.downColor,
-        } as any);
-        series.setData(normalizedData as any);
-        break;
-
-      case "area":
-        series = chart.addSeries(AreaSeries, {
-          lineColor: defaultColors.line,
-          topColor: defaultColors.line + "40",
-          bottomColor: defaultColors.line + "10",
-        } as any);
-        series.setData(normalizedData as any);
-        break;
-
-      case "candlestick":
-        series = chart.addSeries(CandlestickSeries, {
-          upColor: defaultColors.upColor,
-          downColor: defaultColors.downColor,
-          borderUpColor: defaultColors.upColor,
-          borderDownColor: defaultColors.downColor,
-          wickUpColor: defaultColors.upColor,
-          wickDownColor: defaultColors.downColor,
-        });
-        series.setData(normalizedData as any);
-        break;
-
-      case "line":
-      default:
-        series = chart.addSeries(LineSeries, {
-          color: defaultColors.line,
-          lineWidth: 2,
-        });
-        series.setData(normalizedData as any);
-        break;
-    }
-
-    chart.timeScale().fitContent();
+  onDestroy(() => {
+    chartInstance?.destroy();
   });
 </script>
 
-<div bind:this={container} class="chart-container">
-  <div bind:this={chartWrapper} class="chart-wrapper"></div>
+<div class="chart-container">
+  <canvas bind:this={canvas}></canvas>
 </div>
 
 <style>
@@ -181,12 +193,11 @@
     min-height: 100px;
     display: flex;
     flex-direction: column;
+    position: relative;
   }
 
-  .chart-wrapper {
-    flex: 1;
-    min-height: 0;
-    height: 100%;
-    width: 100%;
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
   }
 </style>
