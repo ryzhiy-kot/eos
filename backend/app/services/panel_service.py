@@ -4,13 +4,12 @@ from typing import Optional
 
 from sqlalchemy import delete, select
 
-from app.db.session import async_session
-from app.models.panel import Panel
 from app.services.namespace_registry import NamespaceRegistry
+from app.services.session_service import Panel, async_session
 
 
 async def create_panel(
-    user_id: uuid.UUID,
+    user_id: str,
     artifact_id: str,
     name: str,
     bq_function: str,
@@ -32,7 +31,7 @@ async def create_panel(
         return panel
 
 
-async def get_panels(user_id: uuid.UUID) -> list[Panel]:
+async def get_panels(user_id: str) -> list[Panel]:
     async with async_session() as session:
         result = await session.execute(
             select(Panel).where(Panel.user_id == user_id, Panel.is_pinned == True)
@@ -40,7 +39,7 @@ async def get_panels(user_id: uuid.UUID) -> list[Panel]:
         return list(result.scalars().all())
 
 
-async def get_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Panel]:
+async def get_panel(panel_id: str, user_id: str) -> Optional[Panel]:
     async with async_session() as session:
         result = await session.execute(
             select(Panel).where(Panel.id == panel_id, Panel.user_id == user_id)
@@ -48,7 +47,7 @@ async def get_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Panel]:
         return result.scalar_one_or_none()
 
 
-async def refresh_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+async def refresh_panel(panel_id: str, user_id: str) -> dict:
     panel = await get_panel(panel_id, user_id)
     if not panel:
         raise ValueError("Panel not found")
@@ -60,7 +59,7 @@ async def refresh_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> dict:
     return func_info.func(**panel.bq_params)
 
 
-async def stream_panel(websocket, panel_id: uuid.UUID, user_id: uuid.UUID):
+async def stream_panel(websocket, panel_id: str, user_id: str):
     """Stream panel data updates via WebSocket."""
     panel = await get_panel(panel_id, user_id)
     if not panel:
@@ -85,7 +84,7 @@ async def stream_panel(websocket, panel_id: uuid.UUID, user_id: uuid.UUID):
         await websocket.send_json({"error": str(e)})
 
 
-async def delete_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+async def delete_panel(panel_id: str, user_id: str) -> bool:
     async with async_session() as session:
         result = await session.execute(
             delete(Panel).where(Panel.id == panel_id, Panel.user_id == user_id)
@@ -95,8 +94,8 @@ async def delete_panel(panel_id: uuid.UUID, user_id: uuid.UUID) -> bool:
 
 
 async def update_panel(
-    panel_id: uuid.UUID,
-    user_id: uuid.UUID,
+    panel_id: str,
+    user_id: str,
     name: Optional[str] = None,
     refresh_interval: Optional[int] = None,
 ) -> Optional[Panel]:

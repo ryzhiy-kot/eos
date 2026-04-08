@@ -203,7 +203,7 @@ class ApiClient {
 
   // Panels
   getPanels() {
-    return this.get<any[]>("/panels");
+    return this.get<any[]>("/panels/");
   }
 
   createPanel(panel: {
@@ -213,7 +213,7 @@ class ApiClient {
     bq_params: object;
     refresh_interval: number;
   }) {
-    return this.post<any>("/panels", panel);
+    return this.post<any>("/panels/", panel);
   }
 
   getPanelRefresh(panelId: string) {
@@ -221,11 +221,11 @@ class ApiClient {
   }
 
   deletePanel(panelId: string) {
-    return this.request<void>(`/panels/${panelId}`, { method: "DELETE" });
+    return this.request<void>(`/panels/${panelId}/`, { method: "DELETE" });
   }
 
   updatePanel(panelId: string, updates: { name?: string; refresh_interval?: number }) {
-    return this.request<any>(`/panels/${panelId}`, {
+    return this.request<any>(`/panels/${panelId}/`, {
       method: "PUT",
       body: JSON.stringify(updates),
     });
@@ -233,7 +233,10 @@ class ApiClient {
 
   connectPanelStream(panelId: string, onMessage: (data: unknown) => void): () => void {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/panels/${panelId}`;
+    const token = this.getToken();
+    const wsUrl = token 
+      ? `${protocol}//${window.location.host}/api/ws/panels/${panelId}?token=${encodeURIComponent(token)}`
+      : `${protocol}//${window.location.host}/api/ws/panels/${panelId}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {

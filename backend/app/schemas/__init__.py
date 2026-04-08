@@ -179,6 +179,7 @@ class PanelUpdate(BaseModel):
 
 class PanelResponse(BaseModel):
     id: str
+    user_id: str
     artifact_id: str
     name: str
     bq_function: str

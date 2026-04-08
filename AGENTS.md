@@ -236,10 +236,10 @@ def get_pnl(desk):
 ### Backend Testing
 ```bash
 # Run tests
-cd backend && pytest
+cd backend && uv run pytest
 
 # Run with coverage
-pytest --cov=app
+uv run pytest --cov=app
 ```
 
 ### Frontend Testing

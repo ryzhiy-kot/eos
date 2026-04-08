@@ -260,23 +260,23 @@ Tests exist in `tests/` directory: `test_context_injector.py`, `test_namespace_r
 
 ### Phase 1: SOLID Refactoring (Primary Focus)
 
-- [ ] **H1: Split `agent_service.py`** — Extract mock response handlers into registry pattern (SRP + OCP)
-- [ ] **M10: Split `context_injector.py`** — Separate mock generators, context builder, function docs (SRP)
-- [ ] **M2: Extract ORM models from `session_service.py`** — Move to dedicated models module (SRP)
-- [ ] **H2: Implement dependency injection** — Replace global singletons with FastAPI `Depends()` (DIP)
-- [ ] **H3: Unify database session management** — Single engine/session across all services (DIP)
+- [x] **H1: Split `agent_service.py`** — Extract mock response handlers into registry pattern (SRP + OCP)
+- [x] **M10: Split `context_injector.py`** — Separate mock generators, context builder, function docs (SRP)
+- [x] **M2: Extract ORM models from `session_service.py`** — Move to dedicated models module (SRP)
+- [x] **H2: Implement dependency injection** — Replace global singletons with FastAPI `Depends()` (DIP)
+- [x] **H3: Unify database session management** — Single engine/session across all services (DIP)
 
 ### Phase 2: Liskov & Interface Segregation
 
-- [ ] **H6: Define abstract `BaseLLMAgent`** — Common interface for GroqAgent and LlmAgent (LSP)
-- [ ] **H7: Custom exception hierarchy** — Domain-specific exceptions (SRP)
-- [ ] **M3: Fix `DotDict`** — Complete dict interface or replace with `SimpleNamespace` (LSP)
+- [x] **H6: Define abstract `BaseLLMAgent`** — Common interface for GroqAgent and LlmAgent (LSP)
+- [x] **H7: Custom exception hierarchy** — Domain-specific exceptions (SRP)
+- [x] **M3: Fix `DotDict`** — Complete dict interface or replace with `SimpleNamespace` (LSP)
 
 ### Phase 3: Type Safety & Best Practices
 
-- [ ] **C3: Add return type annotations** — All route functions
-- [ ] **M7: Consolidate logging** — Use `get_logger` everywhere
-- [ ] **M9: Move CORS origins to config**
+- [x] **C3: Add return type annotations** — All route functions
+- [x] **M7: Consolidate logging** — Use `get_logger` everywhere
+- [x] **M9: Move CORS origins to config**
 
 ### Phase 4: Security (Deferred)
 
