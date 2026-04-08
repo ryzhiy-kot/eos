@@ -341,7 +341,7 @@ async def chat_stream(
     
     Routes to mock or real agent based on DEMO_MODE setting.
     """
-    from app.config import get_settings
+    from ..config import get_settings
     settings = get_settings()
     
     if settings.DEMO_MODE:

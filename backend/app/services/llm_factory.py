@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.agents.adapters import create_groq_agent
-from app.agents.base import BaseLLMAgent
-from app.agents.groq_agent import GroqAgent
-from app.config import get_settings
-from app.core.logging import get_logger
+from ..agents.adapters import create_groq_agent
+from ..agents.base import BaseLLMAgent
+from ..agents.groq_agent import GroqAgent
+from ..config import get_settings
+from ..core.logging import get_logger
 
 logger = get_logger(__name__)
 

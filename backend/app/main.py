@@ -4,11 +4,11 @@ import dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.middleware import LoggingMiddleware
-from app.api.routes import agents, auth, config, market, panels, pnl, risk
-from app.api.websocket import router as ws_router
-from app.config import get_settings
-from app.core.logging import get_logger
+from .api.middleware import LoggingMiddleware
+from .api.routes import agents, auth, config, market, panels, pnl, risk
+from .api.websocket import router as ws_router
+from .config import get_settings
+from .core.logging import get_logger
 
 dotenv.load_dotenv()
 

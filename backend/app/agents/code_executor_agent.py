@@ -4,14 +4,14 @@ from typing import Any
 from google.adk.tools import FunctionTool
 from pydantic import BaseModel, Field
 
-from app.config import get_settings
-from app.services.artifact_collector import ArtifactCollector
-from app.services.code_executor import execute_code_streaming
-from app.services.context_injector import (
+from ..config import get_settings
+from ..services.artifact_collector import ArtifactCollector
+from ..services.code_executor import execute_code_streaming
+from ..services.context_injector import (
     build_execution_context,
     get_execution_environment_doc,
 )
-from app.services.llm_factory import create_llm_agent
+from ..services.llm_factory import create_llm_agent
 
 
 logger = logging.getLogger(__name__)

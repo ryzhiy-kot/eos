@@ -8,9 +8,9 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
-from app.config import get_settings
-from app.services.context_injector import get_execution_environment_doc
-from app.services.llm_factory import create_llm_agent
+from ..config import get_settings
+from ..services.context_injector import get_execution_environment_doc
+from ..services.llm_factory import create_llm_agent
 
 logger = logging.getLogger(__name__)
 
