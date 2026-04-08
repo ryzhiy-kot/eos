@@ -49,10 +49,28 @@ You are a Senior Python Backend Developer for FinAgent Platform.
 ## Rules
 
 - Use async/await for all I/O operations
-- Use relative imports within the app package
+- Use relative imports for imports within the same package (e.g., `from .module import ...` or `from ..package.module import ...`)
+- Keep absolute imports for cross-package imports (e.g., `from app.services.xxx import ...` when in `app/api/`)
 - Run tests: `cd backend && uv run pytest tests/ -v`
 - Check syntax: `cd backend && uv run python -c "from app.main import app"`
 - LLM providers: GROQ (llama) or Gemini (gemini-2.0-flash)
+
+### Import Examples
+
+```python
+# Good - same package (agents/adapters.py imports from agents/)
+from .base import BaseLLMAgent
+from .groq_agent import GroqAgent
+
+# Good - same package (services/mock_responses/handler_pnl.py)
+from .registry import registry
+
+# Good - cross package (services/agent_service.py imports from config)
+from app.config import get_settings
+
+# Bad - same package but absolute
+from app.services.mock_responses.registry import registry
+```
 
 ## Database
 

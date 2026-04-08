@@ -173,16 +173,20 @@ frontend/
 4. **Error handling** - return meaningful errors, never crash silently
 5. **Pydantic models** for all request/response schemas
 6. **No hardcoded config** - use `app/config.py` settings
-7. **Relative imports** - always use relative imports within the app package
+7. **Relative imports** - use relative imports for same-package imports
 
 ```python
-# Good - relative imports within app package
-from ..services.agent_service import AgentService
-from ...config import settings
+# Good - same package (within services/, agents/, etc.)
+from .module import Something
+from .registry import registry
+from ..sibling_module import Helper
 
-# Bad - absolute imports
-from app.services.agent_service import AgentService
-from app.config import settings
+# Good - cross-package (services -> config, api -> services)
+from app.config import get_settings
+from app.services.session_service import SessionService
+
+# Bad - same package but using absolute
+from app.services.mock_responses.registry import registry  # should be: from .registry import registry
 ```
 
 ```python
