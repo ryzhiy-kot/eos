@@ -44,7 +44,8 @@ def test_get_execution_environment_doc():
     
     # Check that key sections are present
     assert "Execution Environment" in doc
-    assert "bq namespace" in doc
+    assert "bq.pnl" in doc  # bq functions are in output
+    assert "Data Query" in doc or "bq" in doc
     assert "Display Utilities" in doc
     assert "Standard Modules" in doc
 

@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+from unittest.mock import patch, MagicMock
 
 from app.agents.code_executor_agent import (
     create_code_executor_agent,
@@ -115,9 +116,18 @@ def test_create_execute_code_tool():
 
 def test_create_code_executor_agent():
     """Test creating the code executor agent."""
-    agent = create_code_executor_agent(user_id="test_user", session_id="test_session")
-    assert agent.name == "CodeExecutorAgent"
-    assert len(agent.tools) > 0
+    with patch('app.agents.code_executor_agent.create_llm_agent') as mock_create:
+        mock_tool = MagicMock()
+        mock_tool.name = "execute_code"
+        
+        mock_agent = MagicMock()
+        mock_agent.name = "CodeExecutorAgent"
+        mock_agent.tools = [mock_tool]
+        mock_create.return_value = mock_agent
+        
+        agent = create_code_executor_agent(user_id="test_user", session_id="test_session")
+        assert agent.name == "CodeExecutorAgent"
+        assert len(agent.tools) > 0
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-from app.models.user import (
+from .user import (
     AgentConversation,
     AgentMessage,
     AssetClass,
@@ -12,7 +12,7 @@ from app.models.user import (
     User,
     UserRole,
 )
-from app.models.panel import Panel
+from .panel import Panel
 
 __all__ = [
     "User",
