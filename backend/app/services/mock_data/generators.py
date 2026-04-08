@@ -9,7 +9,7 @@ from __future__ import annotations
 import random
 from datetime import UTC, datetime, timedelta
 
-from app.services.mock_data.constants import (
+from .constants import (
     ALL_INSTRUMENTS,
     ATTRIBUTION_FACTORS,
     BASE_CURVE_RATES,

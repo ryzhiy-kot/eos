@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 
 from app.services.artifact_collector import ArtifactCollector
-from app.services.mock_responses.registry import registry
+from .registry import registry
 
 
 def _is_rate_curve_request(message: str) -> bool:
