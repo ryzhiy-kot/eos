@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # WebSocket
     WS_HEARTBEAT_INTERVAL: int = 30
 
+    # CORS
+    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:4173", "http://localhost:3000"]
+
 
 @lru_cache
 def get_settings() -> Settings:

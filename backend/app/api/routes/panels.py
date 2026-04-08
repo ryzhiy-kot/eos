@@ -1,3 +1,5 @@
+"""Panel routes — REST API for dashboard panels."""
+
 from datetime import datetime
 from uuid import UUID
 
@@ -10,21 +12,23 @@ from app.schemas import (
     PanelUpdate,
 )
 from app.services.auth import get_current_user
-from app.services.panel_service import (
-    create_panel,
-    delete_panel,
-    get_panel,
-    get_panels,
-    refresh_panel,
-    update_panel,
-)
+from app.services.panel_service import PanelService, get_panel_service
 
 router = APIRouter(prefix="/panels", tags=["panels"])
 
 
+def get_panel_service_dep() -> PanelService:
+    """Dependency injection for PanelService."""
+    return get_panel_service()
+
+
 @router.get("/", response_model=list[PanelResponse])
-async def list_panels(current_user: dict = Depends(get_current_user)):
-    panels = await get_panels(UUID(current_user["sub"]))
+async def list_panels(
+    current_user: dict = Depends(get_current_user),
+    panel_service: PanelService = Depends(get_panel_service_dep),
+) -> list[PanelResponse]:
+    """List all pinned panels for the current user."""
+    panels = await panel_service.get_panels(UUID(current_user["sub"]))
     return [PanelResponse.model_validate(p) for p in panels]
 
 
@@ -32,8 +36,10 @@ async def list_panels(current_user: dict = Depends(get_current_user)):
 async def create_panel_endpoint(
     panel: PanelCreate,
     current_user: dict = Depends(get_current_user),
-):
-    new_panel = await create_panel(
+    panel_service: PanelService = Depends(get_panel_service_dep),
+) -> PanelResponse:
+    """Create a new panel."""
+    new_panel = await panel_service.create_panel(
         user_id=UUID(current_user["sub"]),
         artifact_id=panel.artifact_id,
         name=panel.name,
@@ -48,8 +54,10 @@ async def create_panel_endpoint(
 async def get_panel_endpoint(
     panel_id: UUID,
     current_user: dict = Depends(get_current_user),
-):
-    panel = await get_panel(panel_id, UUID(current_user["sub"]))
+    panel_service: PanelService = Depends(get_panel_service_dep),
+) -> PanelResponse:
+    """Get a specific panel by ID."""
+    panel = await panel_service.get_panel(panel_id, UUID(current_user["sub"]))
     if not panel:
         raise HTTPException(status_code=404, detail="Panel not found")
     return PanelResponse.model_validate(panel)
@@ -59,9 +67,11 @@ async def get_panel_endpoint(
 async def refresh_panel_endpoint(
     panel_id: UUID,
     current_user: dict = Depends(get_current_user),
-):
+    panel_service: PanelService = Depends(get_panel_service_dep),
+) -> PanelDataResponse:
+    """Refresh panel data by re-executing its bq function."""
     try:
-        data = await refresh_panel(panel_id, UUID(current_user["sub"]))
+        data = await panel_service.refresh_panel(panel_id, UUID(current_user["sub"]))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -72,8 +82,10 @@ async def refresh_panel_endpoint(
 async def delete_panel_endpoint(
     panel_id: UUID,
     current_user: dict = Depends(get_current_user),
-):
-    deleted = await delete_panel(panel_id, UUID(current_user["sub"]))
+    panel_service: PanelService = Depends(get_panel_service_dep),
+) -> dict:
+    """Delete a panel."""
+    deleted = await panel_service.delete_panel(panel_id, UUID(current_user["sub"]))
     if not deleted:
         raise HTTPException(status_code=404, detail="Panel not found")
     return {"status": "deleted"}
@@ -84,8 +96,10 @@ async def update_panel_endpoint(
     panel_id: UUID,
     panel_update: PanelUpdate,
     current_user: dict = Depends(get_current_user),
-):
-    panel = await update_panel(
+    panel_service: PanelService = Depends(get_panel_service_dep),
+) -> PanelResponse:
+    """Update a panel's properties."""
+    panel = await panel_service.update_panel(
         panel_id,
         UUID(current_user["sub"]),
         name=panel_update.name,

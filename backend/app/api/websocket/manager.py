@@ -1,12 +1,12 @@
 import asyncio
-import logging
 from datetime import UTC, datetime
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from app.core.logging import get_logger
 from app.services.financial_api import mock_service
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConnectionManager:

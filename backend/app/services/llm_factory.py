@@ -1,13 +1,19 @@
-import logging
+"""LLM agent factory — creates agents based on configuration.
+
+Uses the BaseLLMAgent interface to enable swappable implementations.
+"""
+
+from __future__ import annotations
+
 from typing import Any
 
-from google.adk.agents import LlmAgent
-from pydantic import BaseModel
-
+from app.agents.adapters import create_groq_agent
+from app.agents.base import BaseLLMAgent
 from app.agents.groq_agent import GroqAgent
 from app.config import get_settings
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_llm_agent(
@@ -15,50 +21,49 @@ def create_llm_agent(
     instruction: str,
     description: str | None = None,
     tools: list[Any] | None = None,
-    input_schema: type[BaseModel] | None = None,
-    output_schema: type[BaseModel] | None = None,
-) -> Any:
-    """Factory to create an LLM agent based on unified configuration.
+    input_schema: type | None = None,
+    output_schema: type | None = None,
+) -> BaseLLMAgent:
+    """Factory to create an LLM agent based on configuration.
 
-    Uses unified settings (LLM_API_KEY, LLM_MODEL) if provided, otherwise
-    falls back to provider-specific settings.
+    Returns a BaseLLMAgent interface, enabling interchangeable implementations.
+
+    Args:
+        name: Agent identifier.
+        instruction: System instruction for the agent.
+        description: Optional human-readable description.
+        tools: List of tools available to the agent.
+        input_schema: Pydantic model for input validation.
+        output_schema: Pydantic model for output validation.
+
+    Returns:
+        BaseLLMAgent instance (GroqAdapter or future providers).
     """
     settings = get_settings()
-
-    # Determine which provider to use
     provider = settings.LLM_PROVIDER.lower()
 
-    # Unify config: prioritize LLM_API_KEY / LLM_MODEL, fallback to provider specifics
     if provider == "groq":
-        api_key = settings.LLM_API_KEY
-        model = settings.LLM_MODEL
-        agent_class = GroqAgent
-    else:
-        # Default to Gemini
-        api_key = settings.LLM_API_KEY
-        model = settings.LLM_MODEL
-        agent_class = LlmAgent
+        logger.info(
+            "Creating GroqAgent '%s' with model '%s'", name, settings.LLM_MODEL
+        )
+        return create_groq_agent(
+            name=name,
+            instruction=instruction,
+            description=description,
+            tools=tools,
+            model=settings.LLM_MODEL,
+            api_key=settings.LLM_API_KEY or None,
+        )
 
+    # Default: Create GroqAgent (can be extended for Gemini, Claude, etc.)
     logger.info(
-        f"Creating {agent_class.__name__} '{name}' using provider '{provider}' and model '{model}'"
+        "Creating default GroqAgent '%s' with model '%s'", name, settings.LLM_MODEL
     )
-
-    agent_kwargs = {
-        "name": name,
-        "model": model,
-        "instruction": instruction,
-        "description": description or f"Agent {name}",
-        "tools": tools or [],
-    }
-
-    # Optional schemas
-    if input_schema:
-        agent_kwargs["input_schema"] = input_schema
-    if output_schema:
-        agent_kwargs["output_schema"] = output_schema
-
-    # Special handling for local API keys if needed (though agents handle env fallback)
-    if api_key:
-        agent_kwargs["api_key"] = api_key
-
-    return agent_class(**agent_kwargs)
+    return create_groq_agent(
+        name=name,
+        instruction=instruction,
+        description=description,
+        tools=tools,
+        model=settings.LLM_MODEL,
+        api_key=settings.LLM_API_KEY or None,
+    )
