@@ -237,7 +237,6 @@ async def agent_chat(
             message=request.message,
             user_id=user_id,
             session_id=session_id,
-            session_service=session_service,
         ):
             yield json.dumps(event) + "\n"
 
