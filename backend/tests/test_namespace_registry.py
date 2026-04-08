@@ -140,20 +140,20 @@ def test_get_functions_dict():
 
 def test_context_injector_registers_bq_functions():
     """Test that importing context_injector registers bq functions."""
-    # Import context_injector to trigger registration via decorators
-    import app.services.context_injector  # noqa: F401
+    # Import to trigger registration
+    from app.services.context_injector import mock_pnl
     
     # Verify bq namespace exists
     bq_ns = NamespaceRegistry.get_namespace("bq")
     assert len(bq_ns) > 0
     
     # Verify specific functions are registered
-    assert "pnl" in bq_ns
-    assert "risk" in bq_ns
-    assert "fx_rates" in bq_ns
-    assert "interest_curves" in bq_ns
-    assert "positions" in bq_ns
-    assert "news" in bq_ns
+    assert "mock_pnl" in bq_ns
+    assert "mock_risk" in bq_ns
+    assert "mock_fx_rates" in bq_ns
+    assert "mock_interest_curves" in bq_ns
+    assert "mock_positions" in bq_ns
+    assert "mock_news" in bq_ns
 
 
 def test_build_execution_context_uses_registry():
@@ -169,10 +169,11 @@ def test_build_execution_context_uses_registry():
     
     # Check that bq namespace is populated from registry
     assert "bq" in context
-    assert hasattr(context["bq"], "pnl")
-    assert hasattr(context["bq"], "risk")
-    assert hasattr(context["bq"], "fx_rates")
+    # Functions are registered with 'mock_' prefix
+    assert hasattr(context["bq"], "mock_pnl")
+    assert hasattr(context["bq"], "mock_risk")
+    assert hasattr(context["bq"], "mock_fx_rates")
     
     # Check that functions are callable
-    result = context["bq"].pnl()
+    result = context["bq"].mock_pnl()
     assert "desks" in result or "date" in result

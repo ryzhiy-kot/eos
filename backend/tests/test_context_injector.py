@@ -13,8 +13,8 @@ def test_get_available_functions():
     assert bq_ns is not None
     assert display_ns is not None
 
-    assert "pnl" in bq_ns.functions
-    pnl_info = bq_ns.functions["pnl"]
+    assert "mock_pnl" in bq_ns.functions
+    pnl_info = bq_ns.functions["mock_pnl"]
 
     assert hasattr(pnl_info, "description")
     assert "P&L attribution data" in pnl_info.description
@@ -44,12 +44,11 @@ def test_get_execution_environment_doc():
     
     # Check that key sections are present
     assert "Execution Environment" in doc
-    assert "bq.pnl" in doc  # bq functions are in output
-    assert "Data Query" in doc or "bq" in doc
+    assert "bq namespace" in doc
     assert "Display Utilities" in doc
     assert "Standard Modules" in doc
 
     # Check that specific functions and signatures are formatted into the output
-    assert "bq.pnl" in doc
+    assert "bq.mock_pnl" in doc
     assert "display.chart" in doc
     assert "currency" in doc  # Parameter type check

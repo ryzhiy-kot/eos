@@ -24,9 +24,9 @@ async def test_execute_code_simple_calculation():
 
 @pytest.mark.asyncio
 async def test_execute_code_with_bq_function():
-    """Test executing code that uses bq.pnl function."""
+    """Test executing code that uses bq.mock_pnl function."""
     code = """
-pnl_data = bq.pnl(desk='FX')
+pnl_data = bq.mock_pnl(desk='FX')
 print('P&L data retrieved:', pnl_data.get('total_pnl'))
 display.chart([{'name': d['desk'], 'value': d['total_pnl']} for d in pnl_data['desks']], chart_type='bar', title='P&L by Desk')
 """
@@ -134,7 +134,7 @@ def test_create_code_executor_agent():
 async def test_execute_code_with_fx_rates():
     """Test executing code that fetches FX rates."""
     code = """
-fx_data = bq.fx_rates()
+fx_data = bq.mock_fx_rates()
 print('FX data retrieved, rates count:', len(fx_data.get('rates', [])))
 """
     result = await execute_code(
@@ -151,7 +151,7 @@ print('FX data retrieved, rates count:', len(fx_data.get('rates', [])))
 async def test_execute_code_with_risk_data():
     """Test executing code that fetches risk data."""
     code = """
-risk_data = bq.risk()
+risk_data = bq.mock_risk()
 print('Risk data retrieved, desks count:', len(risk_data.get('desks', [])))
 """
     result = await execute_code(
