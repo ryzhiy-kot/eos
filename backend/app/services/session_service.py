@@ -1,182 +1,138 @@
-import logging
+"""Session service — business logic for sessions, messages, and artifacts.
+
+Uses the centralized database session from app.db.session and models
+from app.models.session_models.
+
+This module follows SRP — it handles only session/artifact/message management,
+not database connections or model definitions.
+"""
+
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, func
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import delete, select
 
-from app.config import get_settings
+from app.core.logging import get_logger
+from app.db.session import async_session
+from app.models.session_models import Artifact, Message, Session
 
-logger = logging.getLogger(__name__)
+# Re-export Base for backward compatibility (tests)
+from app.db.session import Base  # noqa: F401
 
-settings = get_settings()
-
-engine = create_async_engine(
-    settings.SESSION_DB_URL,
-    echo=settings.DEBUG,
-)
-
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+logger = get_logger(__name__)
 
 
-class Base(DeclarativeBase):
-    pass
+async def init_db() -> None:
+    """Initialize database tables (for backward compatibility)."""
+    from app.db.session import engine
 
-
-class Session(Base):
-    __tablename__ = "sessions"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    artifacts: Mapped[list["Artifact"]] = relationship(
-        "Artifact", back_populates="session", cascade="all, delete-orphan"
-    )
-    messages: Mapped[list["Message"]] = relationship(
-        "Message", back_populates="session", cascade="all, delete-orphan"
-    )
-
-
-class Message(Base):
-    __tablename__ = "messages"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    session_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    role: Mapped[str] = mapped_column(String(20), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    session: Mapped["Session"] = relationship("Session", back_populates="messages")
-
-
-class Artifact(Base):
-    __tablename__ = "artifacts"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    session_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    type: Mapped[str] = mapped_column(String(50), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    spec: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    columns: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    format: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    session: Mapped["Session"] = relationship("Session", back_populates="artifacts")
-
-
-async def init_db():
-    """Initialize the database tables."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_session_maker():
-    """Get the async session maker."""
-    return async_session
+        await conn.run_sync(Session.metadata.create_all)
 
 
 class SessionService:
-    """Service for managing sessions and artifacts using SQLAlchemy."""
+    """Service for managing sessions, messages, and artifacts."""
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None):
-        self._session_factory = session_factory or async_session
+    def __init__(self, session_factory=None):
+        self._session_factory = session_factory
 
-    async def _generate_name(self) -> str:
+    async def _get_session_factory(self):
+        """Get the session factory, using injected one if available."""
+        if self._session_factory is not None:
+            return self._session_factory
+        return async_session
+
+    def _generate_name(self) -> str:
         """Generate an auto-name based on current date."""
         now = datetime.now(UTC)
         return f"Session - {now.strftime('%b %d, %Y')}"
 
     async def create_session(self, user_id: str, name: str | None = None) -> Session:
         """Create a new session."""
+        factory = await self._get_session_factory()
         session_id = str(uuid4())
-        session_name = name or await self._generate_name()
+        session_name = name or self._generate_name()
 
-        async with self._session_factory() as session:
-            db_session = Session(
+        async with factory() as db:
+            new_session = Session(
                 id=session_id,
                 user_id=user_id,
                 name=session_name,
             )
-            session.add(db_session)
-            await session.commit()
-            await session.refresh(db_session)
-            logger.info(f"Created session {session_id} for user {user_id}")
-            return db_session
+            db.add(new_session)
+            await db.commit()
+            await db.refresh(new_session)
+            logger.info("Created session %s for user %s", session_id, user_id)
+            return new_session
 
-    async def ensure_session(self, session_id: str, user_id: str, name: str | None = None) -> Session:
-        """Ensure a session exists in the database, creating it if necessary."""
-        async with self._session_factory() as session:
-            db_session = await session.get(Session, session_id)
-            if db_session:
-                return db_session
-            
-            # Create if not found
-            session_name = name or await self._generate_name()
-            db_session = Session(
+    async def ensure_session(
+        self, session_id: str, user_id: str, name: str | None = None
+    ) -> Session:
+        """Ensure a session exists, creating it if necessary."""
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            existing = await db.get(Session, session_id)
+            if existing:
+                return existing
+
+            session_name = name or self._generate_name()
+            new_session = Session(
                 id=session_id,
                 user_id=user_id,
                 name=session_name,
             )
-            session.add(db_session)
-            await session.commit()
-            await session.refresh(db_session)
-            logger.info(f"Lazily created session {session_id} for user {user_id}")
-            return db_session
+            db.add(new_session)
+            await db.commit()
+            await db.refresh(new_session)
+            logger.info("Lazily created session %s for user %s", session_id, user_id)
+            return new_session
 
     async def get_session(self, session_id: str) -> Session | None:
         """Get a session by ID."""
-        async with self._session_factory() as session:
-            result = await session.get(Session, session_id)
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            result = await db.get(Session, session_id)
             if result:
-                await session.refresh(result)
+                await db.refresh(result)
             return result
 
     async def list_sessions(self, user_id: str) -> list[Session]:
         """List all sessions for a user."""
-        from sqlalchemy import select
-
-        async with self._session_factory() as session:
+        factory = await self._get_session_factory()
+        async with factory() as db:
             stmt = (
                 select(Session)
                 .where(Session.user_id == user_id)
                 .order_by(Session.updated_at.desc())
             )
-            result = await session.execute(stmt)
+            result = await db.execute(stmt)
             return list(result.scalars().all())
 
     async def update_session(self, session_id: str, name: str) -> Session | None:
         """Update a session's name."""
-        async with self._session_factory() as session:
-            db_session = await session.get(Session, session_id)
-            if not db_session:
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            session_obj = await db.get(Session, session_id)
+            if not session_obj:
                 return None
-            db_session.name = name
-            await session.commit()
-            await session.refresh(db_session)
-            logger.info(f"Updated session {session_id} name to '{name}'")
-            return db_session
+            session_obj.name = name
+            await db.commit()
+            await db.refresh(session_obj)
+            logger.info("Updated session %s name to '%s'", session_id, name)
+            return session_obj
 
     async def delete_session(self, session_id: str) -> bool:
         """Delete a session and its artifacts."""
-        async with self._session_factory() as session:
-            db_session = await session.get(Session, session_id)
-            if not db_session:
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            session_obj = await db.get(Session, session_id)
+            if not session_obj:
                 return False
-            await session.delete(db_session)
-            await session.commit()
-            logger.info(f"Deleted session {session_id}")
+            await db.delete(session_obj)
+            await db.commit()
+            logger.info("Deleted session %s", session_id)
             return True
 
     async def save_artifact(
@@ -191,10 +147,11 @@ class SessionService:
         format: str | None = None,
     ) -> Artifact | None:
         """Save an artifact associated with a session."""
-        async with self._session_factory() as session:
-            db_session = await session.get(Session, session_id)
-            if not db_session:
-                logger.warning(f"Cannot save artifact: session {session_id} not found")
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            session_obj = await db.get(Session, session_id)
+            if not session_obj:
+                logger.warning("Cannot save artifact: session %s not found", session_id)
                 return None
 
             artifact = Artifact(
@@ -208,36 +165,39 @@ class SessionService:
                 content=content,
                 format=format,
             )
-            session.add(artifact)
-            await session.commit()
-            await session.refresh(artifact)
-            logger.info(f"Saved artifact {artifact.id} for session {session_id}")
+            db.add(artifact)
+            await db.commit()
+            await db.refresh(artifact)
+            logger.info("Saved artifact %s for session %s", artifact.id, session_id)
             return artifact
 
     async def get_artifacts(self, session_id: str) -> list[Artifact]:
         """Get all artifacts for a session."""
-        from sqlalchemy import select
-
-        async with self._session_factory() as session:
+        factory = await self._get_session_factory()
+        async with factory() as db:
             stmt = (
                 select(Artifact)
                 .where(Artifact.session_id == session_id)
                 .order_by(Artifact.created_at.desc())
             )
-            result = await session.execute(stmt)
+            result = await db.execute(stmt)
             return list(result.scalars().all())
 
     async def get_artifact(self, artifact_id: str) -> Artifact | None:
         """Get a specific artifact by ID."""
-        async with self._session_factory() as session:
-            return await session.get(Artifact, artifact_id)
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            return await db.get(Artifact, artifact_id)
 
-    async def save_message(self, session_id: str, role: str, content: str) -> Message | None:
+    async def save_message(
+        self, session_id: str, role: str, content: str
+    ) -> Message | None:
         """Save a message to a session."""
-        async with self._session_factory() as session:
-            db_session = await session.get(Session, session_id)
-            if not db_session:
-                logger.warning(f"Cannot save message: session {session_id} not found")
+        factory = await self._get_session_factory()
+        async with factory() as db:
+            session_obj = await db.get(Session, session_id)
+            if not session_obj:
+                logger.warning("Cannot save message: session %s not found", session_id)
                 return None
 
             message = Message(
@@ -246,39 +206,42 @@ class SessionService:
                 role=role,
                 content=content,
             )
-            session.add(message)
-            await session.commit()
-            await session.refresh(message)
-            logger.info(f"Saved message {message.id} for session {session_id}")
+            db.add(message)
+            await db.commit()
+            await db.refresh(message)
+            logger.info("Saved message %s for session %s", message.id, session_id)
             return message
 
     async def get_messages(self, session_id: str) -> list[Message]:
         """Get all messages for a session, ordered by creation time."""
-        from sqlalchemy import select
-
-        async with self._session_factory() as session:
+        factory = await self._get_session_factory()
+        async with factory() as db:
             stmt = (
                 select(Message)
                 .where(Message.session_id == session_id)
                 .order_by(Message.created_at.asc())
             )
-            result = await session.execute(stmt)
+            result = await db.execute(stmt)
             return list(result.scalars().all())
 
     async def clear_messages(self, session_id: str) -> bool:
         """Clear all messages for a session."""
-        from sqlalchemy import delete
-
-        async with self._session_factory() as session:
+        factory = await self._get_session_factory()
+        async with factory() as db:
             stmt = delete(Message).where(Message.session_id == session_id)
-            await session.execute(stmt)
-            await session.commit()
-            logger.info(f"Cleared messages for session {session_id}")
+            await db.execute(stmt)
+            await db.commit()
+            logger.info("Cleared messages for session %s", session_id)
             return True
 
 
+# Singleton instance for backward compatibility
+_session_service: SessionService | None = None
+
+
 def get_session_service() -> SessionService:
-    """Get or create a SessionService instance."""
-    if not hasattr(get_session_service, "_instance"):
-        get_session_service._instance = SessionService()
-    return get_session_service._instance
+    """Get or create a SessionService singleton."""
+    global _session_service
+    if _session_service is None:
+        _session_service = SessionService()
+    return _session_service

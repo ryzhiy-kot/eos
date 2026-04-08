@@ -3,9 +3,11 @@
   import { onMount } from "svelte";
   import { checkAuth } from "$lib/stores/auth";
   import { page } from "$app/stores";
-  import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact } from "$lib/stores/agent";
+  import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact, panels, activeTabId, fetchPanels, pinArtifact, refreshPanelData, type Artifact } from "$lib/stores/agent";
   import AgentTerminal from "$lib/components/agent/AgentTerminal.svelte";
   import ArtifactWindow from "$lib/components/agent/ArtifactWindow.svelte";
+  import TabBar from "$lib/components/layout/TabBar.svelte";
+  import GenericChart from "$lib/components/charts/GenericChart.svelte";
 
   let { children } = $props();
 
@@ -14,13 +16,49 @@
   let dragStart = $state({ x: 0, y: 0 });
   let isResizing = $state(false);
   let resizeStart = $state({ width: 0, height: 0, x: 0, y: 0 });
+  let panelData = $state<Record<string, { data: unknown; last_updated: string }>>({});
 
   onMount(() => {
     checkAuth();
     expandPanel();
+    fetchPanels();
   });
 
   const isLoginPage = $derived($page.url.pathname === "/login");
+  const hasTabs = $derived($panels.length > 0);
+  const activePanel = $derived($panels.find((p) => p.id === $activeTabId));
+  const activePanelData = $derived(activePanel ? panelData[activePanel.id] : null);
+
+  function handleTabClick(panelId: string) {
+    activeTabId.set(panelId);
+    const panel = $panels.find((p) => p.id === panelId);
+    if (panel && panel.refresh_interval > 0) {
+      startPanelRefresh(panel.id, panel.refresh_interval);
+    }
+  }
+
+  function startPanelRefresh(panelId: string, interval: number) {
+    refreshPanelData(panelId).then((result) => {
+      panelData = { ...panelData, [panelId]: result };
+    });
+    if (interval > 0) {
+      setInterval(() => {
+        refreshPanelData(panelId).then((result) => {
+          panelData = { ...panelData, [panelId]: result };
+        });
+      }, interval * 1000);
+    }
+  }
+
+  async function handlePinArtifact(artifact: Artifact) {
+    let bqFunction = "pnl";
+    if (artifact.type === "chart") {
+      const spec = artifact.spec as { type?: string } | undefined;
+      if (spec?.type === "bar") bqFunction = "pnl";
+      else if (spec?.type === "line") bqFunction = "curves";
+    }
+    await pinArtifact(artifact, bqFunction, 0);
+  }
 
   function handleTerminalMouseDown(e: MouseEvent) {
     const target = e.target as HTMLElement;
@@ -82,12 +120,16 @@
           </svg>
           <span class="logo-text">FinAgent</span>
         </div>
-        <nav class="nav-links">
-          <a href="/" class="nav-link" class:active={$page.url.pathname === "/"}>Dashboard</a>
-          <a href="/market" class="nav-link" class:active={$page.url.pathname === "/market"}>Market</a>
-          <a href="/risk" class="nav-link" class:active={$page.url.pathname === "/risk"}>Risk</a>
-          <a href="/pnl" class="nav-link" class:active={$page.url.pathname === "/pnl"}>P&amp;L</a>
-        </nav>
+        {#if hasTabs}
+          <TabBar onTabClick={handleTabClick} />
+        {:else}
+          <nav class="nav-links">
+            <a href="/" class="nav-link" class:active={$page.url.pathname === "/"}>Dashboard</a>
+            <a href="/market" class="nav-link" class:active={$page.url.pathname === "/market"}>Market</a>
+            <a href="/risk" class="nav-link" class:active={$page.url.pathname === "/risk"}>Risk</a>
+            <a href="/pnl" class="nav-link" class:active={$page.url.pathname === "/pnl"}>P&amp;L</a>
+          </nav>
+        {/if}
       </div>
       <div class="header-right">
         <button class="terminal-toggle" onclick={togglePanel}>
@@ -102,7 +144,28 @@
       </div>
     </header>
     <main class="main-content">
-      {@render children()}
+      {#if hasTabs && activePanel}
+        <div class="tab-content">
+          <div class="tab-header">
+            <span class="tab-title">{activePanel.name}</span>
+            {#if activePanelData?.last_updated}
+              <span class="tab-updated">Updated: {new Date(activePanelData.last_updated).toLocaleTimeString()}</span>
+            {/if}
+          </div>
+          <div class="tab-chart">
+            {#if activePanelData?.data}
+              {@const chartData = (activePanelData.data as any)?.desks || (activePanelData.data as any)?.data || []}
+              {@const normalized = chartData.map((d: any) => ({
+                time: d.time || d.label || d.name || 1700000000,
+                value: d.value ?? d.total_pnl ?? d.pnl ?? 0,
+              }))}
+              <GenericChart data={normalized} chartType="bar" />
+            {/if}
+          </div>
+        </div>
+      {:else}
+        {@render children()}
+      {/if}
     </main>
     
     {#if $agentState.panelExpanded}
@@ -123,7 +186,7 @@
       
       <div class="artifacts-layer">
         {#each $visibleArtifacts as artifact, i (artifact.id)}
-          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} />
+          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} onPin={handlePinArtifact} />
         {/each}
       </div>
     {/if}
@@ -283,5 +346,37 @@
 
   .artifacts-layer :global(.artifact-window) {
     pointer-events: auto;
+  }
+
+  .tab-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tab-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+  }
+
+  .tab-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .tab-updated {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .tab-chart {
+    flex: 1;
+    min-height: 0;
+    padding: 12px;
   }
 </style>

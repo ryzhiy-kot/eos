@@ -22,7 +22,7 @@ MAIN_AGENT_NAME = "FinancialOrchestratorAgent"
 
 def create_code_executor_subagent(user_id: str, session_id: str) -> LlmAgent:
     """Create the CodeExecutorAgent as a sub-agent."""
-    from app.agents.code_executor_agent import create_code_executor_agent
+    from .code_executor_agent import create_code_executor_agent
 
     return create_code_executor_agent(user_id=user_id, session_id=session_id)
 

@@ -8,9 +8,10 @@
     artifact: Artifact;
     index: number;
     onClose?: (id: string) => void;
+    onPin?: (artifact: Artifact) => void;
   }
 
-  let { artifact, index, onClose }: Props = $props();
+  let { artifact, index, onClose, onPin }: Props = $props();
 
   let isMinimized = $state(false);
   let initialPosition = $derived({ x: 100 + (index % 4) * 50, y: 100 + Math.floor(index / 4) * 50 });
@@ -98,6 +99,7 @@
       [{index}] {artifact.type}: {artifact.title || "Untitled"}
     </span>
     <div class="window-controls">
+      <button onclick={() => onPin?.(artifact)} title="Pin to tabs">📌</button>
       <button onclick={() => (isMinimized = !isMinimized)} title={isMinimized ? "Expand" : "Minimize"}>
         {isMinimized ? "□" : "—"}
       </button>
