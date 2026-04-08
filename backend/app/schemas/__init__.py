@@ -8,6 +8,8 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
+    user_id: str
+    last_workspace_id: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -193,3 +195,33 @@ class PanelResponse(BaseModel):
 class PanelDataResponse(BaseModel):
     data: dict
     last_updated: datetime
+
+
+class WorkspaceCreate(BaseModel):
+    name: str
+
+
+class WorkspaceUpdate(BaseModel):
+    name: str | None = None
+    artifact_positions: dict | None = None
+
+
+class ArtifactPosition(BaseModel):
+    x: int = 100
+    y: int = 100
+    width: int = 400
+    height: int = 320
+    visible: bool = True
+
+
+class WorkspaceResponse(BaseModel):
+    id: str
+    user_id: str
+    name: str
+    artifact_positions: dict
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkspaceListResponse(BaseModel):
+    workspaces: list[WorkspaceResponse]

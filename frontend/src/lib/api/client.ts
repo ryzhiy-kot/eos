@@ -67,17 +67,22 @@ class ApiClient {
     });
   }
 
+  put<T>(path: string, data: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
   // Auth
   async login(username: string, password: string) {
-    const result = await this.post<{ access_token: string; refresh_token: string; expires_in: number }>(
-      "/auth/login",
-      { username, password }
-    );
-    this.setToken(result.access_token);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("refresh_token", result.refresh_token);
-    }
-    return result;
+    return this.post<{
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+      user_id: string;
+      last_workspace_id: string | null;
+    }>("/auth/login", { username, password });
   }
 
   logout() {

@@ -24,17 +24,32 @@ class Base(DeclarativeBase):
     pass
 
 
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    artifact_positions: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Session(Base):
     __tablename__ = "sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    workspace_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    workspace: Mapped["Workspace"] = relationship("Workspace", backref="sessions")
     artifacts: Mapped[list["Artifact"]] = relationship(
         "Artifact", back_populates="session", cascade="all, delete-orphan"
     )
@@ -64,6 +79,9 @@ class Artifact(Base):
     session_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    workspace_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     spec: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -74,6 +92,7 @@ class Artifact(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     session: Mapped["Session"] = relationship("Session", back_populates="artifacts")
+    workspace: Mapped["Workspace"] = relationship("Workspace", backref="artifacts")
 
 
 class Panel(Base):
@@ -207,6 +226,7 @@ class SessionService:
         data: dict | None = None,
         content: str | None = None,
         format: str | None = None,
+        workspace_id: str | None = None,
     ) -> Artifact | None:
         """Save an artifact associated with a session."""
         async with self._session_factory() as session:
@@ -218,6 +238,7 @@ class SessionService:
             artifact = Artifact(
                 id=str(uuid4()),
                 session_id=session_id,
+                workspace_id=workspace_id,
                 type=artifact_type,
                 title=title,
                 spec=spec,
@@ -292,6 +313,67 @@ class SessionService:
             await session.execute(stmt)
             await session.commit()
             logger.info(f"Cleared messages for session {session_id}")
+            return True
+
+    async def create_workspace(self, user_id: str, name: str) -> Workspace:
+        """Create a new workspace."""
+        workspace = Workspace(
+            id=str(uuid4()),
+            user_id=user_id,
+            name=name,
+            artifact_positions={},
+        )
+        async with self._session_factory() as session:
+            session.add(workspace)
+            await session.commit()
+            await session.refresh(workspace)
+            logger.info(f"Created workspace {workspace.id} for user {user_id}")
+            return workspace
+
+    async def get_workspace(self, workspace_id: str) -> Workspace | None:
+        """Get a workspace by ID."""
+        async with self._session_factory() as session:
+            return await session.get(Workspace, workspace_id)
+
+    async def list_workspaces(self, user_id: str) -> list[Workspace]:
+        """List all workspaces for a user."""
+        from sqlalchemy import select
+
+        async with self._session_factory() as session:
+            stmt = (
+                select(Workspace)
+                .where(Workspace.user_id == user_id)
+                .order_by(Workspace.updated_at.desc())
+            )
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+
+    async def update_workspace(
+        self, workspace_id: str, name: str | None = None, artifact_positions: dict | None = None
+    ) -> Workspace | None:
+        """Update a workspace."""
+        async with self._session_factory() as session:
+            workspace = await session.get(Workspace, workspace_id)
+            if not workspace:
+                return None
+            if name is not None:
+                workspace.name = name
+            if artifact_positions is not None:
+                workspace.artifact_positions = artifact_positions
+            await session.commit()
+            await session.refresh(workspace)
+            logger.info(f"Updated workspace {workspace_id}")
+            return workspace
+
+    async def delete_workspace(self, workspace_id: str) -> bool:
+        """Delete a workspace."""
+        async with self._session_factory() as session:
+            workspace = await session.get(Workspace, workspace_id)
+            if not workspace:
+                return False
+            await session.delete(workspace)
+            await session.commit()
+            logger.info(f"Deleted workspace {workspace_id}")
             return True
 
 

@@ -1,5 +1,6 @@
-import { writable, derived } from "svelte/store";
+import { writable, derived, get } from "svelte/store";
 import { api } from "$lib/api/client";
+import { fetchWorkspaces, selectWorkspace } from "./workspace";
 
 interface User {
   id: string;
@@ -7,6 +8,14 @@ interface User {
   display_name: string;
   role: string;
   is_active: boolean;
+}
+
+interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  user_id: string;
+  last_workspace_id: string | null;
 }
 
 export const user = writable<User | null>(null);
@@ -28,9 +37,23 @@ export async function login(username: string, password: string) {
   isLoading.set(true);
   authError.set(null);
   try {
-    await api.login(username, password);
+    const response = await api.post<LoginResponse>("/auth/login", { username, password });
+    api.setToken(response.access_token);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("refresh_token", response.refresh_token);
+    }
     const userData = await api.get<User>("/auth/me");
     user.set(userData);
+
+    const workspaces = await fetchWorkspaces();
+    if (workspaces.length === 0) {
+      await api.post("/workspaces/", { name: "Default" });
+      await fetchWorkspaces();
+    }
+    const lastWorkspaceId = response.last_workspace_id || (workspaces.length > 0 ? workspaces[0].id : null);
+    if (lastWorkspaceId) {
+      await selectWorkspace(lastWorkspaceId);
+    }
   } catch (e: any) {
     authError.set(e.message || "Login failed");
     throw e;

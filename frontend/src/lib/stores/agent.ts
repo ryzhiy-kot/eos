@@ -1,5 +1,6 @@
 import { writable, derived, get } from "svelte/store";
 import { api } from "$lib/api/client";
+import { currentWorkspaceId, artifactPositions, type ArtifactPosition } from "./workspace";
 
 export interface Artifact {
   id: string;
@@ -310,7 +311,7 @@ export function parsePrompt(text: string): ParsedPrompt {
   
   let command: string | null = null;
   
-  if (cleanText.startsWith("!")) {
+  if (cleanText.startsWith("/")) {
     const spaceIdx = cleanText.indexOf(" ");
     if (spaceIdx === -1) {
       command = cleanText.slice(1).toLowerCase();
@@ -355,6 +356,7 @@ export async function loadSession(sessionId: string) {
       timestamp: new Date(m.created_at),
     }));
     
+    const wsPositions = get(artifactPositions);
     const artifacts: Artifact[] = artifactsRes.artifacts.map((a) => ({
       id: a.id,
       type: a.type as Artifact["type"],
@@ -367,7 +369,7 @@ export async function loadSession(sessionId: string) {
       pdfData: a.data,
       format: a.format,
       created_at: a.created_at,
-      visible: true,
+      visible: wsPositions[a.id]?.visible ?? true,
     }));
     
     const session = await api.getSessions();

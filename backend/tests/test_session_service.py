@@ -2,7 +2,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.services.session_service import Base, Session, Artifact, SessionService
+from app.services.session_service import Base, Session, Artifact, SessionService, Workspace
 
 
 @pytest_asyncio.fixture
@@ -238,3 +238,86 @@ async def test_cascade_delete_artifacts(session_service, test_session):
 
     artifacts_after = await session_service.get_artifacts(test_session.id)
     assert len(artifacts_after) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_workspace(session_service):
+    """Test creating a new workspace."""
+    workspace = await session_service.create_workspace(user_id="user123", name="My Workspace")
+    assert workspace.id is not None
+    assert workspace.user_id == "user123"
+    assert workspace.name == "My Workspace"
+    assert workspace.artifact_positions == {}
+
+
+@pytest.mark.asyncio
+async def test_get_workspace(session_service):
+    """Test retrieving a workspace by ID."""
+    workspace = await session_service.create_workspace(user_id="user123", name="Test Workspace")
+    retrieved = await session_service.get_workspace(workspace.id)
+    assert retrieved is not None
+    assert retrieved.id == workspace.id
+    assert retrieved.name == "Test Workspace"
+
+
+@pytest.mark.asyncio
+async def test_list_workspaces(session_service):
+    """Test listing workspaces for a user."""
+    await session_service.create_workspace(user_id="user123", name="Workspace 1")
+    await session_service.create_workspace(user_id="user123", name="Workspace 2")
+    
+    workspaces = await session_service.list_workspaces("user123")
+    assert len(workspaces) == 2
+    names = [w.name for w in workspaces]
+    assert "Workspace 1" in names
+    assert "Workspace 2" in names
+
+
+@pytest.mark.asyncio
+async def test_update_workspace_name(session_service):
+    """Test updating workspace name."""
+    workspace = await session_service.create_workspace(user_id="user123", name="Original Name")
+    
+    updated = await session_service.update_workspace(workspace.id, name="New Name")
+    assert updated is not None
+    assert updated.name == "New Name"
+
+
+@pytest.mark.asyncio
+async def test_update_workspace_positions(session_service):
+    """Test updating workspace artifact positions."""
+    workspace = await session_service.create_workspace(user_id="user123", name="Test")
+    
+    positions = {"artifact1": {"x": 100, "y": 200, "width": 400, "height": 300, "visible": True}}
+    updated = await session_service.update_workspace(workspace.id, artifact_positions=positions)
+    assert updated is not None
+    assert updated.artifact_positions == positions
+
+
+@pytest.mark.asyncio
+async def test_delete_workspace(session_service):
+    """Test deleting a workspace."""
+    workspace = await session_service.create_workspace(user_id="user123", name="To Delete")
+    workspace_id = workspace.id
+    
+    result = await session_service.delete_workspace(workspace_id)
+    assert result is True
+    
+    retrieved = await session_service.get_workspace(workspace_id)
+    assert retrieved is None
+
+
+@pytest.mark.asyncio
+async def test_workspace_with_artifact_workspace_id(session_service):
+    """Test saving artifact with workspace_id."""
+    workspace = await session_service.create_workspace(user_id="user123", name="Test")
+    session = await session_service.create_session(user_id="user123")
+    
+    artifact = await session_service.save_artifact(
+        session_id=session.id,
+        artifact_type="chart",
+        title="Test Chart",
+        workspace_id=workspace.id,
+    )
+    assert artifact is not None
+    assert artifact.workspace_id == workspace.id

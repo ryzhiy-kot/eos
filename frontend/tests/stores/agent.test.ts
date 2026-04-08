@@ -106,13 +106,13 @@ describe("agent store", () => {
 
   describe("parsePrompt", () => {
     it("should parse command starting with !", () => {
-      const result = parsePrompt("!clear");
+      const result = parsePrompt("/clear");
       expect(result.command).toBe("clear");
-      expect(result.text).toBe("!clear");
+      expect(result.text).toBe("/clear");
     });
 
     it("should parse command with arguments", () => {
-      const result = parsePrompt("!send hello world");
+      const result = parsePrompt("/send hello world");
       expect(result.command).toBe("send");
       expect(result.text).toBe("hello world");
     });
