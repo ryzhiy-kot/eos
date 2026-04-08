@@ -236,7 +236,7 @@
       
       <div class="artifacts-layer">
         {#each $visibleArtifacts as artifact, i (artifact.id)}
-          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} onPin={handlePinArtifact} />
+          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} />
         {/each}
       </div>
     {/if}
