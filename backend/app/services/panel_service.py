@@ -13,7 +13,7 @@ from sqlalchemy import delete, select
 from app.core.logging import get_logger
 from app.db.session import async_session
 from app.models.panel import Panel
-from app.services.mock_data import (
+from .mock_data import (
     mock_fx_rates,
     mock_interest_curves,
     mock_news,

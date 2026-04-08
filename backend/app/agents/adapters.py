@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from app.agents.base import BaseLLMAgent
-from app.agents.groq_agent import GroqAgent as GroqAgentImpl
+from .base import BaseLLMAgent
+from .groq_agent import GroqAgent as GroqAgentImpl
 
 
 class GroqAgentAdapter(BaseLLMAgent):

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query, WebSocket
 
-from app.api.websocket.manager import market_stream_handler, risk_stream_handler
+from .websocket.manager import market_stream_handler, risk_stream_handler
 
 router = APIRouter(tags=["websocket"])
 

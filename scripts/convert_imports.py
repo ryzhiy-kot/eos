@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Convert absolute imports to relative for handler files within same package.
+"""Convert absolute imports to relative for imports within same package group.
 
-Only converts for files that are NOT __init__.py files, to avoid package import issues.
+Converts ALL files in the same package (not just handlers).
 """
 
 import re
@@ -12,24 +12,17 @@ APP_DIR = Path(
 )
 
 
-def get_package_info(file_path: Path) -> tuple[str, str, bool]:
-    """Get first package, subpackage, and whether it's a handler file.
-
-    Returns: (first_pkg, subpkg, is_handler)
-    E.g., services/mock_responses/handler_pnl.py -> ("services", "mock_responses", True)
-    """
+def get_first_package(file_path: Path) -> str:
+    """Get the first package (e.g., 'services', 'api', 'agents')."""
     rel = file_path.relative_to(APP_DIR)
-    parts = list(rel.parts[:-1])  # Exclude filename
-
-    if len(parts) < 2:
-        return "", "", False
-
-    is_handler = file_path.stem != "__init__"
-    return parts[0], parts[1] if len(parts) > 1 else "", is_handler
+    parts = rel.parts
+    if len(parts) > 1:
+        return parts[0]
+    return ""
 
 
-def convert_import(line: str, source_pkg: str, subpkg: str) -> str:
-    """Convert import to relative if in same subpackage."""
+def convert_import(line: str, source_pkg: str) -> str:
+    """Convert import to relative if in same first package."""
     if line.strip().startswith("from .") or "from __future__" in line:
         return line
 
@@ -43,29 +36,24 @@ def convert_import(line: str, source_pkg: str, subpkg: str) -> str:
     target_module = match.group(2)
     imports = match.group(3)
 
-    target_parts = target_module.split(".")
+    target_first = target_module.split(".")[0]
 
-    # Only convert if target is in the same subpackage (e.g., services.mock_responses -> mock_responses)
-    if (
-        len(target_parts) >= 2
-        and target_parts[0] == source_pkg
-        and target_parts[1] == subpkg
-    ):
-        remaining = target_module.split(".", 2)[2] if len(target_parts) > 2 else ""
+    if target_first != source_pkg:
+        return line
 
-        if remaining:
-            return f"{indent}from .{remaining} import {imports}\n"
-        else:
-            return f"{indent}from . import {imports}\n"
+    remaining = target_module.split(".", 1)[1] if "." in target_module else ""
 
-    return line
+    if remaining:
+        return f"{indent}from .{remaining} import {imports}\n"
+    else:
+        return f"{indent}from . import {imports}\n"
 
 
 def process_file(file_path: Path) -> bool:
     """Process a single Python file."""
-    source_pkg, subpkg, is_handler = get_package_info(file_path)
+    source_pkg = get_first_package(file_path)
 
-    if not is_handler or not source_pkg or not subpkg:
+    if not source_pkg:
         return False
 
     try:
@@ -79,7 +67,7 @@ def process_file(file_path: Path) -> bool:
 
     for line in lines:
         if "from app." in line and not line.strip().startswith("#"):
-            new_line = convert_import(line, source_pkg, subpkg)
+            new_line = convert_import(line, source_pkg)
             if new_line != line:
                 modified = True
                 new_lines.append(new_line.rstrip())

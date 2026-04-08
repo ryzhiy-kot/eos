@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from app.services.artifact_collector import ArtifactCollector
-from app.services.mock_data.generators import (
+from .artifact_collector import ArtifactCollector
+from .mock_data.generators import (
     mock_fx_rates,
     mock_interest_curves,
     mock_news,

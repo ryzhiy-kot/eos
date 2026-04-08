@@ -16,9 +16,9 @@ from collections.abc import AsyncGenerator
 
 from app.config import get_settings
 from app.core.logging import get_logger
-from app.services.context_injector import build_execution_context
-from app.services.mock_responses.registry import registry
-from app.services.session_service import SessionService
+from .context_injector import build_execution_context
+from .mock_responses.registry import registry
+from .session_service import SessionService
 
 # Import all handlers so they register themselves
 import app.services.mock_responses.handler_pnl  # noqa: F401

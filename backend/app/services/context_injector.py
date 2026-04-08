@@ -7,14 +7,14 @@ All new code should import directly from:
 - app.services.function_docs (get_available_functions, get_execution_environment_doc)
 """
 
-from app.services.context_builder import DotDict, build_execution_context
-from app.services.function_docs import (
+from .context_builder import DotDict, build_execution_context
+from .function_docs import (
     FunctionDoc,
     NamespaceDoc,
     get_available_functions,
     get_execution_environment_doc,
 )
-from app.services.mock_data import (
+from .mock_data import (
     MOCK_CURVE_TENORS,
     MOCK_CURVE_TYPES,
     MOCK_DESKS,

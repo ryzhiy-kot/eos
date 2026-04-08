@@ -4,7 +4,7 @@ Provides realistic mock financial data for P&L, risk, FX rates,
 interest curves, positions, and news.
 """
 
-from app.services.mock_data.constants import (
+from .constants import (
     MOCK_DESKS,
     MOCK_CURVE_TENORS,
     MOCK_CURVE_TYPES,
@@ -13,7 +13,7 @@ from app.services.mock_data.constants import (
     MOCK_INSTRUMENTS_FX,
     MOCK_INSTRUMENTS_RATES,
 )
-from app.services.mock_data.generators import (
+from .generators import (
     mock_fx_rates,
     mock_interest_curves,
     mock_news,
