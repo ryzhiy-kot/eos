@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 CODE_EXECUTOR_NAME = "CodeExecutorAgent"
-CODE_EXECUTOR_MODEL = "gemini-2.0-flash"
 
 
 class CodeExecutorInput(BaseModel):
@@ -182,4 +181,5 @@ Guidelines:
         description="Specialized agent for executing Python code for financial analysis",
         tools=tools,
         input_schema=CodeExecutorInput,
+        output_schema=CodeExecutorOutput,
     )

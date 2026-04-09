@@ -2,10 +2,8 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 
-from google.adk.agents import LlmAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools.agent_tool import AgentTool
 from google.genai import types
 
 from ..config import get_settings
@@ -20,7 +18,7 @@ APP_NAME = "finagent"
 MAIN_AGENT_NAME = "FinancialOrchestratorAgent"
 
 
-def create_code_executor_subagent(user_id: str, session_id: str) -> LlmAgent:
+def create_code_executor_subagent(user_id: str, session_id: str):
     """Create the CodeExecutorAgent as a sub-agent."""
     from .code_executor_agent import create_code_executor_agent
 
@@ -30,8 +28,11 @@ def create_code_executor_subagent(user_id: str, session_id: str) -> LlmAgent:
 def create_main_agent(
     user_id: str,
     session_id: str,
-) -> tuple[LlmAgent, LlmAgent]:
+):
     """Create the main orchestrator agent with the code executor as a sub-agent.
+
+    Uses sub_agents instead of AgentTool to enable event propagation from
+    sub-agents to the root runner.
 
     Args:
         user_id: The user ID for context
@@ -42,15 +43,11 @@ def create_main_agent(
     """
     code_executor_agent = create_code_executor_subagent(user_id, session_id)
 
-    agent_function_tool = AgentTool(agent=code_executor_agent)
-
-    tools = [agent_function_tool]
-
     execution_env_doc = get_execution_environment_doc()
 
     system_instruction = f"""You are a Quantitative Analyst for FX, Rates, Credit, and Commodities trading. Help traders analyze P&L, risk, and market data.
 
-Delegate complex tasks (calculations, analysis, visualizations) to the CodeExecutorAgent using the agent_function tool.
+Delegate complex tasks (calculations, analysis, visualizations) to the CodeExecutorAgent.
 
 {execution_env_doc}
 
@@ -63,7 +60,7 @@ Guidelines:
         name=MAIN_AGENT_NAME,
         instruction=system_instruction,
         description="Financial trading assistant orchestrator with data analysis capabilities",
-        tools=tools,
+        sub_agents=[code_executor_agent],
     )
 
     return main_agent, code_executor_agent
@@ -222,6 +219,16 @@ async def run_agent(
                         response = part.function_response.response
                         if isinstance(response, dict):
                             if "artifacts" in response:
+                                for artifact in response["artifacts"]:
+                                    yield {
+                                        "type": artifact.get("type", "chart"),
+                                        "title": artifact.get("title", ""),
+                                        "spec": artifact.get("spec"),
+                                        "columns": artifact.get("columns"),
+                                        "data": artifact.get("data"),
+                                        "content": artifact.get("content"),
+                                        "format": artifact.get("format"),
+                                    }
                                 all_artifacts.extend(response["artifacts"])
                             if "text_outputs" in response:
                                 for text in response["text_outputs"]:

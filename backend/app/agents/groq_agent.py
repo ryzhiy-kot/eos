@@ -28,6 +28,7 @@ class GroqAgent(BaseAgent):
     api_key: str | None = None
     instruction: str | None = None
     tools: list[Any] = []
+    sub_agents: list[Any] = []
 
     # Use PrivateAttr for the client to avoid Pydantic serialization/validation issues
     _client: AsyncGroq = PrivateAttr()
