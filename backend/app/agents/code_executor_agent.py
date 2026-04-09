@@ -184,5 +184,4 @@ Guidelines:
         description="Specialized agent for executing Python code for financial analysis",
         tools=tools,
         input_schema=CodeExecutorInput,
-        output_schema=CodeExecutorOutput,
     )
