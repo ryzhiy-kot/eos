@@ -3,24 +3,35 @@
   import GenericChart from "$lib/components/charts/GenericChart.svelte";
   import PnLWaterfall from "$lib/components/charts/PnLWaterfall.svelte";
   import RiskGauge from "$lib/components/charts/RiskGauge.svelte";
+  import { artifactPositions, currentWorkspaceId, type ArtifactPosition } from "$lib/stores/workspace";
 
   interface Props {
     artifact: Artifact;
     index: number;
     onClose?: (id: string) => void;
+    initialPosition?: { x: number; y: number };
+    initialSize?: { width: number; height: number };
   }
 
-  let { artifact, index, onClose }: Props = $props();
+  let { artifact, index, onClose, initialPosition: initialPos, initialSize: initialSz }: Props = $props();
 
   let isMinimized = $state(false);
-  let initialPosition = $derived({ x: 100 + (index % 4) * 50, y: 100 + Math.floor(index / 4) * 50 });
-  let position = $state({ x: initialPosition.x, y: initialPosition.y });
-  let size = $state({ width: 400, height: 320 });
+  let position = $state(initialPos ?? { x: 100 + (index % 4) * 50, y: 100 + Math.floor(index / 4) * 50 });
+  let size = $state(initialSz ?? { width: 400, height: 320 });
   let zIndex = $state(10);
   let isDragging = $state(false);
   let dragStart = $state({ x: 0, y: 0 });
   let isResizing = $state(false);
   let resizeStart = $state({ width: 0, height: 0, x: 0, y: 0 });
+
+  $effect(() => {
+    const wsId = $currentWorkspaceId;
+    if (!wsId) return;
+    artifactPositions.update((positions) => ({
+      ...positions,
+      [artifact.id]: { ...position, ...size, visible: artifact.visible },
+    }));
+  });
 
   function handleMouseDown(e: MouseEvent) {
     const target = e.target as HTMLElement;
