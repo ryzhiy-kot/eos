@@ -21,12 +21,6 @@ settings = get_settings()
 CODE_EXECUTOR_NAME = "CodeExecutorAgent"
 
 
-class CodeExecutorInput(BaseModel):
-    """Input schema for CodeExecutorAgent."""
-
-    code: str = Field(description="Python code to execute")
-
-
 class CodeExecutorOutput(BaseModel):
     """Output schema for CodeExecutorAgent."""
 
@@ -178,5 +172,4 @@ Guidelines:
         instruction=instruction,
         description="Specialized agent for executing Python code for financial analysis",
         tools=tools,
-        input_schema=CodeExecutorInput,
     )
