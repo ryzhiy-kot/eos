@@ -1,6 +1,7 @@
 import { writable, derived, get } from "svelte/store";
 import { api } from "$lib/api/client";
 import { fetchWorkspaces, selectWorkspace } from "./workspace";
+import { loadSession, fetchSessions } from "./agent";
 
 interface User {
   id: string;
@@ -73,6 +74,27 @@ export async function checkAuth() {
   try {
     const userData = await api.get<User>("/auth/me");
     user.set(userData);
+
+    const workspaces = await fetchWorkspaces();
+    if (workspaces.length > 0) {
+      const savedWorkspaceId = localStorage.getItem("last_workspace_id");
+      const workspaceId = savedWorkspaceId || workspaces[0].id;
+      await selectWorkspace(workspaceId);
+      localStorage.setItem("last_workspace_id", workspaceId);
+    }
+
+    await fetchSessions();
+    const sessionId = localStorage.getItem("last_session_id");
+    const sessions = await api.getSessions();
+    if (sessions.sessions.length > 0) {
+      const targetSessionId = sessionId || sessions.sessions[0].id;
+      await loadSession(targetSessionId);
+      localStorage.setItem("last_session_id", targetSessionId);
+    } else {
+      const newSession = await api.createSession("Session 1");
+      await loadSession(newSession.id);
+      localStorage.setItem("last_session_id", newSession.id);
+    }
   } catch {
     api.clearToken();
   }

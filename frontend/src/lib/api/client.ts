@@ -198,6 +198,10 @@ class ApiClient {
     return this.get<{ sessions: Array<{ id: string; name: string; created_at: string; updated_at: string }> }>("/agents/sessions");
   }
 
+  createSession(name: string) {
+    return this.post<{ id: string }>("/agents/sessions", { name });
+  }
+
   getSessionArtifacts(sessionId: string) {
     return this.get<{ artifacts: any[] }>(`/agents/sessions/${sessionId}/artifacts`);
   }

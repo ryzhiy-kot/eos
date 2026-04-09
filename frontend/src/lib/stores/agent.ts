@@ -383,6 +383,10 @@ export async function loadSession(sessionId: string) {
       artifacts,
     }));
     
+    if (typeof window !== "undefined") {
+      localStorage.setItem("last_session_id", sessionId);
+    }
+    
     return true;
   } catch (e) {
     console.error("Failed to load session:", e);
