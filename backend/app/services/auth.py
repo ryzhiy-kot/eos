@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -36,7 +37,7 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
-def invalidate_token(token: str) -> None:
+async def invalidate_token(token: str) -> None:
     """Add token to blacklist to invalidate it."""
     token_blacklist.add(token)
     # Clean up expired tokens periodically (simplified)
@@ -51,32 +52,41 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return payload
 
 
-def hash_password(password: str) -> str:
+def hash_password_sync(password: str) -> str:
+    """Synchronous version for static initialization."""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+async def hash_password(password: str) -> str:
+    return await asyncio.to_thread(hash_password_sync, password)
+
+
+def verify_password_sync(plain_password: str, hashed_password: str) -> bool:
+    """Synchronous version of verify password."""
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
-async def ldap_authenticate(username: str, password: str) -> dict | None:
-    """Authenticate against LDAP server. Returns user info dict or None."""
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return await asyncio.to_thread(verify_password_sync, plain_password, hashed_password)
+
+
+def _ldap_authenticate_sync(username: str, password: str, settings_dict: dict) -> dict | None:
     try:
         from ldap3 import ALL, Connection, Server
 
-        server = Server(settings.LDAP_SERVER, get_info=ALL)
-        user_dn = settings.LDAP_USER_SEARCH_FILTER.format(username=username)
+        server = Server(settings_dict["LDAP_SERVER"], get_info=ALL)
+        user_dn = settings_dict["LDAP_USER_SEARCH_FILTER"].format(username=username)
 
         # Try to bind with user credentials
         conn = Connection(
             server,
-            user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
+            user=f"{user_dn},{settings_dict['LDAP_USER_SEARCH_BASE']}",
             password=password,
             auto_bind=True,
         )
 
         conn.search(
-            settings.LDAP_USER_SEARCH_BASE,
+            settings_dict["LDAP_USER_SEARCH_BASE"],
             f"(uid={username})",
             attributes=["mail", "cn", "uid"],
         )
@@ -95,3 +105,13 @@ async def ldap_authenticate(username: str, password: str) -> dict | None:
         }
     except Exception:
         return None
+
+
+async def ldap_authenticate(username: str, password: str) -> dict | None:
+    """Authenticate against LDAP server. Returns user info dict or None."""
+    settings_dict = {
+        "LDAP_SERVER": settings.LDAP_SERVER,
+        "LDAP_USER_SEARCH_FILTER": settings.LDAP_USER_SEARCH_FILTER,
+        "LDAP_USER_SEARCH_BASE": settings.LDAP_USER_SEARCH_BASE,
+    }
+    return await asyncio.to_thread(_ldap_authenticate_sync, username, password, settings_dict)
