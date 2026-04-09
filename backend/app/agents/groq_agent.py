@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, List, Optional
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
@@ -25,10 +25,10 @@ class GroqAgent(BaseAgent):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     model: str = "llama-3.1-8b-instant"
-    api_key: str | None = None
-    instruction: str | None = None
-    tools: list[Any] = []
-    sub_agents: list[Any] = []
+    api_key: Optional[str] = None
+    instruction: Optional[str] = None
+    tools: List[Any] = []
+    sub_agents: List[Any] = []
 
     # Use PrivateAttr for the client to avoid Pydantic serialization/validation issues
     _client: AsyncGroq = PrivateAttr()

@@ -6,7 +6,7 @@ Uses lazy imports to avoid importing unused provider modules.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, List, Optional, Type
 
 from ..agents.base import BaseLLMAgent
 from ..config import get_settings
@@ -18,11 +18,11 @@ logger = get_logger(__name__)
 def create_llm_agent(
     name: str,
     instruction: str,
-    description: str | None = None,
-    tools: list[Any] | None = None,
-    sub_agents: list[Any] | None = None,
-    input_schema: type | None = None,
-    output_schema: type | None = None,
+    description: Optional[str] = None,
+    tools: Optional[List[Any]] = None,
+    sub_agents: Optional[List[Any]] = None,
+    input_schema: Optional[Type] = None,
+    output_schema: Optional[Type] = None,
 ) -> BaseLLMAgent:
     """Factory to create an LLM agent based on configuration.
 

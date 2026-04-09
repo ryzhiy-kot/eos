@@ -1,6 +1,6 @@
 import logging
+from typing import Any, Optional
 
-from typing import Any
 from google.adk.tools import FunctionTool
 from pydantic import BaseModel, Field
 
@@ -24,11 +24,7 @@ CODE_EXECUTOR_NAME = "CodeExecutorAgent"
 class CodeExecutorInput(BaseModel):
     """Input schema for CodeExecutorAgent."""
 
-    request: str = Field(description="The user's request or task for code execution")
-    code: str | None = Field(
-        default=None,
-        description="Optional Python code to execute directly. If not provided, the agent will generate code based on the request.",
-    )
+    code: str = Field(description="Python code to execute")
 
 
 class CodeExecutorOutput(BaseModel):
@@ -41,13 +37,13 @@ class CodeExecutorOutput(BaseModel):
         description="List of all captured stdout (print calls) output."
     )
     artifacts: list[dict] = Field(description="List of generated visual artifacts.")
-    error: str | None = Field(
+    error: Optional[str] = Field(
         default=None, description="Error message if execution failed, None otherwise."
     )
 
 
 async def execute_code(
-    request: str = "", code: str | None = None, user_id: str = "", session_id: str = ""
+    code: str, user_id: str = "", session_id: str = ""
 ) -> CodeExecutorOutput:
     """Execute Python code in a sandboxed environment and return results with artifacts.
 
@@ -55,8 +51,7 @@ async def execute_code(
     with access to financial data and visualization utilities.
 
     Args:
-        request: The initial user request. used as code if `code` is not provided.
-        code: Optional Python code to execute directly. Takes precedence over `request`.
+        code: Python code to execute.
         user_id: Unique identifier for the user (for data scoping).
         session_id: Active session identifier (for context continuity).
 
@@ -69,7 +64,7 @@ async def execute_code(
     """
 
     # Determine which code to actually execute
-    code_to_run = code if code else request
+    code_to_run = code
 
     # Initialize the artifact collector and execution context
     collector = ArtifactCollector()
@@ -141,14 +136,14 @@ def create_execute_code_tool() -> FunctionTool:
     - success: bool - Whether execution succeeded
     - text_outputs: list[str] - Any text printed during execution
     - artifacts: list[dict] - Charts, tables, PDFs generated
-    - error: str | None - Error message if failed
+    - error: Optional[str] - Error message if failed
     """
     return FunctionTool(func=execute_code)
 
 
 def create_code_executor_agent(
-    user_id: str | None = None,
-    session_id: str | None = None,
+    user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Any:
     """Create the CodeExecutorAgent with appropriate tools."""
     tools = [create_execute_code_tool()]

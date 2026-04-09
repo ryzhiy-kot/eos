@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import AsyncGenerator
+from typing import Dict, List
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -73,7 +74,7 @@ def get_adk_session_service() -> InMemorySessionService:
     return get_adk_session_service._instance
 
 
-async def save_artifacts_to_db(session_id: str, artifacts: list[dict]) -> None:
+async def save_artifacts_to_db(session_id: str, artifacts: List[Dict]) -> None:
     """Save artifacts to the database via session service."""
     try:
         from app.services.session_service import get_session_service
@@ -105,7 +106,7 @@ async def save_message_to_db(session_id: str, role: str, content: str) -> None:
         logger.error(f"Failed to save message to DB: {e}")
 
 
-async def load_messages_from_db(session_id: str) -> list[dict]:
+async def load_messages_from_db(session_id: str) -> List[Dict]:
     """Load previous messages from the database."""
     try:
         from app.services.session_service import get_session_service

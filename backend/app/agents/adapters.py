@@ -7,7 +7,7 @@ Uses lazy imports to avoid importing unused provider modules.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, List, Optional
 
 from .base import BaseLLMAgent
 
@@ -74,11 +74,11 @@ class GeminiAgentAdapter(BaseLLMAgent):
 def create_groq_agent(
     name: str,
     instruction: str,
-    description: str | None = None,
-    tools: list[Any] | None = None,
-    sub_agents: list[Any] | None = None,
+    description: Optional[str] = None,
+    tools: Optional[List[Any]] = None,
+    sub_agents: Optional[List[Any]] = None,
     model: str = "llama-3.1-8b-instant",
-    api_key: str | None = None,
+    api_key: Optional[str] = None,
 ) -> BaseLLMAgent:
     """Factory function to create a GroqAgent conforming to BaseLLMAgent.
 
@@ -108,9 +108,9 @@ def create_groq_agent(
 def create_gemini_agent(
     name: str,
     instruction: str,
-    description: str | None = None,
-    tools: list[Any] | None = None,
-    sub_agents: list[Any] | None = None,
+    description: Optional[str] = None,
+    tools: Optional[List[Any]] = None,
+    sub_agents: Optional[List[Any]] = None,
     model: str = "gemini-2.0-flash",
 ) -> BaseLLMAgent:
     """Factory function to create a Gemini LlmAgent conforming to BaseLLMAgent.
