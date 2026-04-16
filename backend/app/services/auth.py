@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+import asyncio
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -51,12 +52,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return payload
 
 
-def hash_password(password: str) -> str:
+def hash_password_sync(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+async def hash_password(password: str) -> str:
+    salt = await asyncio.to_thread(bcrypt.gensalt)
+    return (await asyncio.to_thread(bcrypt.hashpw, password.encode("utf-8"), salt)).decode("utf-8")
+
+
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return await asyncio.to_thread(bcrypt.checkpw, plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
 async def ldap_authenticate(username: str, password: str) -> dict | None:
@@ -68,18 +74,21 @@ async def ldap_authenticate(username: str, password: str) -> dict | None:
         user_dn = settings.LDAP_USER_SEARCH_FILTER.format(username=username)
 
         # Try to bind with user credentials
-        conn = Connection(
-            server,
-            user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
-            password=password,
-            auto_bind=True,
-        )
+        def bind_and_search():
+            conn = Connection(
+                server,
+                user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
+                password=password,
+                auto_bind=True,
+            )
+            conn.search(
+                settings.LDAP_USER_SEARCH_BASE,
+                f"(uid={username})",
+                attributes=["mail", "cn", "uid"],
+            )
+            return conn
 
-        conn.search(
-            settings.LDAP_USER_SEARCH_BASE,
-            f"(uid={username})",
-            attributes=["mail", "cn", "uid"],
-        )
+        conn = await asyncio.to_thread(bind_and_search)
 
         if not conn.entries:
             conn.unbind()
