@@ -4,6 +4,7 @@
   import { checkAuth, loadConfig, displayName } from "$lib/stores/auth";
   import { page } from "$app/stores";
   import { agentState, visibleArtifacts, togglePanel, expandPanel, updateTerminalPosition, updateTerminalSize, hideArtifact, showArtifact, panels, activeTabId, fetchPanels, pinArtifact, refreshPanelData, type Artifact } from "$lib/stores/agent";
+  import { artifactPositions } from "$lib/stores/workspace";
   import { api } from "$lib/api/client";
   import AgentTerminal from "$lib/components/agent/AgentTerminal.svelte";
   import ArtifactWindow from "$lib/components/agent/ArtifactWindow.svelte";
@@ -236,7 +237,14 @@
       
       <div class="artifacts-layer">
         {#each $visibleArtifacts as artifact, i (artifact.id)}
-          <ArtifactWindow {artifact} index={i} onClose={(id) => hideArtifact(id)} />
+          {@const pos = $artifactPositions[artifact.id]}
+          <ArtifactWindow 
+            {artifact} 
+            index={i} 
+            onClose={(id) => hideArtifact(id)}
+            initialPosition={pos ? { x: pos.x, y: pos.y } : undefined}
+            initialSize={pos ? { width: pos.width, height: pos.height } : undefined}
+          />
         {/each}
       </div>
     {/if}

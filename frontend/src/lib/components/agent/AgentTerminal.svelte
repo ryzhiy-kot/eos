@@ -109,7 +109,7 @@
       case "save": {
         if (parts.length === 0) {
           addAssistantMessage(
-            `Usage: !export <index> [format]\n  !export 0 png\n  !export 1 pdf\n  !export 2`,
+            `Usage: /export <index> [format]\n  /export 0 png\n  /export 1 pdf\n  /export 2`,
           );
           return;
         }
@@ -147,13 +147,13 @@
         }
 
         addAssistantMessage(
-          list + "\n\nUse !refresh <n> <seconds> to update panel refresh interval.",
+          list + "\n\nUse /refresh <n> <seconds> to update panel refresh interval.",
         );
         break;
       }
       case "show": {
         if (parts.length === 0) {
-          addAssistantMessage("Usage: !show <index> (e.g., !show 0)");
+          addAssistantMessage("Usage: /show <index> (e.g., /show 0)");
           return;
         }
         const idx = parseInt(parts[0], 10);
@@ -171,7 +171,7 @@
       case "del":
       case "delete": {
         if (parts.length === 0) {
-          addAssistantMessage("Usage: !del <index> (e.g., !del 0)");
+          addAssistantMessage("Usage: /del <index> (e.g., /del 0)");
           return;
         }
         const idx = parseInt(parts[0], 10);
@@ -193,22 +193,22 @@
       }
       case "refresh": {
         if (parts.length < 2) {
-          addAssistantMessage("Usage: !refresh <panel_index> <seconds>");
-          addAssistantMessage("Example: !refresh 0 30 - Set panel 0 to refresh every 30 seconds");
-          addAssistantMessage("Use 0 to disable auto-refresh (e.g., !refresh 0 0)");
+          addAssistantMessage("Usage: /refresh <panel_index> <seconds>");
+          addAssistantMessage("Example: /refresh 0 30 - Set panel 0 to refresh every 30 seconds");
+          addAssistantMessage("Use 0 to disable auto-refresh (e.g., /refresh 0 0)");
           return;
         }
         const idx = parseInt(parts[0], 10);
         const interval = parseInt(parts[1], 10);
 
         if (isNaN(idx) || isNaN(interval)) {
-          addAssistantMessage("Invalid parameters. Usage: !refresh <panel_index> <seconds>");
+          addAssistantMessage("Invalid parameters. Usage: /refresh <panel_index> <seconds>");
           return;
         }
 
         const panelList = $panels;
         if (idx < 0 || idx >= panelList.length) {
-          addAssistantMessage(`Panel ${idx} not found. Use !ls to list panels.`);
+          addAssistantMessage(`Panel ${idx} not found. Use /ls to list panels.`);
           return;
         }
 
@@ -223,7 +223,7 @@
       }
       case "cat": {
         if (parts.length === 0) {
-          addAssistantMessage("Usage: !cat <index>");
+          addAssistantMessage("Usage: /cat <index>");
           return;
         }
         const idx = parseInt(parts[0], 10);
@@ -252,16 +252,16 @@
         break;
       case "help":
         addAssistantMessage(`Available commands:
-!ls, !list - Show all artifacts
-!show <n> - Show/hide artifact
-!del <n> - Delete artifact
-!cat <n> - Show artifact details
-!export <n> [format] - Export artifact
-!refresh <n> <s> - Set panel refresh interval in seconds
-!clear - Clear conversation
-!clear-artifacts - Delete all artifacts
-!sessions - Show and switch between previous sessions
-!help - Show this help
+/ls, /list - Show all artifacts
+/show <n> - Show/hide artifact
+/del <n> - Delete artifact
+/cat <n> - Show artifact details
+/export <n> [format] - Export artifact
+/refresh <n> <s> - Set panel refresh interval in seconds
+/clear - Clear conversation
+/clear-artifacts - Delete all artifacts
+/sessions - Show and switch between previous sessions
+/help - Show this help
 
 Artifact references in prompts:
   "chart 0" - Reference first chart
@@ -269,7 +269,7 @@ Artifact references in prompts:
   "explain table 0" - Reference with context`);
         break;
       default:
-        addAssistantMessage(`Unknown command: ${cmd}. Try !help`);
+        addAssistantMessage(`Unknown command: ${cmd}. Try /help`);
     }
   }
 
@@ -557,7 +557,7 @@ Artifact references in prompts:
         onclick={() => {
           fetchSessions();
           addAssistantMessage(
-            "Fetching sessions... Type !sessions to view and switch sessions.",
+            "Fetching sessions... Type /sessions to view and switch sessions.",
           );
         }}
         title="Refresh sessions"
@@ -583,7 +583,7 @@ Artifact references in prompts:
           <p class="hint">
             Ask about P&L, risk, positions, rates, or market data
           </p>
-          <p class="hint">Commands: !help, !ls, !refresh, !sessions</p>
+          <p class="hint">Commands: /help, /ls, /refresh, /sessions</p>
         </div>
       {/if}
 

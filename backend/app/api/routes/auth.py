@@ -16,6 +16,7 @@ from ...services.auth import (
     ldap_authenticate,
     verify_password,
 )
+from ...services.session_service import get_session_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -72,10 +73,16 @@ async def login(request: LoginRequest):
     access_token = create_access_token(user_data["id"], user_data["role"])
     refresh_token = create_refresh_token(user_data["id"])
 
+    session_service = get_session_service()
+    workspaces = await session_service.list_workspaces(user_data["id"])
+    last_workspace_id = workspaces[0].id if workspaces else None
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_id=user_data["id"],
+        last_workspace_id=last_workspace_id,
     )
 
 

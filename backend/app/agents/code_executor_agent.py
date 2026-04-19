@@ -1,6 +1,6 @@
 import logging
+from typing import Any, Optional
 
-from typing import Any
 from google.adk.tools import FunctionTool
 from pydantic import BaseModel, Field
 
@@ -19,17 +19,6 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 CODE_EXECUTOR_NAME = "CodeExecutorAgent"
-CODE_EXECUTOR_MODEL = "gemini-2.0-flash"
-
-
-class CodeExecutorInput(BaseModel):
-    """Input schema for CodeExecutorAgent."""
-
-    request: str = Field(description="The user's request or task for code execution")
-    code: str | None = Field(
-        default=None,
-        description="Optional Python code to execute directly. If not provided, the agent will generate code based on the request.",
-    )
 
 
 class CodeExecutorOutput(BaseModel):
@@ -42,13 +31,13 @@ class CodeExecutorOutput(BaseModel):
         description="List of all captured stdout (print calls) output."
     )
     artifacts: list[dict] = Field(description="List of generated visual artifacts.")
-    error: str | None = Field(
+    error: Optional[str] = Field(
         default=None, description="Error message if execution failed, None otherwise."
     )
 
 
 async def execute_code(
-    request: str = "", code: str | None = None, user_id: str = "", session_id: str = ""
+    code: str, user_id: str = "", session_id: str = ""
 ) -> CodeExecutorOutput:
     """Execute Python code in a sandboxed environment and return results with artifacts.
 
@@ -56,8 +45,7 @@ async def execute_code(
     with access to financial data and visualization utilities.
 
     Args:
-        request: The initial user request. used as code if `code` is not provided.
-        code: Optional Python code to execute directly. Takes precedence over `request`.
+        code: Python code to execute.
         user_id: Unique identifier for the user (for data scoping).
         session_id: Active session identifier (for context continuity).
 
@@ -70,7 +58,7 @@ async def execute_code(
     """
 
     # Determine which code to actually execute
-    code_to_run = code if code else request
+    code_to_run = code
 
     # Initialize the artifact collector and execution context
     collector = ArtifactCollector()
@@ -142,14 +130,14 @@ def create_execute_code_tool() -> FunctionTool:
     - success: bool - Whether execution succeeded
     - text_outputs: list[str] - Any text printed during execution
     - artifacts: list[dict] - Charts, tables, PDFs generated
-    - error: str | None - Error message if failed
+    - error: Optional[str] - Error message if failed
     """
     return FunctionTool(func=execute_code)
 
 
 def create_code_executor_agent(
-    user_id: str | None = None,
-    session_id: str | None = None,
+    user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Any:
     """Create the CodeExecutorAgent with appropriate tools."""
     tools = [create_execute_code_tool()]
@@ -161,16 +149,19 @@ def create_code_executor_agent(
 Your role is to execute Python code to help users with financial calculations, data analysis, and visualizations.
 
 IMPORTANT WORKFLOW:
-1. Write Python code that uses bq.* and display.* functions
-2. Pass your code to the execute_code tool via the 'request' parameter
-3. The execute_code tool runs your code and returns results
+1. First, determine if the user's request requires coding (data analysis, calculations, visualizations using bq.*/display.* APIs).
+2. If the request does NOT require coding (e.g., simple conversation, clarifications, general questions about markets), respond with: "TRANSFER_TO_MAIN" followed by your brief response.
+3. If coding IS required, write Python code that uses bq.* and display.* functions.
+4. Pass your code to the execute_code tool via the 'request' parameter.
+5. The execute_code tool runs your code and returns results.
 
 DO NOT call bq.* or display.* directly - they are only available inside execute_code.
 
 {execution_env_doc}
 
 Guidelines:
-- Write clean, executable Python code
+- First check if coding is needed. Simple greetings, clarification questions, general market info = TRANSFER_TO_MAIN
+- When coding is needed: Write clean, executable Python code
 - Use bq.* to fetch data, display.* to generate visualizations
 - Always include print() statements for intermediate results
 - If execute_code returns success: False, analyze the error, fix your code, and retry
@@ -181,5 +172,4 @@ Guidelines:
         instruction=instruction,
         description="Specialized agent for executing Python code for financial analysis",
         tools=tools,
-        input_schema=CodeExecutorInput,
     )
