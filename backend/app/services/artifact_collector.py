@@ -1,6 +1,6 @@
 import base64
 import uuid
-from typing import Optional, Union, Literal
+from typing import Union, Literal
 from pydantic import BaseModel, Field
 
 
@@ -41,11 +41,11 @@ class PdfTable(BaseModel):
 
 
 class PdfContent(BaseModel):
-    title: str = Field(default="Report", description="Main PDF title")
-    tables: Optional[list[PdfTable]] = Field(
+    title: str | None = Field(default=None, description="Title of the artifact")
+    tables: list[PdfTable] | None = Field(
         default=None, description="List of tables to include"
     )
-    text: Optional[str] = Field(default=None, description="Text content for the PDF")
+    text: str | None = Field(default=None, description="Text content for the PDF")
 
 
 TableDataParam = list[dict[str, Union[float, int, str, bool]]]

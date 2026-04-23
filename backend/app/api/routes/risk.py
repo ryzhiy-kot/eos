@@ -1,6 +1,6 @@
 """Risk routes — REST API for risk metrics and positions."""
 
-from typing import Optional
+
 
 from fastapi import APIRouter, Depends, Query
 
@@ -37,8 +37,8 @@ async def get_var_history(
 
 @router.get("/positions", response_model=list[PositionResponse])
 async def get_positions(
-    desk: Optional[str] = Query(None),
-    strategy: Optional[str] = Query(None),
+    desk: str | None = Query(None),
+    strategy: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
     mock_svc: MockFinancialService = Depends(get_mock_service),
 ) -> list[dict]:

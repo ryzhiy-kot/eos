@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Optional
+
 
 from sqlalchemy import delete, select
 
@@ -13,7 +13,7 @@ async def create_panel(
     artifact_id: str,
     name: str,
     bq_function: str,
-    bq_params: Optional[dict] = None,
+    bq_params: dict | None = None,
     refresh_interval: int = 0,
 ) -> Panel:
     async with async_session() as session:
@@ -39,7 +39,7 @@ async def get_panels(user_id: str) -> list[Panel]:
         return list(result.scalars().all())
 
 
-async def get_panel(panel_id: str, user_id: str) -> Optional[Panel]:
+async def get_panel(panel_id: str, user_id: str) -> Panel | None:
     async with async_session() as session:
         result = await session.execute(
             select(Panel).where(Panel.id == panel_id, Panel.user_id == user_id)
@@ -96,9 +96,9 @@ async def delete_panel(panel_id: str, user_id: str) -> bool:
 async def update_panel(
     panel_id: str,
     user_id: str,
-    name: Optional[str] = None,
-    refresh_interval: Optional[int] = None,
-) -> Optional[Panel]:
+    name: str | None = None,
+    refresh_interval: int | None = None,
+) -> Panel | None:
     async with async_session() as session:
         result = await session.execute(
             select(Panel).where(Panel.id == panel_id, Panel.user_id == user_id)
