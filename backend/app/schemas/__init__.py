@@ -24,6 +24,10 @@ class UserResponse(BaseModel):
     last_login: datetime | None = None
 
 
+class LogoutResponse(BaseModel):
+    message: str
+
+
 class InstrumentResponse(BaseModel):
     id: str
     symbol: str

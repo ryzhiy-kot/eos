@@ -1,6 +1,6 @@
 """Market routes — REST API for market data (quotes, instruments, OHLCV)."""
 
-from typing import Optional
+
 
 from fastapi import APIRouter, Depends, Query
 
@@ -30,8 +30,8 @@ def get_mock_service() -> MockFinancialService:
 
 @router.get("/instruments", response_model=list[InstrumentResponse])
 async def list_instruments(
-    asset_class: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
+    asset_class: str | None = Query(None),
+    search: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
 ) -> list[InstrumentResponse]:
     """List available instruments with optional filtering."""
