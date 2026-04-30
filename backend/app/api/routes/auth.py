@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 
 from ...config import get_settings
 from ...schemas import LoginRequest, TokenResponse, UserResponse
@@ -25,6 +26,10 @@ security = HTTPBearer()
 TRADER_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
 ADMIN_USER_ID = "550e8400-e29b-41d4-a716-446655440001"
 
+
+class LogoutResponse(BaseModel):
+    message: str
+
 # In-memory user store for mock mode (replace with DB in production)
 MOCK_USERS = {
     "admin": {
@@ -32,7 +37,7 @@ MOCK_USERS = {
         "email": "admin@company.com",
         "display_name": "Admin User",
         "role": "admin",
-        "password_hash": hash_password("admin123"),
+        "password_hash": "$2b$12$49vdiOxg36.R2u/t60xdvuNr4UwEBHH9KavYHA0ngSLbE73W1UKhy",
         "is_active": True,
     },
     "trader": {
@@ -40,13 +45,18 @@ MOCK_USERS = {
         "email": "trader@company.com",
         "display_name": "Jane Trader",
         "role": "trader",
-        "password_hash": hash_password("trader123"),
+        "password_hash": "$2b$12$4VOEhgDHfjKAx0yoxuvxRORPnL84y.UdFMSGfEzc7IqWCcnx5bPke",
         "is_active": True,
     },
 }
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Login user",
+    description="Authenticates a user via LDAP or mock store and returns access and refresh tokens."
+)
 async def login(request: LoginRequest):
     # Try LDAP first, fallback to mock users
     ldap_user = await ldap_authenticate(request.username, request.password)
@@ -60,7 +70,7 @@ async def login(request: LoginRequest):
         }
     elif request.username in MOCK_USERS:
         user_data = MOCK_USERS[request.username]
-        if not verify_password(request.password, user_data["password_hash"]):
+        if not await verify_password(request.password, user_data["password_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
             )
@@ -79,7 +89,12 @@ async def login(request: LoginRequest):
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Refresh token",
+    description="Uses a valid refresh token to issue new access and refresh tokens."
+)
 async def refresh_token(refresh_token: str):
     payload = decode_token(refresh_token)
     if payload.get("type") != "refresh":
@@ -105,7 +120,12 @@ async def refresh_token(refresh_token: str):
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get current user",
+    description="Retrieves the authenticated user's profile information."
+)
 async def get_me(current_user: dict = Depends(get_current_user)):
     user_id = current_user["sub"]
     for u in MOCK_USERS.values():
@@ -121,7 +141,12 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     raise HTTPException(status_code=404, detail="User not found")
 
 
-@router.post("/logout")
+@router.post(
+    "/logout",
+    response_model=LogoutResponse,
+    summary="Logout user",
+    description="Invalidates the user's current access token."
+)
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     invalidate_token(credentials.credentials)
-    return {"message": "Logged out successfully"}
+    return LogoutResponse(message="Logged out successfully")
