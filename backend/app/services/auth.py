@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -51,17 +52,21 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return payload
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+async def hash_password(password: str) -> str:
+    def _hash() -> str:
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return await asyncio.to_thread(_hash)
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    def _verify() -> bool:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    return await asyncio.to_thread(_verify)
 
 
 async def ldap_authenticate(username: str, password: str) -> dict | None:
     """Authenticate against LDAP server. Returns user info dict or None."""
-    try:
+    def _sync_ldap() -> dict | None:
         from ldap3 import ALL, Connection, Server
 
         server = Server(settings.LDAP_SERVER, get_info=ALL)
@@ -93,5 +98,8 @@ async def ldap_authenticate(username: str, password: str) -> dict | None:
             "email": str(entry.mail) if hasattr(entry, "mail") else f"{username}@company.com",
             "display_name": str(entry.cn) if hasattr(entry, "cn") else username,
         }
+
+    try:
+        return await asyncio.to_thread(_sync_ldap)
     except Exception:
         return None
