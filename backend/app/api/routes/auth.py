@@ -11,7 +11,7 @@ from ...services.auth import (
     create_refresh_token,
     decode_token,
     get_current_user,
-    hash_password,
+    hash_password_sync,
     invalidate_token,
     ldap_authenticate,
     verify_password,
@@ -32,7 +32,7 @@ MOCK_USERS = {
         "email": "admin@company.com",
         "display_name": "Admin User",
         "role": "admin",
-        "password_hash": hash_password("admin123"),
+        "password_hash": hash_password_sync("admin123"),
         "is_active": True,
     },
     "trader": {
@@ -40,13 +40,20 @@ MOCK_USERS = {
         "email": "trader@company.com",
         "display_name": "Jane Trader",
         "role": "trader",
-        "password_hash": hash_password("trader123"),
+        "password_hash": hash_password_sync("trader123"),
         "is_active": True,
     },
 }
 
+MOCK_USERS_BY_ID = {user["id"]: user for user in MOCK_USERS.values()}
 
-@router.post("/login", response_model=TokenResponse)
+
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="User Login",
+    description="Authenticate a user using LDAP or mock credentials and return access and refresh tokens."
+)
 async def login(request: LoginRequest):
     # Try LDAP first, fallback to mock users
     ldap_user = await ldap_authenticate(request.username, request.password)
@@ -60,7 +67,8 @@ async def login(request: LoginRequest):
         }
     elif request.username in MOCK_USERS:
         user_data = MOCK_USERS[request.username]
-        if not verify_password(request.password, user_data["password_hash"]):
+        is_valid = await verify_password(request.password, user_data["password_hash"])
+        if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
             )
@@ -79,7 +87,12 @@ async def login(request: LoginRequest):
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Refresh Token",
+    description="Exchange a valid refresh token for a new access token and refresh token."
+)
 async def refresh_token(refresh_token: str):
     payload = decode_token(refresh_token)
     if payload.get("type") != "refresh":
@@ -88,12 +101,8 @@ async def refresh_token(refresh_token: str):
         )
 
     user_id = payload["sub"]
-    # Find user role (simplified)
-    role = "trader"
-    for u in MOCK_USERS.values():
-        if u["id"] == user_id:
-            role = u["role"]
-            break
+    user = MOCK_USERS_BY_ID.get(user_id)
+    role = user["role"] if user else "trader"
 
     access_token = create_access_token(user_id, role)
     new_refresh_token = create_refresh_token(user_id)
@@ -105,23 +114,33 @@ async def refresh_token(refresh_token: str):
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get Current User",
+    description="Retrieve the profile information of the currently authenticated user."
+)
 async def get_me(current_user: dict = Depends(get_current_user)):
     user_id = current_user["sub"]
-    for u in MOCK_USERS.values():
-        if u["id"] == user_id:
-            return UserResponse(
-                id=u["id"],
-                email=u["email"],
-                display_name=u["display_name"],
-                role=u["role"],
-                is_active=u["is_active"],
-                last_login=datetime.now(UTC),
-            )
+    user = MOCK_USERS_BY_ID.get(user_id)
+    if user:
+        return UserResponse(
+            id=user["id"],
+            email=user["email"],
+            display_name=user["display_name"],
+            role=user["role"],
+            is_active=user["is_active"],
+            last_login=datetime.now(UTC),
+        )
     raise HTTPException(status_code=404, detail="User not found")
 
 
-@router.post("/logout")
+@router.post(
+    "/logout",
+    response_model=dict,
+    summary="User Logout",
+    description="Invalidate the user's current access token."
+)
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     invalidate_token(credentials.credentials)
     return {"message": "Logged out successfully"}
