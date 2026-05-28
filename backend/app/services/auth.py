@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -51,34 +52,54 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return payload
 
 
-def hash_password(password: str) -> str:
+def hash_password_sync(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password_sync(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+
+async def hash_password(password: str) -> str:
+    return await asyncio.to_thread(hash_password_sync, password)
+
+
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return await asyncio.to_thread(verify_password_sync, plain_password, hashed_password)
+
+
+def _ldap_bind_and_search(server, user_dn, password, username, search_base):
+    from ldap3 import Connection
+    conn = Connection(
+        server,
+        user=f"{user_dn},{search_base}",
+        password=password,
+        auto_bind=True,
+    )
+    conn.search(
+        search_base,
+        f"(uid={username})",
+        attributes=["mail", "cn", "uid"],
+    )
+    return conn
 
 
 async def ldap_authenticate(username: str, password: str) -> dict | None:
     """Authenticate against LDAP server. Returns user info dict or None."""
     try:
-        from ldap3 import ALL, Connection, Server
+        from ldap3 import ALL, Server
 
         server = Server(settings.LDAP_SERVER, get_info=ALL)
         user_dn = settings.LDAP_USER_SEARCH_FILTER.format(username=username)
 
-        # Try to bind with user credentials
-        conn = Connection(
+        # Try to bind with user credentials and search, executed in thread
+        conn = await asyncio.to_thread(
+            _ldap_bind_and_search,
             server,
-            user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
-            password=password,
-            auto_bind=True,
-        )
-
-        conn.search(
+            user_dn,
+            password,
+            username,
             settings.LDAP_USER_SEARCH_BASE,
-            f"(uid={username})",
-            attributes=["mail", "cn", "uid"],
         )
 
         if not conn.entries:
