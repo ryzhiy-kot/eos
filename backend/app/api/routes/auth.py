@@ -26,13 +26,14 @@ TRADER_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
 ADMIN_USER_ID = "550e8400-e29b-41d4-a716-446655440001"
 
 # In-memory user store for mock mode (replace with DB in production)
+# Pre-computed bcrypt hashes to avoid blocking module initialization
 MOCK_USERS = {
     "admin": {
         "id": ADMIN_USER_ID,
         "email": "admin@company.com",
         "display_name": "Admin User",
         "role": "admin",
-        "password_hash": hash_password("admin123"),
+        "password_hash": "$2b$12$1ftfcDzHB7yTiBMm3aE1QuJRoMywL4UyQ/IDnc/ZFQQBgE5Fh71uK",
         "is_active": True,
     },
     "trader": {
@@ -40,13 +41,13 @@ MOCK_USERS = {
         "email": "trader@company.com",
         "display_name": "Jane Trader",
         "role": "trader",
-        "password_hash": hash_password("trader123"),
+        "password_hash": "$2b$12$aNmlsLp7yEAbei8os8DJyO4dg9UpnAfq3d9C7WRcCeqFdwE5uOsZu",
         "is_active": True,
     },
 }
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, summary="User Login", description="Authenticate a user and return access and refresh tokens.")
 async def login(request: LoginRequest):
     # Try LDAP first, fallback to mock users
     ldap_user = await ldap_authenticate(request.username, request.password)
@@ -60,7 +61,8 @@ async def login(request: LoginRequest):
         }
     elif request.username in MOCK_USERS:
         user_data = MOCK_USERS[request.username]
-        if not verify_password(request.password, user_data["password_hash"]):
+        is_valid = await verify_password(request.password, user_data["password_hash"])
+        if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
             )
@@ -69,8 +71,8 @@ async def login(request: LoginRequest):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
 
-    access_token = create_access_token(user_data["id"], user_data["role"])
-    refresh_token = create_refresh_token(user_data["id"])
+    access_token = await create_access_token(user_data["id"], user_data["role"])
+    refresh_token = await create_refresh_token(user_data["id"])
 
     return TokenResponse(
         access_token=access_token,
@@ -79,9 +81,9 @@ async def login(request: LoginRequest):
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post("/refresh", response_model=TokenResponse, summary="Refresh Token", description="Exchange a refresh token for a new access token.")
 async def refresh_token(refresh_token: str):
-    payload = decode_token(refresh_token)
+    payload = await decode_token(refresh_token)
     if payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
@@ -95,8 +97,8 @@ async def refresh_token(refresh_token: str):
             role = u["role"]
             break
 
-    access_token = create_access_token(user_id, role)
-    new_refresh_token = create_refresh_token(user_id)
+    access_token = await create_access_token(user_id, role)
+    new_refresh_token = await create_refresh_token(user_id)
 
     return TokenResponse(
         access_token=access_token,
@@ -105,7 +107,7 @@ async def refresh_token(refresh_token: str):
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, summary="Get Current User", description="Get the currently authenticated user's profile.")
 async def get_me(current_user: dict = Depends(get_current_user)):
     user_id = current_user["sub"]
     for u in MOCK_USERS.values():
@@ -121,7 +123,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     raise HTTPException(status_code=404, detail="User not found")
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=dict, summary="User Logout", description="Invalidate the current access token.")
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     invalidate_token(credentials.credentials)
     return {"message": "Logged out successfully"}

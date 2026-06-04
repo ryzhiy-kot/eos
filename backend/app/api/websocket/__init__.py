@@ -25,7 +25,7 @@ async def websocket_panel_stream(websocket: WebSocket, panel_id: str, token: str
         return
     
     try:
-        current_user = decode_token(token)
+        current_user = await decode_token(token)
     except Exception:
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
