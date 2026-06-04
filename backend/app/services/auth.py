@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -14,23 +15,23 @@ security = HTTPBearer()
 token_blacklist: set[str] = set()
 
 
-def create_access_token(user_id: str, role: str) -> str:
+async def create_access_token(user_id: str, role: str) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": user_id, "role": role, "exp": expire, "type": "access"}
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return await asyncio.to_thread(jwt.encode, payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: str) -> str:
+async def create_refresh_token(user_id: str) -> str:
     expire = datetime.now(UTC) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {"sub": user_id, "exp": expire, "type": "refresh"}
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return await asyncio.to_thread(jwt.encode, payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def decode_token(token: str) -> dict:
+async def decode_token(token: str) -> dict:
     if token in token_blacklist:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked")
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = await asyncio.to_thread(jwt.decode, token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
@@ -45,18 +46,25 @@ def invalidate_token(token: str) -> None:
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    payload = decode_token(credentials.credentials)
+    payload = await decode_token(credentials.credentials)
     if payload.get("type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
     return payload
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+async def hash_password(password: str) -> str:
+    def _hash() -> bytes:
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+    hashed = await asyncio.to_thread(_hash)
+    return hashed.decode("utf-8")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    def _verify() -> bool:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+    return await asyncio.to_thread(_verify)
 
 
 async def ldap_authenticate(username: str, password: str) -> dict | None:
@@ -67,26 +75,32 @@ async def ldap_authenticate(username: str, password: str) -> dict | None:
         server = Server(settings.LDAP_SERVER, get_info=ALL)
         user_dn = settings.LDAP_USER_SEARCH_FILTER.format(username=username)
 
-        # Try to bind with user credentials
-        conn = Connection(
-            server,
-            user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
-            password=password,
-            auto_bind=True,
-        )
+        def _ldap_operations():
+            # Try to bind with user credentials
+            conn = Connection(
+                server,
+                user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
+                password=password,
+                auto_bind=True,
+            )
 
-        conn.search(
-            settings.LDAP_USER_SEARCH_BASE,
-            f"(uid={username})",
-            attributes=["mail", "cn", "uid"],
-        )
+            conn.search(
+                settings.LDAP_USER_SEARCH_BASE,
+                f"(uid={username})",
+                attributes=["mail", "cn", "uid"],
+            )
 
-        if not conn.entries:
+            if not conn.entries:
+                conn.unbind()
+                return None
+
+            entry = conn.entries[0]
             conn.unbind()
-            return None
+            return entry
 
-        entry = conn.entries[0]
-        conn.unbind()
+        entry = await asyncio.to_thread(_ldap_operations)
+        if not entry:
+            return None
 
         return {
             "username": str(entry.uid) if hasattr(entry, "uid") else username,
