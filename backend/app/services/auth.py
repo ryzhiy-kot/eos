@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -51,47 +52,55 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return payload
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+async def hash_password(password: str) -> str:
+    return await asyncio.to_thread(
+        lambda: bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    )
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return await asyncio.to_thread(
+        lambda: bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    )
+
+
+def _ldap_sync(username: str, password: str) -> dict | None:
+    from ldap3 import ALL, Connection, Server
+
+    server = Server(settings.LDAP_SERVER, get_info=ALL)
+    user_dn = settings.LDAP_USER_SEARCH_FILTER.format(username=username)
+
+    # Try to bind with user credentials
+    conn = Connection(
+        server,
+        user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
+        password=password,
+        auto_bind=True,
+    )
+
+    conn.search(
+        settings.LDAP_USER_SEARCH_BASE,
+        f"(uid={username})",
+        attributes=["mail", "cn", "uid"],
+    )
+
+    if not conn.entries:
+        conn.unbind()
+        return None
+
+    entry = conn.entries[0]
+    conn.unbind()
+
+    return {
+        "username": str(entry.uid) if hasattr(entry, "uid") else username,
+        "email": str(entry.mail) if hasattr(entry, "mail") else f"{username}@company.com",
+        "display_name": str(entry.cn) if hasattr(entry, "cn") else username,
+    }
 
 
 async def ldap_authenticate(username: str, password: str) -> dict | None:
     """Authenticate against LDAP server. Returns user info dict or None."""
     try:
-        from ldap3 import ALL, Connection, Server
-
-        server = Server(settings.LDAP_SERVER, get_info=ALL)
-        user_dn = settings.LDAP_USER_SEARCH_FILTER.format(username=username)
-
-        # Try to bind with user credentials
-        conn = Connection(
-            server,
-            user=f"{user_dn},{settings.LDAP_USER_SEARCH_BASE}",
-            password=password,
-            auto_bind=True,
-        )
-
-        conn.search(
-            settings.LDAP_USER_SEARCH_BASE,
-            f"(uid={username})",
-            attributes=["mail", "cn", "uid"],
-        )
-
-        if not conn.entries:
-            conn.unbind()
-            return None
-
-        entry = conn.entries[0]
-        conn.unbind()
-
-        return {
-            "username": str(entry.uid) if hasattr(entry, "uid") else username,
-            "email": str(entry.mail) if hasattr(entry, "mail") else f"{username}@company.com",
-            "display_name": str(entry.cn) if hasattr(entry, "cn") else username,
-        }
+        return await asyncio.to_thread(_ldap_sync, username, password)
     except Exception:
         return None
