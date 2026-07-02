@@ -32,7 +32,7 @@ MOCK_USERS = {
         "email": "admin@company.com",
         "display_name": "Admin User",
         "role": "admin",
-        "password_hash": hash_password("admin123"),
+        "password_hash": "$2b$12$2KVBI18BfpV9LVaT.htmoOSTLHyzOo1/tBS68M6sZxIwiw0qWnuxa",
         "is_active": True,
     },
     "trader": {
@@ -40,13 +40,18 @@ MOCK_USERS = {
         "email": "trader@company.com",
         "display_name": "Jane Trader",
         "role": "trader",
-        "password_hash": hash_password("trader123"),
+        "password_hash": "$2b$12$aE.IAKGQJTYVXMXJpIFlLO4zjXTSg.7YyE7RgLtek7Vk/tR77j1aK",
         "is_active": True,
     },
 }
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="User Login",
+    description="Authenticates a user via LDAP or mock credentials and returns JWT access and refresh tokens."
+)
 async def login(request: LoginRequest):
     # Try LDAP first, fallback to mock users
     ldap_user = await ldap_authenticate(request.username, request.password)
@@ -60,7 +65,7 @@ async def login(request: LoginRequest):
         }
     elif request.username in MOCK_USERS:
         user_data = MOCK_USERS[request.username]
-        if not verify_password(request.password, user_data["password_hash"]):
+        if not await verify_password(request.password, user_data["password_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
             )
@@ -79,7 +84,12 @@ async def login(request: LoginRequest):
     )
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Refresh Token",
+    description="Refreshes an expired access token using a valid refresh token."
+)
 async def refresh_token(refresh_token: str):
     payload = decode_token(refresh_token)
     if payload.get("type") != "refresh":
@@ -105,7 +115,12 @@ async def refresh_token(refresh_token: str):
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get Current User",
+    description="Returns the profile information of the currently authenticated user."
+)
 async def get_me(current_user: dict = Depends(get_current_user)):
     user_id = current_user["sub"]
     for u in MOCK_USERS.values():
@@ -121,7 +136,11 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     raise HTTPException(status_code=404, detail="User not found")
 
 
-@router.post("/logout")
+@router.post(
+    "/logout",
+    summary="User Logout",
+    description="Invalidates the current user's token."
+)
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     invalidate_token(credentials.credentials)
     return {"message": "Logged out successfully"}

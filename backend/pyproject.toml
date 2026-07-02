@@ -25,6 +25,7 @@ dependencies = [
     "pandas>=2.0.0",
     "fpdf>=1.7.2",
     "aiosqlite>=0.20.0",
+    "asgi-lifespan>=2.1.0",
 ]
 
 [project.optional-dependencies]
